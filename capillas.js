@@ -631,6 +631,8 @@ async function rsSubmitToSharePoint(){
   try{
     const body=new FormData();
     body.append("payload",JSON.stringify(rsPayload()));
+    const draftId=document.getElementById("draftId")?.value||"";
+    if(draftId) body.append("draftId",draftId);
 
     const cropped=await rsCroppedFile();
     if(cropped) body.append("esquelaProcesadaFile",cropped,cropped.name);
@@ -669,3 +671,133 @@ form.addEventListener("submit",async e=>{
   if(!validateCurrentVisualStep()) return;
   await rsSubmitToSharePoint();
 });
+
+
+/* Borradores de Registro de Servicios */
+function rsDraftFormData(){
+  const body=new FormData();
+  body.append("payload",JSON.stringify(rsPayload()));
+  const current=document.getElementById("draftId")?.value||"";
+  if(current) body.append("draftId",current);
+  return body;
+}
+
+async function rsAddDraftFiles(body){
+  const cropped=await rsCroppedFile();
+  if(cropped) body.append("esquelaProcesadaFile",cropped,cropped.name);
+  const cert=document.getElementById("certificadoDefuncion")?.files?.[0];
+  if(cert) body.append("certificadoDefuncion",cert,cert.name);
+  const orden=document.getElementById("ordenInhumacionCremacion")?.files?.[0];
+  if(orden) body.append("ordenInhumacionCremacion",orden,orden.name);
+}
+
+async function rsSaveDraft(){
+  const button=document.getElementById("saveDraftBtn");
+  const status=document.getElementById("status");
+  if(!button)return;
+  const original=button.textContent;
+  button.disabled=true;
+  button.textContent="Guardando...";
+  try{
+    const body=rsDraftFormData();
+    await rsAddDraftFiles(body);
+    const response=await fetch("guardar-borrador.php",{method:"POST",body,credentials:"same-origin",headers:{"Accept":"application/json"}});
+    const result=await response.json().catch(()=>null);
+    if(!response.ok||!result?.ok) throw new Error(result?.message||("HTTP "+response.status));
+    document.getElementById("draftId").value=result.draftId||"";
+    const url=new URL(location.href);
+    url.searchParams.set("draft",result.draftId);
+    url.searchParams.delete("nuevo");
+    history.replaceState(null,"",url);
+    if(status) status.textContent="Borrador guardado. Puedes continuar después desde Mis servicios.";
+    button.textContent="Borrador guardado";
+    setTimeout(()=>{button.textContent=original;button.disabled=false;},1500);
+  }catch(error){
+    console.error("Guardar borrador:",error);
+    if(status) status.textContent="No fue posible guardar el borrador: "+(error?.message||error);
+    button.textContent=original;
+    button.disabled=false;
+  }
+}
+document.getElementById("saveDraftBtn")?.addEventListener("click",rsSaveDraft);
+
+function rsSetNamed(name,value){
+  const el=form.elements.namedItem(name);
+  if(!el)return;
+  if(el instanceof RadioNodeList){
+    el.value=value??"";
+    return;
+  }
+  if(el.type==="checkbox"){
+    el.checked=!!value;
+  }else{
+    el.value=value??"";
+    el.dispatchEvent(new Event("change",{bubbles:true}));
+  }
+}
+
+function rsSetDateTime(id,value){
+  const original=document.getElementById(id);
+  if(!original)return;
+  original.value=value||"";
+  if(original.dataset.jdjpSplit==="1"){
+    const parts=jdjpIsoToParts(value||"");
+    const d=document.getElementById(original.dataset.dateInputId);
+    const t=document.getElementById(original.dataset.timeInputId);
+    if(d)d.value=parts.date;
+    if(t)t.value=parts.time;
+  }
+}
+
+function rsApplyDraftPayload(p){
+  if(!p||typeof p!=="object")return;
+  const simple=["numeroReferencia","servicio","ubicacion","sala","tiempoCapillas","prevision","tipoAtaud","numeroServicio","titular","fallecido","sexo","destinoFinal","embalsamador","rescate1","rescate2","ubicacionRescate","motivo","referenciaCrematorio","personalCrematorio","personalVenta","precioVenta"];
+  simple.forEach(k=>rsSetNamed(k,p[k]??""));
+  document.getElementById("llevaExequia").checked=!!p.llevaExequia;
+  document.getElementById("requierePlaca").checked=!!p.requierePlaca;
+
+  ["inicio","termino","horaExequia","fechaDefuncion","inicioCrematorio","fechaHoraInhumacion"].forEach(k=>rsSetDateTime(k,p[k]||""));
+  const nacimiento=document.getElementById("fechaNacimiento");
+  if(nacimiento)nacimiento.value=p.fechaNacimiento||"";
+  const compra=document.getElementById("fechaCompra");
+  if(compra)compra.value=p.fechaCompra||"";
+
+  const selected=Array.isArray(p.serviciosExtra)?p.serviciosExtra:[];
+  extrasMenu.querySelectorAll('input[type="checkbox"]').forEach(ch=>ch.checked=selected.includes(ch.value));
+  Array.from(extrasSelect.options).forEach(o=>o.selected=selected.includes(o.value));
+  updateExtras();
+  const amounts=p.extraAmounts&&typeof p.extraAmounts==="object"?p.extraAmounts:{};
+  document.querySelectorAll("[data-extra-input]").forEach(i=>{const v=amounts[i.dataset.extraInput];i.value=(v===null||v===undefined)?"":String(v);});
+  updateRules();updateExtras();updateTotal();calcAge();syncOperationEmpty();
+}
+
+async function rsLoadDraftFromUrl(){
+  const params=new URLSearchParams(location.search);
+  const id=params.get("draft");
+  if(!id)return;
+  const status=document.getElementById("status");
+  try{
+    if(status)status.textContent="Cargando borrador...";
+    const response=await fetch("guardar-borrador.php?id="+encodeURIComponent(id),{cache:"no-store",credentials:"same-origin"});
+    const result=await response.json().catch(()=>null);
+    if(!response.ok||!result?.ok)throw new Error(result?.message||("HTTP "+response.status));
+    document.getElementById("draftId").value=id;
+    rsApplyDraftPayload(result.draft?.payload||{});
+    const files=result.draft?.files||{};
+    if(files.certificado?.name)document.getElementById("certificadoDefuncionName").textContent=files.certificado.name+" · guardado";
+    if(files.orden?.name)document.getElementById("ordenInhumacionCremacionName").textContent=files.orden.name+" · guardado";
+    if(files.esquela?.name){
+      const resultBox=document.getElementById("imageResult");
+      if(resultBox){
+        resultBox.classList.remove("hidden");
+        const copy=resultBox.querySelector("span");
+        if(copy)copy.textContent="La imagen ajustada ya está guardada en este borrador.";
+      }
+    }
+    if(status)status.textContent="Borrador cargado. Continúa la captura o publícalo cuando esté completo.";
+  }catch(error){
+    console.error("Cargar borrador:",error);
+    if(status)status.textContent="No fue posible cargar el borrador: "+(error?.message||error);
+  }
+}
+rsLoadDraftFromUrl();
