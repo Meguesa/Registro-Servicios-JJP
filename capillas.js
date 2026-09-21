@@ -418,3 +418,45 @@ function initJdjpDatePickers(){
   });
 }
 initJdjpDatePickers();
+
+
+/* Máscara de captura: el usuario escribe solo números; separadores automáticos */
+function formatJdjpDateDigits(raw,withTime){
+  const max=withTime?12:8;
+  const digits=String(raw||"").replace(/\D/g,"").slice(0,max);
+  let out="";
+  if(digits.length<=2) return digits;
+  out=digits.slice(0,2)+"/";
+  if(digits.length<=4) return out+digits.slice(2);
+  out+=digits.slice(2,4)+"/";
+  if(digits.length<=8) return out+digits.slice(4);
+  out+=digits.slice(4,8);
+  if(!withTime) return out;
+  out+=" ";
+  if(digits.length<=10) return out+digits.slice(8);
+  return out+digits.slice(8,10)+":"+digits.slice(10,12);
+}
+
+function applyJdjpDateMask(el,withTime){
+  if(!el || el.dataset.jdjpMask==="1") return;
+  el.dataset.jdjpMask="1";
+
+  el.addEventListener("input",()=>{
+    const formatted=formatJdjpDateDigits(el.value,withTime);
+    if(el.value!==formatted) el.value=formatted;
+  });
+
+  el.addEventListener("blur",()=>{
+    const needed=withTime?16:10;
+    if(el.value && el.value.length!==needed){
+      // No inventar una fecha incompleta: se conserva para que validación la detecte.
+      return;
+    }
+    if(el._flatpickr && el.value){
+      el._flatpickr.setDate(el.value,false,withTime?"d/m/Y H:i":"d/m/Y");
+    }
+  });
+}
+
+document.querySelectorAll(".datetime-picker").forEach(el=>applyJdjpDateMask(el,true));
+document.querySelectorAll(".date-only-picker").forEach(el=>applyJdjpDateMask(el,false));
