@@ -55,22 +55,22 @@ declare(strict_types=1);
         <div><h2>Información del servicio</h2><p>Define el tipo de servicio, ubicación, tiempos y referencia operativa.</p></div>
       </div>
       <div class="form-grid grid-2">
-        <label>Número de Referencia<input name="numeroReferencia" required></label>
+        <label>Número de Referencia<input name="numeroReferencia" placeholder="Ej. 1957, AF2054" required></label>
         <label>Tipo de Servicio<select name="servicio" id="servicio" required></select></label>
         <label>Ubicación Servicio Capillas<select name="ubicacion" id="ubicacion" required></select></label>
         <label id="wrapSala">Sala<select name="sala" id="sala"></select></label>
-        <label id="wrapInicio">Fecha y Hora Inicio<input type="text" name="inicio" id="inicio" class="date-picker datetime-picker" placeholder="dd/mm/yyyy HH:mm" autocomplete="off"></label>
-        <label id="wrapTermino">Fecha y Hora Término<input type="text" name="termino" id="termino" class="date-picker datetime-picker" placeholder="dd/mm/yyyy HH:mm" autocomplete="off"></label>
+        <label id="wrapInicio">Fecha y Hora Inicio<input type="text" name="inicio" id="inicio" class="date-picker datetime-picker" placeholder="Ej. 21/09/2026 12:00" autocomplete="off"></label>
+        <label id="wrapTermino">Fecha y Hora Término<input type="text" name="termino" id="termino" class="date-picker datetime-picker" placeholder="Ej. 21/09/2026 12:00" autocomplete="off"></label>
         <label id="wrapTiempo">Tiempo de Capillas<select name="tiempoCapillas" id="tiempoCapillas"></select></label>
         <label>Previsión/Uso Inmediato<select name="prevision" id="prevision" required></select></label>
         <label id="wrapTipoAtaud">Tipo de Ataúd/Urna<select name="tipoAtaud" id="tipoAtaud"></select></label>
-        <label>Número de Servicio<input name="numeroServicio" id="numeroServicio" required></label>
+        <label>Número de Servicio<input name="numeroServicio" id="numeroServicio" placeholder="Ej. 4225, 15783AF" required></label>
       </div>
       <div class="option-row">
         <label id="wrapExequiaToggle" class="switch-card"><div><strong>Lleva exequia?</strong><small>Actívalo para capturar fecha y hora.</small></div><input type="checkbox" name="llevaExequia" id="llevaExequia"></label>
         <label class="switch-card"><div><strong>Requiere Placa de Urna?</strong><small>Conserva el comportamiento actual del registro.</small></div><input type="checkbox" name="requierePlaca" id="requierePlaca"></label>
       </div>
-      <div id="wrapExequia" class="conditional-box"><label>Fecha y Hora Exequia<input type="text" name="horaExequia" id="horaExequia" class="date-picker datetime-picker" placeholder="dd/mm/yyyy HH:mm" autocomplete="off"></label></div>
+      <div id="wrapExequia" class="conditional-box"><label>Fecha y Hora Exequia<input type="text" name="horaExequia" id="horaExequia" class="date-picker datetime-picker" placeholder="Ej. 21/09/2026 12:00" autocomplete="off"></label></div>
       <div class="reference-summary">
         <div><span>Código de Servicio</span><strong id="codigoServicio">—</strong></div>
         <div><span>Ataúd/Urna</span><strong id="codigoAtaud">—</strong></div>
@@ -81,22 +81,22 @@ declare(strict_types=1);
     <section class="form-section wizard-panel" data-step="1">
       <div class="section-title"><span>2</span><div><h2>Fallecido y responsable</h2><p>Datos personales, destino final y personal que participa en el servicio.</p></div></div>
       <div class="form-grid grid-2">
-        <label>Titular Responsable<input name="titular" required></label>
-        <label>Nombre de Fallecido(a)<input name="fallecido" required></label>
+        <label>Titular Responsable<input name="titular" placeholder="Ej. Juan Pérez González" required></label>
+        <label>Nombre de Fallecido(a)<input name="fallecido" placeholder="Ej. María López García" required></label>
       </div>
       <div class="form-grid grid-3">
-        <label>Fecha Nacimiento<input type="text" name="fechaNacimiento" id="fechaNacimiento" class="date-picker date-only-picker" placeholder="dd/mm/yyyy" autocomplete="off" required></label>
-        <label>Fecha y Hora Defunción<input type="text" name="fechaDefuncion" id="fechaDefuncion" class="date-picker datetime-picker" placeholder="dd/mm/yyyy HH:mm" autocomplete="off" required></label>
-        <label>Edad<input name="edad" id="edad" readonly></label>
+        <label>Fecha Nacimiento<input type="text" name="fechaNacimiento" id="fechaNacimiento" class="date-picker date-only-picker" placeholder="Ej. 01/01/1950" autocomplete="off" required></label>
+        <label>Fecha y Hora Defunción<input type="text" name="fechaDefuncion" id="fechaDefuncion" class="date-picker datetime-picker" placeholder="Ej. 21/09/2026 12:00" autocomplete="off" required></label>
+        <label>Edad<input name="edad" id="edad" placeholder="Se calcula automáticamente" readonly></label>
       </div>
       <div class="form-grid grid-2">
-        <label>Ubicación Destino Final<input name="destinoFinal" required></label>
+        <label>Ubicación Destino Final<input name="destinoFinal" placeholder="Ej. Parque JdJP, Crematorio" required></label>
         <label>Embalsamador<select name="embalsamador" id="embalsamador" required></select></label>
-        <label>Personal Rescate 1<input name="rescate1" required></label>
-        <label>Personal Rescate 2<input name="rescate2"></label>
+        <label>Personal Rescate 1<input name="rescate1" placeholder="Ej. José Martínez" required></label>
+        <label>Personal Rescate 2<input name="rescate2" placeholder="Ej. Pedro Ramírez"></label>
         <label>Sexo<select name="sexo" id="sexo"><option value="">Seleccionar</option><option>Masculino</option><option>Femenino</option></select></label>
-        <label>Ubicación de Rescate<input name="ubicacionRescate" required></label>
-        <label class="span-2">Motivo de Fallecimiento<input name="motivo" required></label>
+        <label>Ubicación de Rescate<input name="ubicacionRescate" placeholder="Ej. Domicilio, C33, C67" required></label>
+        <label class="span-2">Motivo de Fallecimiento<input name="motivo" placeholder="Ej. Infarto, cáncer" required></label>
       </div>
     </section>
 
@@ -105,14 +105,14 @@ declare(strict_types=1);
       <div id="crematorioSection" class="conditional-card">
         <div class="subsection-title"><strong>Crematorio</strong><span>Visible únicamente para servicios de cremación.</span></div>
         <div class="form-grid grid-2">
-          <label>Referencia Crematorio<input name="referenciaCrematorio" id="referenciaCrematorio"></label>
-          <label>Fecha y Hora Inicio Crematorio<input type="text" name="inicioCrematorio" id="inicioCrematorio" class="date-picker datetime-picker" placeholder="dd/mm/yyyy HH:mm" autocomplete="off"></label>
-          <label class="span-2">Personal de Crematorio<input name="personalCrematorio" id="personalCrematorio"></label>
+          <label>Referencia Crematorio<input name="referenciaCrematorio" id="referenciaCrematorio" placeholder="Ej. C-123, C587"></label>
+          <label>Fecha y Hora Inicio Crematorio<input type="text" name="inicioCrematorio" id="inicioCrematorio" class="date-picker datetime-picker" placeholder="Ej. 21/09/2026 12:00" autocomplete="off"></label>
+          <label class="span-2">Personal de Crematorio<input name="personalCrematorio" id="personalCrematorio" placeholder="Ej. Nombre del responsable"></label>
         </div>
       </div>
       <div id="inhumacionSection" class="conditional-card">
         <div class="subsection-title"><strong>Inhumación</strong><span>Visible únicamente cuando el servicio es Inhumación.</span></div>
-        <label>Fecha y Hora Inhumación<input type="text" name="fechaHoraInhumacion" id="fechaHoraInhumacion" class="date-picker datetime-picker" placeholder="dd/mm/yyyy HH:mm" autocomplete="off"></label>
+        <label>Fecha y Hora Inhumación<input type="text" name="fechaHoraInhumacion" id="fechaHoraInhumacion" class="date-picker datetime-picker" placeholder="Ej. 21/09/2026 12:00" autocomplete="off"></label>
       </div>
       <div id="operationEmpty" class="empty-state"><strong>Sin datos adicionales para este servicio</strong><span>Continúa al siguiente paso.</span></div>
     </section>
@@ -120,9 +120,9 @@ declare(strict_types=1);
     <section class="form-section wizard-panel" data-step="3">
       <div class="section-title"><span>4</span><div><h2>Venta y servicios adicionales</h2><p>Captura el precio base y agrega únicamente los conceptos que correspondan.</p></div></div>
       <div class="form-grid grid-2">
-        <label>Fecha Compra<input type="text" name="fechaCompra" id="fechaCompra" class="date-picker date-only-picker" placeholder="dd/mm/yyyy" autocomplete="off"></label>
-        <label>Personal Venta<input name="personalVenta"></label>
-        <label>Precio de Venta<input type="number" min="0" step="0.01" name="precioVenta" id="precioVenta" required></label>
+        <label>Fecha Compra<input type="text" name="fechaCompra" id="fechaCompra" class="date-picker date-only-picker" placeholder="Ej. 20/09/2026" autocomplete="off"></label>
+        <label>Personal Venta<input name="personalVenta" placeholder="Ej. Nombre del asesor"></label>
+        <label>Precio de Venta<input type="number" min="0" step="0.01" name="precioVenta" id="precioVenta" placeholder="Ej. 30000.00" required></label>
         <label>Servicios Adicionales
           <div class="services-list" id="extrasMenu" aria-label="Servicios adicionales"></div>
           <select name="serviciosExtra[]" id="serviciosExtra" multiple class="native-multi-hidden" aria-hidden="true" tabindex="-1"></select>
