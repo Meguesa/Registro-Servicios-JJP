@@ -20,13 +20,13 @@ function fill(id,items,placeholder="Seleccionar"){
     el.appendChild(o);
   });
 }
-fill("servicio",SERVICIOS);
-fill("ubicacion",UBICACIONES);
-fill("sala",SALAS);
-fill("tiempoCapillas",TIEMPOS);
-fill("prevision",PREVISION);
-fill("tipoAtaud",ATAUDES);
-fill("embalsamador",EMBALSAMADORES);
+fill("servicio",SERVICIOS,"Ej. Inhumación, Cremación");
+fill("ubicacion",UBICACIONES,"Ej. Churubusco, Apodaca");
+fill("sala",SALAS,"Ej. Sala 1");
+fill("tiempoCapillas",TIEMPOS,"Ej. 12H");
+fill("prevision",PREVISION,"Ej. Uso Inmediato");
+fill("tipoAtaud",ATAUDES,"Ej. Ataud Madera Basico");
+fill("embalsamador",EMBALSAMADORES,"Ej. Bibi");
 fill("serviciosExtra",EXTRAS,"");
 
 const form=document.getElementById("capillasForm");
@@ -47,7 +47,7 @@ EXTRAS.filter(x=>x!=="No Aplica").forEach(x=>{
   input.type="number";
   input.min="0";
   input.step="0.01";
-  input.value="0";
+  input.placeholder="Ej. 1500.00";
   input.dataset.extraInput=x;
   wrap.appendChild(input);
   extrasMontos.appendChild(wrap);
@@ -156,7 +156,7 @@ precioVenta.addEventListener("input",updateTotal);
 extrasMontos.addEventListener("input",updateTotal);
 document.getElementById("resetBtn").addEventListener("click",()=>{
   form.reset();
-  document.querySelectorAll(".extra-item input").forEach(i=>i.value="0");
+  document.querySelectorAll(".extra-item input").forEach(i=>i.value="");
   calcAge();
   updateRules();
   updateExtras();
