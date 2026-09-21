@@ -22,6 +22,7 @@ declare(strict_types=1);
     </div>
     <div class="solicitud-topbar-context">Captura y seguimiento de servicios operativos</div>
     <div class="solicitud-topbar-actions">
+      <a class="solicitud-topbar-back" href="mis-servicios.php">Mis servicios</a>
       <a class="solicitud-topbar-back" href="/">Regresar al portal</a>
       <button class="account-trigger-static" type="button" aria-label="Usuario" title="Usuario">
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -192,13 +193,17 @@ declare(strict_types=1);
     </section>
 
     <div class="wizard-actions">
-      <div><button type="button" class="secondary-button" id="resetBtn">Limpiar</button></div>
+      <div>
+        <button type="button" class="secondary-button" id="resetBtn">Limpiar</button>
+        <button type="button" class="secondary-button draft-button" id="saveDraftBtn">Guardar borrador</button>
+      </div>
       <div>
         <button type="button" class="secondary-button" id="prevStep">Anterior</button>
         <button type="button" class="primary-button" id="nextStep">Siguiente</button>
         <button type="submit" class="primary-button" id="submitBtn">Registrar servicio</button>
       </div>
     </div>
+    <input type="hidden" id="draftId" name="draftId" value="">
     <p id="status" class="status">Listo para registrar en SharePoint.</p>
   </form>
 </main>
