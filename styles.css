@@ -529,3 +529,154 @@ select:invalid{
     gap:8px;
   }
 }
+
+
+/* Shell visual unificado con las demás herramientas del Portal Interno */
+.solicitud-topbar{
+  position:sticky;
+  top:0;
+  z-index:30;
+  background:#fff;
+  border-bottom:2px solid var(--jp-gold);
+  box-shadow:none;
+}
+.solicitud-topbar-inner{
+  width:min(1056px,calc(100% - 36px));
+  min-height:88px;
+  margin:0 auto;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center;
+  gap:28px;
+}
+.solicitud-topbar-left{
+  display:flex;
+  align-items:center;
+  gap:16px;
+  min-width:0;
+}
+.solicitud-topbar-logo{
+  width:54px;
+  height:54px;
+  flex:0 0 54px;
+  border-radius:50%;
+  object-fit:cover;
+}
+.solicitud-topbar-title{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  min-width:0;
+}
+.solicitud-topbar-title strong{
+  color:var(--jp-brown);
+  font-size:24px;
+  line-height:1.1;
+  font-weight:800;
+}
+.solicitud-topbar-title span{
+  color:#0b4e7d;
+  font-size:12px;
+  font-weight:700;
+  white-space:nowrap;
+}
+.solicitud-topbar-context{
+  justify-self:center;
+  color:#5f554f;
+  font-size:12px;
+  font-weight:700;
+  text-align:center;
+  white-space:nowrap;
+}
+.solicitud-topbar-actions{
+  justify-self:end;
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.solicitud-topbar-back{
+  min-height:42px;
+  padding:0 16px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--jp-brown);
+  background:#fff;
+  border:1px solid #d9ccc5;
+  border-radius:8px;
+  font-size:12px;
+  font-weight:800;
+  text-decoration:none;
+  white-space:nowrap;
+}
+.solicitud-topbar-back:hover{
+  background:#faf8f4;
+}
+.account-trigger-static{
+  width:46px;
+  height:46px;
+  min-width:46px;
+  padding:0;
+  display:grid;
+  place-items:center;
+  color:#fff;
+  background:#4c1608;
+  border:3px solid var(--jp-gold);
+  border-radius:50%;
+  box-shadow:0 4px 10px rgba(58,17,9,.15);
+}
+.account-trigger-static svg{
+  width:22px;
+  height:22px;
+}
+.form-banner-meta{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.form-banner-meta .preview-pill{
+  white-space:nowrap;
+}
+
+/* Mantener el cuerpo alineado con el ancho visual de Solicitud de Venta */
+.page-shell{
+  width:min(1056px,calc(100% - 28px));
+}
+
+@media(max-width:1000px){
+  .solicitud-topbar-inner{
+    width:calc(100% - 24px);
+    grid-template-columns:minmax(0,1fr) auto;
+  }
+  .solicitud-topbar-context{display:none}
+  .form-banner-meta{align-items:flex-end;flex-direction:column}
+}
+@media(max-width:760px){
+  .solicitud-topbar-inner{
+    min-height:76px;
+    gap:10px;
+  }
+  .solicitud-topbar-logo{
+    width:44px;
+    height:44px;
+    flex-basis:44px;
+  }
+  .solicitud-topbar-title strong{font-size:18px}
+  .solicitud-topbar-title span{display:none}
+  .solicitud-topbar-back{
+    padding:0 11px;
+    font-size:11px;
+  }
+  .account-trigger-static{
+    width:40px;
+    height:40px;
+    min-width:40px;
+  }
+  .form-banner-meta{
+    width:100%;
+    align-items:stretch;
+  }
+  .form-banner-meta .preview-pill{
+    align-self:flex-start;
+  }
+}
