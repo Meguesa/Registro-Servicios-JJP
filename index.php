@@ -14,15 +14,21 @@ declare(strict_types=1);
 <header class="solicitud-topbar">
   <div class="solicitud-topbar-inner">
     <div class="solicitud-topbar-left">
-      <div class="brand-mark">JdJP</div>
+      <img class="solicitud-topbar-logo" src="/mapa/assets/logo.jpg" alt="Jardines de Juan Pablo">
       <div class="solicitud-topbar-title">
         <strong>Registro de Servicios</strong>
         <span>Portal Interno JdJP · Jardines de Juan Pablo</span>
       </div>
     </div>
-    <div class="solicitud-topbar-context">Captura de servicios de Capillas</div>
+    <div class="solicitud-topbar-context">Captura y seguimiento de servicios operativos</div>
     <div class="solicitud-topbar-actions">
-      <span class="preview-pill">Piloto · sin envío a SharePoint</span>
+      <a class="solicitud-topbar-back" href="/">Regresar al portal</a>
+      <button class="account-trigger-static" type="button" aria-label="Usuario" title="Usuario">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="8" r="4" fill="currentColor"></circle>
+          <path d="M4 20c0-4.1 3.6-6 8-6s8 1.9 8 6v1H4z" fill="currentColor"></path>
+        </svg>
+      </button>
     </div>
   </div>
 </header>
@@ -34,9 +40,12 @@ declare(strict_types=1);
       <h1>Registro de servicio</h1>
       <p>Captura la información por etapas. Los cálculos y campos condicionales conservan la lógica actual.</p>
     </div>
-    <div class="step-counter">
-      <span>Paso</span>
-      <strong><span id="currentStepNumber">1</span> de 5</strong>
+    <div class="form-banner-meta">
+      <span class="preview-pill">Piloto · sin envío a SharePoint</span>
+      <div class="step-counter">
+        <span>Paso</span>
+        <strong><span id="currentStepNumber">1</span> de 5</strong>
+      </div>
     </div>
   </section>
 
