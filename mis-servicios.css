@@ -1,0 +1,14 @@
+.button-link{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.services-home{padding-top:26px}
+.service-menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}
+.service-menu-card{min-height:84px;padding:16px;display:flex;align-items:center;gap:14px;text-align:left;background:#fff;border:1px solid var(--jp-border);border-radius:12px;color:var(--jp-text)}
+.service-menu-card>span{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;background:#eef1f4;color:var(--jp-blue);font-weight:900}
+.service-menu-card div{display:flex;flex-direction:column;gap:3px}.service-menu-card strong{color:var(--jp-brown)}.service-menu-card small{color:var(--jp-muted)}
+.service-menu-card.active{border-color:#a8c1d5;box-shadow:0 0 0 3px rgba(34,91,138,.08)}.service-menu-card.active>span{background:var(--jp-blue);color:#fff}
+.services-panel{background:#fff;border:1px solid var(--jp-border);border-radius:14px;padding:20px;box-shadow:var(--jp-shadow)}
+.services-panel-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:14px}.services-panel-heading h2{margin:0;color:var(--jp-brown)}.services-panel-heading p{margin:4px 0 0;color:var(--jp-muted)}
+.services-list-cards{display:grid;gap:10px}.service-card{display:grid;grid-template-columns:1.1fr 1.4fr 1fr 1fr 1fr auto;gap:12px;align-items:center;padding:14px;background:#faf8f4;border:1px solid var(--jp-border);border-radius:10px}
+.service-field{min-width:0}.service-field span,.service-field strong{display:block}.service-field span{font-size:10px;color:var(--jp-muted);text-transform:uppercase}.service-field strong{margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--jp-brown)}
+.service-badge{display:inline-flex!important;width:max-content;padding:5px 8px;border-radius:999px;background:#fff1c9;color:#765700;font-size:10px}.service-badge.published{background:#e8f4ec;color:#23623b}
+.service-open{text-decoration:none}.service-message{min-height:22px;margin:8px 0;color:#a22}
+@media(max-width:850px){.service-card{grid-template-columns:repeat(2,minmax(0,1fr))}.service-card .service-open{grid-column:span 2}.service-menu-grid{grid-template-columns:1fr}}
