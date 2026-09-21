@@ -383,80 +383,172 @@ document.getElementById("resetBtn").addEventListener("click",()=>{
 });
 
 
-/* Selectores de fecha JdJP: formato fijo dd/mm/yyyy y calendario + hora */
-function initJdjpDatePickers(){
-  if(!window.flatpickr) return;
 
-  if(flatpickr.l10ns && flatpickr.l10ns.es){
-    flatpickr.localize(flatpickr.l10ns.es);
+
+/* Fecha + hora separadas visualmente, un solo valor combinado para SharePoint */
+function jdjpPad2(n){ return String(n).padStart(2,"0"); }
+
+function jdjpDateToIso(dateText,timeText){
+  if(!dateText || !timeText) return "";
+  const p=dateText.split("/");
+  if(p.length!==3) return "";
+  const [dd,mm,yyyy]=p;
+  if(!/^\d{2}$/.test(dd) || !/^\d{2}$/.test(mm) || !/^\d{4}$/.test(yyyy)) return "";
+  if(!/^\d{2}:\d{2}$/.test(timeText)) return "";
+  return yyyy+"-"+mm+"-"+dd+"T"+timeText+":00";
+}
+
+function jdjpIsoToParts(value){
+  if(!value) return {date:"",time:""};
+  // ISO/local SharePoint-style value
+  let m=value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if(m) return {date:m[3]+"/"+m[2]+"/"+m[1],time:m[4]+":"+m[5]};
+  // Legacy display value
+  m=value.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
+  if(m) return {date:m[1]+"/"+m[2]+"/"+m[3],time:m[4]+":"+m[5]};
+  return {date:"",time:""};
+}
+
+function formatJdjpDateOnly(raw){
+  const digits=String(raw||"").replace(/\D/g,"").slice(0,8);
+  if(digits.length<=2) return digits;
+  if(digits.length<=4) return digits.slice(0,2)+"/"+digits.slice(2);
+  return digits.slice(0,2)+"/"+digits.slice(2,4)+"/"+digits.slice(4);
+}
+
+function applyJdjpDateOnlyMask(el){
+  if(!el || el.dataset.jdjpMask==="1") return;
+  el.dataset.jdjpMask="1";
+  el.addEventListener("input",()=>{
+    const formatted=formatJdjpDateOnly(el.value);
+    if(el.value!==formatted) el.value=formatted;
+  });
+}
+
+function syncJdjpCombined(original,dateInput,timeInput){
+  original.value=jdjpDateToIso(dateInput.value,timeInput.value);
+  original.dispatchEvent(new Event("input",{bubbles:true}));
+  original.dispatchEvent(new Event("change",{bubbles:true}));
+}
+
+function createJdjpSplitDateTime(original){
+  if(!original || original.dataset.jdjpSplit==="1") return;
+  original.dataset.jdjpSplit="1";
+
+  const existing=jdjpIsoToParts(original.value);
+  const wasRequired=original.required;
+  original.required=false;
+  original.type="hidden";
+  original.classList.remove("datetime-picker");
+
+  const wrap=document.createElement("div");
+  wrap.className="split-datetime";
+
+  const dateWrap=document.createElement("div");
+  dateWrap.className="split-datetime-part split-date-part";
+  const dateLabel=document.createElement("span");
+  dateLabel.className="split-datetime-label";
+  dateLabel.textContent="Fecha";
+  const dateInput=document.createElement("input");
+  dateInput.type="text";
+  dateInput.className="split-date-input";
+  dateInput.placeholder="dd/mm/yyyy";
+  dateInput.autocomplete="off";
+  dateInput.value=existing.date;
+
+  const timeWrap=document.createElement("div");
+  timeWrap.className="split-datetime-part split-time-part";
+  const timeLabel=document.createElement("span");
+  timeLabel.className="split-datetime-label";
+  timeLabel.textContent="Hora";
+  const timeInput=document.createElement("input");
+  timeInput.type="time";
+  timeInput.className="split-time-input";
+  timeInput.step="300";
+  timeInput.value=existing.time;
+
+  dateWrap.append(dateLabel,dateInput);
+  timeWrap.append(timeLabel,timeInput);
+  wrap.append(dateWrap,timeWrap);
+  original.after(wrap);
+
+  original.dataset.dateInputId=original.id+"__date";
+  original.dataset.timeInputId=original.id+"__time";
+  dateInput.id=original.dataset.dateInputId;
+  timeInput.id=original.dataset.timeInputId;
+
+  if(wasRequired){
+    dateInput.required=true;
+    timeInput.required=true;
   }
 
-  document.querySelectorAll(".datetime-picker").forEach(el=>{
-    if(el._flatpickr) el._flatpickr.destroy();
-    flatpickr(el,{
-      enableTime:true,
-      time_24hr:true,
-      dateFormat:"d/m/Y H:i",
-      allowInput:true,
-      minuteIncrement:5,
-      disableMobile:true,
-      locale:"es",
-      onChange:()=>{ if(el.id==="fechaDefuncion") calcAge(); }
-    });
-  });
+  applyJdjpDateOnlyMask(dateInput);
 
-  document.querySelectorAll(".date-only-picker").forEach(el=>{
-    if(el._flatpickr) el._flatpickr.destroy();
-    flatpickr(el,{
+  if(window.flatpickr){
+    flatpickr(dateInput,{
       enableTime:false,
       dateFormat:"d/m/Y",
       allowInput:true,
       disableMobile:true,
       locale:"es",
-      onChange:()=>{ if(el.id==="fechaNacimiento") calcAge(); }
+      onChange:()=>{
+        syncJdjpCombined(original,dateInput,timeInput);
+        if(original.id==="fechaDefuncion") calcAge();
+      }
     });
+  }
+
+  const sync=()=>{
+    syncJdjpCombined(original,dateInput,timeInput);
+    if(original.id==="fechaDefuncion") calcAge();
+  };
+  dateInput.addEventListener("input",sync);
+  dateInput.addEventListener("change",sync);
+  timeInput.addEventListener("input",sync);
+  timeInput.addEventListener("change",sync);
+}
+
+function initJdjpDatePickers(){
+  if(window.flatpickr && flatpickr.l10ns && flatpickr.l10ns.es){
+    flatpickr.localize(flatpickr.l10ns.es);
+  }
+
+  document.querySelectorAll(".datetime-picker").forEach(createJdjpSplitDateTime);
+
+  document.querySelectorAll(".date-only-picker").forEach(el=>{
+    applyJdjpDateOnlyMask(el);
+    if(window.flatpickr){
+      if(el._flatpickr) el._flatpickr.destroy();
+      flatpickr(el,{
+        enableTime:false,
+        dateFormat:"d/m/Y",
+        allowInput:true,
+        disableMobile:true,
+        locale:"es",
+        onChange:()=>{ if(el.id==="fechaNacimiento") calcAge(); }
+      });
+    }
   });
 }
 initJdjpDatePickers();
 
+/* Hacer que Required se aplique a las dos partes visibles */
+const jdjpOriginalSetRequired=setRequired;
+setRequired=function(id,on){
+  const el=document.getElementById(id);
+  if(!el) return;
 
-/* Máscara de captura: el usuario escribe solo números; separadores automáticos */
-function formatJdjpDateDigits(raw,withTime){
-  const max=withTime?12:8;
-  const digits=String(raw||"").replace(/\D/g,"").slice(0,max);
-  let out="";
-  if(digits.length<=2) return digits;
-  out=digits.slice(0,2)+"/";
-  if(digits.length<=4) return out+digits.slice(2);
-  out+=digits.slice(2,4)+"/";
-  if(digits.length<=8) return out+digits.slice(4);
-  out+=digits.slice(4,8);
-  if(!withTime) return out;
-  out+=" ";
-  if(digits.length<=10) return out+digits.slice(8);
-  return out+digits.slice(8,10)+":"+digits.slice(10,12);
-}
+  if(el.dataset.jdjpSplit==="1"){
+    const d=document.getElementById(el.dataset.dateInputId);
+    const t=document.getElementById(el.dataset.timeInputId);
+    if(d) d.required=!!on;
+    if(t) t.required=!!on;
+    el.required=false;
+    return;
+  }
 
-function applyJdjpDateMask(el,withTime){
-  if(!el || el.dataset.jdjpMask==="1") return;
-  el.dataset.jdjpMask="1";
+  jdjpOriginalSetRequired(id,on);
+};
 
-  el.addEventListener("input",()=>{
-    const formatted=formatJdjpDateDigits(el.value,withTime);
-    if(el.value!==formatted) el.value=formatted;
-  });
-
-  el.addEventListener("blur",()=>{
-    const needed=withTime?16:10;
-    if(el.value && el.value.length!==needed){
-      // No inventar una fecha incompleta: se conserva para que validación la detecte.
-      return;
-    }
-    if(el._flatpickr && el.value){
-      el._flatpickr.setDate(el.value,false,withTime?"d/m/Y H:i":"d/m/Y");
-    }
-  });
-}
-
-document.querySelectorAll(".datetime-picker").forEach(el=>applyJdjpDateMask(el,true));
-document.querySelectorAll(".date-only-picker").forEach(el=>applyJdjpDateMask(el,false));
+/* Reaplicar reglas una vez creados los controles separados */
+updateRules();
