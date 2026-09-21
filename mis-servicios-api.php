@@ -42,5 +42,14 @@ try {
 } catch (Throwable $e) {
     error_log('Registro Servicios lista: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['ok'=>false,'message'=>'No fue posible cargar los servicios.'], JSON_UNESCAPED_UNICODE);
+    echo json_encode([
+        'ok'=>false,
+        'message'=>'No fue posible cargar los servicios.',
+        'debug'=>[
+            'type'=>get_class($e),
+            'message'=>$e->getMessage(),
+            'file'=>$e->getFile(),
+            'line'=>$e->getLine(),
+        ],
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }
