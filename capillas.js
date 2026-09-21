@@ -381,3 +381,40 @@ document.getElementById("resetBtn").addEventListener("click",()=>{
     });
   }
 });
+
+
+/* Selectores de fecha JdJP: formato fijo dd/mm/yyyy y calendario + hora */
+function initJdjpDatePickers(){
+  if(!window.flatpickr) return;
+
+  if(flatpickr.l10ns && flatpickr.l10ns.es){
+    flatpickr.localize(flatpickr.l10ns.es);
+  }
+
+  document.querySelectorAll(".datetime-picker").forEach(el=>{
+    if(el._flatpickr) el._flatpickr.destroy();
+    flatpickr(el,{
+      enableTime:true,
+      time_24hr:true,
+      dateFormat:"d/m/Y H:i",
+      allowInput:true,
+      minuteIncrement:5,
+      disableMobile:true,
+      locale:"es",
+      onChange:()=>{ if(el.id==="fechaDefuncion") calcAge(); }
+    });
+  });
+
+  document.querySelectorAll(".date-only-picker").forEach(el=>{
+    if(el._flatpickr) el._flatpickr.destroy();
+    flatpickr(el,{
+      enableTime:false,
+      dateFormat:"d/m/Y",
+      allowInput:true,
+      disableMobile:true,
+      locale:"es",
+      onChange:()=>{ if(el.id==="fechaNacimiento") calcAge(); }
+    });
+  });
+}
+initJdjpDatePickers();
