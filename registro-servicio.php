@@ -175,7 +175,7 @@ try {
     $fieldIndex = rs_fields_by_norm(is_array($fieldRows) ? $fieldRows : []);
 
     $sp = [];
-    rs_add_value($sp, $fieldIndex, ['ModoPrueba', 'Modo Prueba'], false, false);
+    rs_add_value($sp, $fieldIndex, ['ModoPrueba', 'Modo Prueba'], true, false);
     rs_add_value($sp, $fieldIndex, ['Numero de Referencia', 'Número de Referencia'], trim((string) ($payload['numeroReferencia'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['Servicio', 'Tipo de Servicio'], trim((string) ($payload['servicio'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['Ubicación Servicio Capillas', 'Ubicacion Servicio Capillas'], trim((string) ($payload['ubicacion'] ?? '')));
