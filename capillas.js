@@ -148,3 +148,49 @@ form.addEventListener("submit",e=>e.preventDefault());
 
 updateRules();
 updateExtras();
+
+
+/* Navegación visual tipo Solicitud de Venta. No modifica la lógica de negocio. */
+let currentWizardStep=0;
+function wizardPanels(){return Array.from(document.querySelectorAll(".wizard-panel"));}
+function showWizardStep(step){
+  const panels=wizardPanels();
+  const max=panels.length-1;
+  currentWizardStep=Math.max(0,Math.min(step,max));
+  panels.forEach((panel,index)=>panel.classList.toggle("active",index===currentWizardStep));
+  document.querySelectorAll(".wizard-step").forEach((button,index)=>{
+    button.classList.toggle("active",index===currentWizardStep);
+    button.classList.toggle("completed",index<currentWizardStep);
+  });
+  document.getElementById("currentStepNumber").textContent=String(currentWizardStep+1);
+  document.getElementById("prevStep").style.visibility=currentWizardStep===0?"hidden":"visible";
+  document.getElementById("nextStep").classList.toggle("hidden",currentWizardStep===max);
+  document.getElementById("submitBtn").classList.toggle("hidden",currentWizardStep!==max);
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function validateCurrentVisualStep(){
+  const panel=wizardPanels()[currentWizardStep];
+  if(!panel)return true;
+  const required=Array.from(panel.querySelectorAll("[required]")).filter(el=>!el.closest(".hidden"));
+  for(const el of required){
+    if(!el.checkValidity()){el.reportValidity();return false;}
+  }
+  return true;
+}
+document.getElementById("nextStep").addEventListener("click",()=>{if(validateCurrentVisualStep())showWizardStep(currentWizardStep+1);});
+document.getElementById("prevStep").addEventListener("click",()=>showWizardStep(currentWizardStep-1));
+document.querySelectorAll(".wizard-step").forEach(button=>{
+  button.addEventListener("click",()=>{
+    const target=Number(button.dataset.stepTarget||0);
+    if(target<=currentWizardStep||validateCurrentVisualStep())showWizardStep(target);
+  });
+});
+function syncOperationEmpty(){
+  const crem=!document.getElementById("crematorioSection").classList.contains("hidden");
+  const inh=!document.getElementById("inhumacionSection").classList.contains("hidden");
+  document.getElementById("operationEmpty").classList.toggle("hidden",crem||inh);
+}
+servicio.addEventListener("change",syncOperationEmpty);
+document.getElementById("resetBtn").addEventListener("click",()=>showWizardStep(0));
+showWizardStep(0);
+syncOperationEmpty();
