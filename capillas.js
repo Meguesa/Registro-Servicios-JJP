@@ -267,9 +267,7 @@ document.getElementById("fechaNacimiento").addEventListener("input",calcAge);
 document.getElementById("fechaDefuncion").addEventListener("input",calcAge);
 
 /* Dropdown multiselección */
-const extrasToggle=document.getElementById("extrasToggle");
 const extrasMenu=document.getElementById("extrasMenu");
-const extrasSummary=document.getElementById("extrasSummary");
 
 function syncExtrasNativeFromChecks(){
   const checked=Array.from(extrasMenu.querySelectorAll('input[type="checkbox"]:checked')).map(i=>i.value);
@@ -281,9 +279,6 @@ function syncExtrasNativeFromChecks(){
     Array.from(extrasSelect.options).forEach(o=>o.selected=o.value==="No Aplica");
   }
   const finalSelected=selectedExtras();
-  extrasSummary.textContent=finalSelected.length
-    ? (finalSelected.length===1?finalSelected[0]:finalSelected.length+" servicios seleccionados")
-    : "Seleccionar servicios adicionales";
   updateExtras();
 }
 
@@ -307,10 +302,7 @@ EXTRAS.forEach(name=>{
     syncExtrasNativeFromChecks();
   });
 });
-extrasToggle.addEventListener("click",()=>extrasMenu.classList.toggle("hidden"));
-document.addEventListener("click",e=>{
-  if(!document.getElementById("extrasMulti").contains(e.target))extrasMenu.classList.add("hidden");
-});
+
 
 /* Editor de esquela */
 let cropper=null;
@@ -370,10 +362,26 @@ document.getElementById("editCropBtn").addEventListener("click",()=>{
 
 document.getElementById("resetBtn").addEventListener("click",()=>{
   extrasMenu.querySelectorAll('input[type="checkbox"]').forEach(i=>i.checked=false);
-  extrasSummary.textContent="Seleccionar servicios adicionales";
+
   if(cropper){cropper.destroy();cropper=null;}
   imageEditor.classList.add("hidden");
   imageResult.classList.add("hidden");
   processedInput.value="";
   croppedPreview.removeAttribute("src");
+});
+
+
+/* Mostrar nombre de documentos seleccionados */
+[
+  ["certificadoDefuncion","certificadoDefuncionName"],
+  ["ordenInhumacionCremacion","ordenInhumacionCremacionName"]
+].forEach(([inputId,labelId])=>{
+  const input=document.getElementById(inputId);
+  const label=document.getElementById(labelId);
+  if(input&&label){
+    input.addEventListener("change",()=>{
+      const file=input.files&&input.files[0];
+      label.textContent=file?file.name:"PDF o imagen";
+    });
+  }
 });
