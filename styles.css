@@ -446,3 +446,39 @@ select:invalid{
   .flatpickr-calendar.hasTime .flatpickr-time .numInputWrapper{width:44%!important}
   .flatpickr-calendar.hasTime .flatpickr-time .flatpickr-time-separator{width:12%!important}
 }
+
+
+/* Cabecera del calendario: mes y año más legibles */
+.flatpickr-calendar .flatpickr-current-month{
+  height:38px!important;
+  padding-top:6px!important;
+  font-size:16px!important;
+  font-weight:700!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:5px!important;
+}
+.flatpickr-calendar .flatpickr-current-month .flatpickr-monthDropdown-months{
+  font-size:16px!important;
+  font-weight:700!important;
+  height:30px!important;
+  line-height:30px!important;
+  padding:0 24px 0 8px!important;
+}
+.flatpickr-calendar .flatpickr-current-month .numInputWrapper{
+  width:72px!important;
+  height:30px!important;
+}
+.flatpickr-calendar .flatpickr-current-month input.cur-year{
+  height:30px!important;
+  line-height:30px!important;
+  font-size:16px!important;
+  font-weight:700!important;
+  padding:0 6px!important;
+}
+.flatpickr-calendar .flatpickr-prev-month,
+.flatpickr-calendar .flatpickr-next-month{
+  height:38px!important;
+  padding:10px 12px!important;
+}
