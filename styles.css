@@ -299,3 +299,150 @@ input::placeholder{
 select:invalid{
   color:#9a918a;
 }
+
+
+/* Selector JdJP definitivo: calendario izquierda + hora derecha */
+.flatpickr-calendar{
+  font-family:"Segoe UI",Arial,sans-serif!important;
+  border:1px solid #d9d2ca!important;
+  border-radius:10px!important;
+  box-shadow:0 16px 40px rgba(31,42,55,.18)!important;
+}
+.flatpickr-calendar.hasTime{
+  width:390px!important;
+  min-width:390px!important;
+  display:grid!important;
+  grid-template-columns:280px 110px!important;
+  grid-template-areas:
+    "months months"
+    "calendar time"!important;
+  overflow:hidden!important;
+}
+.flatpickr-calendar.hasTime .flatpickr-months{
+  grid-area:months!important;
+  width:100%!important;
+}
+.flatpickr-calendar.hasTime .flatpickr-innerContainer{
+  grid-area:calendar!important;
+  width:280px!important;
+  min-width:280px!important;
+  display:block!important;
+}
+.flatpickr-calendar.hasTime .flatpickr-rContainer{
+  width:280px!important;
+  min-width:280px!important;
+}
+.flatpickr-calendar.hasTime .flatpickr-weekdays,
+.flatpickr-calendar.hasTime .flatpickr-days,
+.flatpickr-calendar.hasTime .dayContainer{
+  width:280px!important;
+  min-width:280px!important;
+  max-width:280px!important;
+}
+.flatpickr-calendar.hasTime .flatpickr-day{
+  width:36px!important;
+  max-width:36px!important;
+  height:34px!important;
+  line-height:34px!important;
+  flex-basis:36px!important;
+  font-size:12px!important;
+}
+.flatpickr-calendar.hasTime .flatpickr-time{
+  grid-area:time!important;
+  width:110px!important;
+  min-width:110px!important;
+  height:auto!important;
+  min-height:260px!important;
+  margin:0!important;
+  padding:52px 10px 16px!important;
+  border-top:0!important;
+  border-left:1px solid #e5ded6!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  justify-content:flex-start!important;
+  gap:8px!important;
+  position:relative!important;
+}
+.flatpickr-calendar.hasTime .flatpickr-time:before{
+  content:"Hora";
+  position:absolute;
+  top:18px;
+  left:0;
+  right:0;
+  text-align:center;
+  color:#6d655f;
+  font-size:10px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.flatpickr-calendar.hasTime .flatpickr-time .numInputWrapper{
+  width:100%!important;
+  height:42px!important;
+  flex:none!important;
+}
+.flatpickr-calendar.hasTime .flatpickr-time input{
+  width:100%!important;
+  height:42px!important;
+  min-height:42px!important;
+  font-size:16px!important;
+  font-weight:700!important;
+  text-align:center!important;
+  padding:4px!important;
+}
+.flatpickr-calendar.hasTime .flatpickr-time .flatpickr-time-separator{
+  width:100%!important;
+  height:16px!important;
+  line-height:16px!important;
+  text-align:center!important;
+  flex:none!important;
+}
+.flatpickr-calendar.hasTime .flatpickr-time .flatpickr-am-pm{
+  display:none!important;
+}
+.flatpickr-current-month{
+  font-size:13px!important;
+}
+.flatpickr-weekday{
+  font-size:11px!important;
+}
+.flatpickr-input{
+  background:#fff!important;
+}
+
+/* Elimina reglas antiguas que ocultaban Flatpickr */
+.flatpickr-calendar.open,
+.flatpickr-calendar.inline{
+  display:grid!important;
+}
+
+@media(max-width:760px){
+  .flatpickr-calendar.hasTime{
+    width:310px!important;
+    min-width:310px!important;
+    display:block!important;
+  }
+  .flatpickr-calendar.hasTime .flatpickr-innerContainer,
+  .flatpickr-calendar.hasTime .flatpickr-rContainer,
+  .flatpickr-calendar.hasTime .flatpickr-weekdays,
+  .flatpickr-calendar.hasTime .flatpickr-days,
+  .flatpickr-calendar.hasTime .dayContainer{
+    width:310px!important;
+    min-width:310px!important;
+    max-width:310px!important;
+  }
+  .flatpickr-calendar.hasTime .flatpickr-time{
+    width:100%!important;
+    min-width:100%!important;
+    min-height:58px!important;
+    padding:8px 12px!important;
+    border-left:0!important;
+    border-top:1px solid #e5ded6!important;
+    flex-direction:row!important;
+    align-items:center!important;
+  }
+  .flatpickr-calendar.hasTime .flatpickr-time:before{display:none!important}
+  .flatpickr-calendar.hasTime .flatpickr-time .numInputWrapper{width:44%!important}
+  .flatpickr-calendar.hasTime .flatpickr-time .flatpickr-time-separator{width:12%!important}
+}
