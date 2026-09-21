@@ -171,7 +171,11 @@ try {
     $listEsc = rawurlencode($listTitle);
     $fieldsUrl = $siteUrl . "/_api/web/lists/getbytitle('" . $listEsc . "')/fields"
         . '?$select=Title,InternalName,TypeAsString,Required,Hidden,ReadOnlyField';
-    $fieldRows = rs_request('GET', $fieldsUrl, $token)['json']['value'] ?? [];
+    try {
+        $fieldRows = rs_request('GET', $fieldsUrl, $token)['json']['value'] ?? [];
+    } catch (Throwable $e) {
+        throw new RuntimeException('Etapa CONSULTAR COLUMNAS: ' . $e->getMessage(), 0, $e);
+    }
     $fieldIndex = rs_fields_by_norm(is_array($fieldRows) ? $fieldRows : []);
 
     $sp = [];
@@ -247,18 +251,26 @@ try {
         }
     }
 
-    $digestData = rs_request('POST', $siteUrl . '/_api/contextinfo', $token, '', [
+    try {
+        $digestData = rs_request('POST', $siteUrl . '/_api/contextinfo', $token, '', [
         'Accept: application/json;odata=nometadata',
         'Content-Type: application/json;odata=nometadata',
     ])['json'];
+    } catch (Throwable $e) {
+        throw new RuntimeException('Etapa CONTEXTINFO: ' . $e->getMessage(), 0, $e);
+    }
     $digest = trim((string) ($digestData['FormDigestValue'] ?? ''));
     if ($digest === '') throw new RuntimeException('SharePoint no devolvio un FormDigest valido.');
 
     $createUrl = $siteUrl . "/_api/web/lists/getbytitle('" . $listEsc . "')/items";
-    $created = rs_request('POST', $createUrl, $token, (string) json_encode($sp, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), [
+    try {
+        $created = rs_request('POST', $createUrl, $token, (string) json_encode($sp, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), [
         'Content-Type: application/json;odata=nometadata',
         'X-RequestDigest: ' . $digest,
     ])['json'];
+    } catch (Throwable $e) {
+        throw new RuntimeException('Etapa CREAR ELEMENTO: ' . $e->getMessage(), 0, $e);
+    }
 
     $itemId = (int) ($created['Id'] ?? $created['ID'] ?? 0);
     if ($itemId <= 0) throw new RuntimeException('SharePoint creo el registro, pero no devolvio un ID utilizable.');
@@ -290,10 +302,14 @@ try {
         $safeName = preg_replace('/[^A-Za-z0-9._() -]+/u', '_', $file['name']) ?: 'archivo';
         $safeName = str_replace("'", "''", $safeName);
         $attachmentUrl = $siteUrl . "/_api/web/lists/getbytitle('" . $listEsc . "')/items(" . $itemId . ")/AttachmentFiles/add(FileName='" . rawurlencode($safeName) . "')";
-        rs_request('POST', $attachmentUrl, $token, $bytes, [
+        try {
+            rs_request('POST', $attachmentUrl, $token, $bytes, [
             'Content-Type: application/octet-stream',
             'X-RequestDigest: ' . $digest,
-        ]);
+            ]);
+        } catch (Throwable $e) {
+            throw new RuntimeException('Etapa ADJUNTAR ARCHIVO ' . $safeName . ': ' . $e->getMessage(), 0, $e);
+        }
         $uploadedNames[] = $safeName;
     }
 
