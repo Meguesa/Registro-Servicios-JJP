@@ -41,7 +41,7 @@ declare(strict_types=1);
       <p>Captura la información por etapas. Los cálculos y campos condicionales conservan la lógica actual.</p>
     </div>
     <div class="form-banner-meta">
-      <span class="preview-pill">Piloto · sin envío a SharePoint</span>
+      <span class="preview-pill">Prueba · conectado a SharePoint</span>
       <div class="step-counter">
         <span>Paso</span>
         <strong><span id="currentStepNumber">1</span> de 5</strong>
@@ -142,7 +142,7 @@ declare(strict_types=1);
     </section>
 
     <section class="form-section wizard-panel" data-step="4">
-      <div class="section-title"><span>5</span><div><h2>Imagen de esquela</h2><p>Último paso del registro. La carga real seguirá deshabilitada durante el piloto.</p></div></div>
+      <div class="section-title"><span>5</span><div><h2>Imagen de esquela</h2><p>Último paso del registro. La información y los archivos se enviarán a SharePoint.</p></div></div>
       <div class="upload-card image-upload-card">
         <div class="upload-heading">
           <div><strong>Imagen Esquela</strong><p class="hint">Selecciona una fotografía y ajusta el encuadre antes de continuar.</p></div>
@@ -188,7 +188,7 @@ declare(strict_types=1);
         </div>
       </div>
 
-      <div class="preview-warning"><strong>Modo piloto</strong><span>Esta versión no escribe datos en SharePoint ni dispara Power Automate.</span></div>
+      <div class="preview-warning"><strong>Modo piloto</strong><span>La prueba se guardará en Eventos Capillas con ModoPrueba = Sí.</span></div>
     </section>
 
     <div class="wizard-actions">
@@ -196,10 +196,10 @@ declare(strict_types=1);
       <div>
         <button type="button" class="secondary-button" id="prevStep">Anterior</button>
         <button type="button" class="primary-button" id="nextStep">Siguiente</button>
-        <button type="submit" class="primary-button" id="submitBtn" disabled>Registrar servicio</button>
+        <button type="submit" class="primary-button" id="submitBtn">Registrar servicio</button>
       </div>
     </div>
-    <p id="status" class="status">Esta versión no escribe datos en SharePoint.</p>
+    <p id="status" class="status">Listo para registrar en SharePoint.</p>
   </form>
 </main>
 
