@@ -69,8 +69,25 @@ function calcAge(){
   const d=document.getElementById("fechaDefuncion").value;
   const out=document.getElementById("edad");
   if(!n||!d){out.value="";return;}
-  const birth=new Date(n+"T00:00:00");
-  const death=new Date(d);
+  const parseDate=(value,withTime)=>{
+    if(value.includes("/")){
+      const parts=value.trim().split(" ");
+      const dp=parts[0].split("/");
+      if(dp.length!==3)return null;
+      let hh=0,mm=0;
+      if(withTime&&parts[1]){
+        const tp=parts[1].split(":");
+        hh=Number(tp[0]||0);mm=Number(tp[1]||0);
+      }
+      const result=new Date(Number(dp[2]),Number(dp[1])-1,Number(dp[0]),hh,mm,0,0);
+      return Number.isNaN(result.getTime())?null:result;
+    }
+    const result=new Date(withTime?value:value+"T00:00:00");
+    return Number.isNaN(result.getTime())?null:result;
+  };
+  const birth=parseDate(n,false);
+  const death=parseDate(d,true);
+  if(!birth||!death){out.value="";return;}
   let age=death.getFullYear()-birth.getFullYear();
   const birthday=new Date(death.getFullYear(),birth.getMonth(),birth.getDate());
   if(birthday>death) age--;
