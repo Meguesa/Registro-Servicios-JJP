@@ -13,10 +13,18 @@ function rs_storage_bootstrap(): array
         throw new RuntimeException('SESSION_REQUIRED');
     }
     $user = portal_user();
-    $email = strtolower(trim((string)($user['email'] ?? '')));
-    if ($email === '') throw new RuntimeException('No fue posible identificar el correo del usuario.');
+    $email = '';
+    foreach (['email','preferred_username','upn','userPrincipalName'] as $key) {
+        $candidate = strtolower(trim((string)($user[$key] ?? '')));
+        if ($candidate !== '') { $email = $candidate; break; }
+    }
+    if ($email === '') {
+        $email = 'session-' . hash('sha256', session_id());
+    }
+
+    $configuredBase = function_exists('portal_config') ? trim((string)(portal_config('registro_servicios_storage_path') ?? '')) : '';
     $home = dirname($root);
-    $base = $home . '/registro-servicios-data';
+    $base = $configuredBase !== '' ? rtrim($configuredBase, '/') : ($home . '/registro-servicios-data');
     if (!is_dir($base) && !mkdir($base, 0770, true) && !is_dir($base)) {
         throw new RuntimeException('No fue posible preparar el almacenamiento privado de Registro de Servicios.');
     }
