@@ -5,6 +5,8 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
+require_once __DIR__ . '/registro-storage.php';
+
 function rs_json(int $status, array $payload): never
 {
     http_response_code($status);
@@ -22,6 +24,9 @@ try {
     require_once $bootstrap;
     require_once $sharepoint;
     portal_require_authentication();
+    $storageCtx = rs_storage_bootstrap();
+    $draftIdRaw = trim((string) ($_POST['draftId'] ?? ''));
+    $draftId = $draftIdRaw !== '' ? rs_safe_id($draftIdRaw) : '';
 
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
         rs_json(405, ['ok' => false, 'message' => 'Metodo no permitido.']);
@@ -275,28 +280,52 @@ try {
     $itemId = (int) ($created['Id'] ?? $created['ID'] ?? 0);
     if ($itemId <= 0) throw new RuntimeException('SharePoint creo el registro, pero no devolvio un ID utilizable.');
 
-    /** @return array<int,array{name:string,tmp:string,size:int,type:string}> */
+    /** @return array<int,array{key:string,name:string,tmp:string,size:int,type:string}> */
     function rs_uploaded_files(): array
     {
         $out = [];
-        foreach (['esquelaProcesadaFile', 'certificadoDefuncion', 'ordenInhumacionCremacion'] as $key) {
-            if (!isset($_FILES[$key]) || !is_array($_FILES[$key])) continue;
-            $file = $_FILES[$key];
+        foreach ([
+            'esquelaProcesadaFile' => 'esquela',
+            'certificadoDefuncion' => 'certificado',
+            'ordenInhumacionCremacion' => 'orden'
+        ] as $inputKey => $logicalKey) {
+            if (!isset($_FILES[$inputKey]) || !is_array($_FILES[$inputKey])) continue;
+            $file = $_FILES[$inputKey];
             $error = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
             if ($error === UPLOAD_ERR_NO_FILE) continue;
-            if ($error !== UPLOAD_ERR_OK) throw new RuntimeException('No fue posible recibir el archivo ' . $key . ' (codigo ' . $error . ').');
+            if ($error !== UPLOAD_ERR_OK) throw new RuntimeException('No fue posible recibir el archivo ' . $inputKey . ' (codigo ' . $error . ').');
             $tmp = (string) ($file['tmp_name'] ?? '');
-            $name = trim((string) ($file['name'] ?? $key));
+            $name = trim((string) ($file['name'] ?? $inputKey));
             $size = (int) ($file['size'] ?? 0);
             if ($tmp === '' || !is_uploaded_file($tmp)) throw new RuntimeException('El archivo ' . $name . ' no es valido.');
             if ($size <= 0 || $size > 15 * 1024 * 1024) throw new RuntimeException('El archivo ' . $name . ' debe ser menor a 15 MB.');
-            $out[] = ['name' => $name, 'tmp' => $tmp, 'size' => $size, 'type' => (string) ($file['type'] ?? 'application/octet-stream')];
+            $out[] = ['key'=>$logicalKey, 'name' => $name, 'tmp' => $tmp, 'size' => $size, 'type' => (string) ($file['type'] ?? 'application/octet-stream')];
         }
         return $out;
     }
 
+    $filesToAttach = rs_uploaded_files();
+    $providedKeys = array_fill_keys(array_map(static fn(array $f): string => $f['key'], $filesToAttach), true);
+
+    if ($draftId !== '') {
+        $draft = rs_read_draft($storageCtx, $draftId);
+        $storedFiles = is_array($draft['files'] ?? null) ? $draft['files'] : [];
+        foreach ($storedFiles as $logicalKey => $stored) {
+            if (isset($providedKeys[$logicalKey]) || !is_array($stored)) continue;
+            $path = (string) ($stored['path'] ?? '');
+            if ($path === '' || !is_file($path) || !is_readable($path)) continue;
+            $filesToAttach[] = [
+                'key'=>(string)$logicalKey,
+                'name'=>(string)($stored['name'] ?? basename($path)),
+                'tmp'=>$path,
+                'size'=>(int)($stored['size'] ?? filesize($path) ?: 0),
+                'type'=>(string)($stored['type'] ?? 'application/octet-stream'),
+            ];
+        }
+    }
+
     $uploadedNames = [];
-    foreach (rs_uploaded_files() as $file) {
+    foreach ($filesToAttach as $file) {
         $bytes = file_get_contents($file['tmp']);
         if ($bytes === false) throw new RuntimeException('No fue posible leer el archivo ' . $file['name'] . '.');
         $safeName = preg_replace('/[^A-Za-z0-9._() -]+/u', '_', $file['name']) ?: 'archivo';
@@ -311,6 +340,21 @@ try {
             throw new RuntimeException('Etapa ADJUNTAR ARCHIVO ' . $safeName . ': ' . $e->getMessage(), 0, $e);
         }
         $uploadedNames[] = $safeName;
+    }
+
+    rs_add_publication($storageCtx, [
+        'itemId'=>(string)$itemId,
+        'status'=>'PUBLICADO',
+        'numeroReferencia'=>trim((string)($payload['numeroReferencia'] ?? '')),
+        'referencia'=>trim((string)($payload['referencia'] ?? '')),
+        'fallecido'=>trim((string)($payload['fallecido'] ?? '')),
+        'servicio'=>trim((string)($payload['servicio'] ?? '')),
+        'ubicacion'=>trim((string)($payload['ubicacion'] ?? '')),
+        'fechaServicio'=>trim((string)($payload['inicio'] ?? '')),
+        'publishedAt'=>gmdate('c'),
+    ]);
+    if ($draftId !== '') {
+        rs_remove_tree(rs_draft_dir($storageCtx, $draftId));
     }
 
     rs_json(201, [
