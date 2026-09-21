@@ -482,3 +482,50 @@ select:invalid{
   height:38px!important;
   padding:10px 12px!important;
 }
+
+
+/* Fecha y hora separadas visualmente */
+.split-datetime{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 150px;
+  gap:10px;
+  width:100%;
+}
+.split-datetime-part{
+  position:relative;
+  min-width:0;
+}
+.split-datetime-label{
+  display:block;
+  margin:0 0 5px 2px;
+  color:var(--jp-muted);
+  font-size:10px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.03em;
+}
+.split-datetime input{
+  width:100%;
+  min-height:44px;
+  height:44px;
+  padding:9px 11px;
+  border:1px solid #d9d2ca;
+  border-radius:8px;
+  background:#fff;
+  color:var(--jp-text);
+  font-size:13px;
+  outline:none;
+}
+.split-datetime input:focus{
+  border-color:var(--jp-blue);
+  box-shadow:0 0 0 3px rgba(34,91,138,.10);
+}
+.split-time-input{
+  text-align:center;
+}
+@media(max-width:760px){
+  .split-datetime{
+    grid-template-columns:minmax(0,1fr) 120px;
+    gap:8px;
+  }
+}
