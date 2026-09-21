@@ -9,6 +9,14 @@ function rs_storage_bootstrap(): array
         throw new RuntimeException('No se encontro el bootstrap del Portal.');
     }
     require_once $bootstrap;
+
+    // Igual que las paginas protegidas del Portal, primero dejamos que el
+    // bootstrap restaure/valide la sesion antes de consultar al usuario.
+    // portal_is_authenticated() por si solo puede devolver false en endpoints
+    // AJAX aunque la pagina principal ya haya pasado por el flujo de acceso.
+    if (function_exists('portal_require_authentication')) {
+        portal_require_authentication();
+    }
     if (!portal_is_authenticated()) {
         throw new RuntimeException('SESSION_REQUIRED');
     }
