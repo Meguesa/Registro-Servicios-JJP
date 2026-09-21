@@ -194,3 +194,169 @@ servicio.addEventListener("change",syncOperationEmpty);
 document.getElementById("resetBtn").addEventListener("click",()=>showWizardStep(0));
 showWizardStep(0);
 syncOperationEmpty();
+
+
+/* Mejoras de fecha, multiselección e imagen */
+function parseDisplayDate(value,withTime=true){
+  if(!value)return null;
+  const parts=value.trim().split(" ");
+  const d=parts[0].split("/");
+  if(d.length!==3)return null;
+  const day=Number(d[0]),month=Number(d[1])-1,year=Number(d[2]);
+  let hour=0,minute=0;
+  if(withTime&&parts[1]){
+    const t=parts[1].split(":");
+    hour=Number(t[0]||0);minute=Number(t[1]||0);
+  }
+  const dt=new Date(year,month,day,hour,minute,0,0);
+  return Number.isNaN(dt.getTime())?null:dt;
+}
+
+if(window.flatpickr){
+  flatpickr.localize(flatpickr.l10ns.es);
+  document.querySelectorAll(".datetime-picker").forEach(el=>{
+    flatpickr(el,{
+      enableTime:true,
+      time_24hr:true,
+      dateFormat:"d/m/Y H:i",
+      allowInput:true,
+      minuteIncrement:5,
+      onChange:()=>{ if(el.id==="fechaDefuncion") calcAge(); }
+    });
+  });
+  document.querySelectorAll(".date-only-picker").forEach(el=>{
+    flatpickr(el,{
+      enableTime:false,
+      dateFormat:"d/m/Y",
+      allowInput:true,
+      onChange:()=>{ if(el.id==="fechaNacimiento") calcAge(); }
+    });
+  });
+}
+
+calcAge=function(){
+  const n=document.getElementById("fechaNacimiento").value;
+  const d=document.getElementById("fechaDefuncion").value;
+  const out=document.getElementById("edad");
+  const birth=parseDisplayDate(n,false);
+  const death=parseDisplayDate(d,true);
+  if(!birth||!death){out.value="";return;}
+  let age=death.getFullYear()-birth.getFullYear();
+  const birthday=new Date(death.getFullYear(),birth.getMonth(),birth.getDate());
+  if(birthday>death)age--;
+  out.value=Math.max(0,age);
+};
+document.getElementById("fechaNacimiento").addEventListener("input",calcAge);
+document.getElementById("fechaDefuncion").addEventListener("input",calcAge);
+
+/* Dropdown multiselección */
+const extrasToggle=document.getElementById("extrasToggle");
+const extrasMenu=document.getElementById("extrasMenu");
+const extrasSummary=document.getElementById("extrasSummary");
+
+function syncExtrasNativeFromChecks(){
+  const checked=Array.from(extrasMenu.querySelectorAll('input[type="checkbox"]:checked')).map(i=>i.value);
+  Array.from(extrasSelect.options).forEach(o=>o.selected=checked.includes(o.value));
+  if(checked.includes("No Aplica")){
+    Array.from(extrasMenu.querySelectorAll('input[type="checkbox"]')).forEach(i=>{
+      if(i.value!=="No Aplica")i.checked=false;
+    });
+    Array.from(extrasSelect.options).forEach(o=>o.selected=o.value==="No Aplica");
+  }
+  const finalSelected=selectedExtras();
+  extrasSummary.textContent=finalSelected.length
+    ? (finalSelected.length===1?finalSelected[0]:finalSelected.length+" servicios seleccionados")
+    : "Seleccionar servicios adicionales";
+  updateExtras();
+}
+
+EXTRAS.forEach(name=>{
+  const label=document.createElement("label");
+  label.className="multi-option";
+  const check=document.createElement("input");
+  check.type="checkbox";
+  check.value=name;
+  const text=document.createElement("span");
+  text.textContent=name;
+  label.append(check,text);
+  extrasMenu.appendChild(label);
+  check.addEventListener("change",()=>{
+    if(name==="No Aplica"&&check.checked){
+      extrasMenu.querySelectorAll('input[type="checkbox"]').forEach(i=>{if(i!==check)i.checked=false;});
+    }else if(name!=="No Aplica"&&check.checked){
+      const na=extrasMenu.querySelector('input[value="No Aplica"]');
+      if(na)na.checked=false;
+    }
+    syncExtrasNativeFromChecks();
+  });
+});
+extrasToggle.addEventListener("click",()=>extrasMenu.classList.toggle("hidden"));
+document.addEventListener("click",e=>{
+  if(!document.getElementById("extrasMulti").contains(e.target))extrasMenu.classList.add("hidden");
+});
+
+/* Editor de esquela */
+let cropper=null;
+const esquelaInput=document.getElementById("esquelaInput");
+const imageEditor=document.getElementById("imageEditor");
+const cropImage=document.getElementById("cropImage");
+const imageResult=document.getElementById("imageResult");
+const croppedPreview=document.getElementById("croppedPreview");
+const processedInput=document.getElementById("esquelaProcesada");
+
+function openCropperFromFile(file){
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    cropImage.src=reader.result;
+    imageEditor.classList.remove("hidden");
+    imageResult.classList.add("hidden");
+    if(cropper){cropper.destroy();cropper=null;}
+    cropImage.onload=()=>{
+      cropper=new Cropper(cropImage,{
+        aspectRatio:4/5,
+        viewMode:1,
+        dragMode:"move",
+        autoCropArea:.82,
+        background:false,
+        responsive:true,
+        restore:false,
+        guides:true,
+        center:true,
+        movable:true,
+        zoomable:true,
+        rotatable:true,
+        scalable:false
+      });
+    };
+  };
+  reader.readAsDataURL(file);
+}
+esquelaInput.addEventListener("change",()=>openCropperFromFile(esquelaInput.files[0]));
+document.getElementById("zoomOutBtn").addEventListener("click",()=>cropper&&cropper.zoom(-.1));
+document.getElementById("zoomInBtn").addEventListener("click",()=>cropper&&cropper.zoom(.1));
+document.getElementById("rotateBtn").addEventListener("click",()=>cropper&&cropper.rotate(90));
+document.getElementById("resetCropBtn").addEventListener("click",()=>cropper&&cropper.reset());
+document.getElementById("applyCropBtn").addEventListener("click",()=>{
+  if(!cropper)return;
+  const canvas=cropper.getCroppedCanvas({width:800,height:1000,imageSmoothingEnabled:true,imageSmoothingQuality:"high"});
+  const data=canvas.toDataURL("image/jpeg",.9);
+  processedInput.value=data;
+  croppedPreview.src=data;
+  imageEditor.classList.add("hidden");
+  imageResult.classList.remove("hidden");
+});
+document.getElementById("editCropBtn").addEventListener("click",()=>{
+  imageResult.classList.add("hidden");
+  imageEditor.classList.remove("hidden");
+});
+
+document.getElementById("resetBtn").addEventListener("click",()=>{
+  extrasMenu.querySelectorAll('input[type="checkbox"]').forEach(i=>i.checked=false);
+  extrasSummary.textContent="Seleccionar servicios adicionales";
+  if(cropper){cropper.destroy();cropper=null;}
+  imageEditor.classList.add("hidden");
+  imageResult.classList.add("hidden");
+  processedInput.value="";
+  croppedPreview.removeAttribute("src");
+});
