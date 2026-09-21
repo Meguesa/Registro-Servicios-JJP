@@ -73,3 +73,160 @@ input,select,.multi-select-toggle{min-height:50px;padding:12px 14px;font-size:14
   .image-result{grid-template-columns:1fr}
   .image-result img{width:100%;height:auto;max-height:420px}
 }
+
+/* Fecha/hora: calendario a la izquierda y hora a la derecha */
+.flatpickr-calendar.hasTime{
+  width:430px!important;
+}
+.flatpickr-calendar.hasTime .flatpickr-rContainer{
+  float:left;
+  width:300px;
+}
+.flatpickr-calendar.hasTime .flatpickr-time{
+  float:right;
+  width:120px;
+  min-height:308px;
+  height:308px;
+  border-left:1px solid #e3ddd5;
+  border-top:0;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  justify-content:center;
+  padding:18px 10px;
+  gap:8px;
+}
+.flatpickr-calendar.hasTime .flatpickr-time .numInputWrapper{
+  width:100%!important;
+  height:52px;
+}
+.flatpickr-calendar.hasTime .flatpickr-time input{
+  font-size:18px;
+}
+.flatpickr-calendar.hasTime .flatpickr-time .flatpickr-time-separator{
+  display:block;
+  text-align:center;
+  width:100%;
+}
+.flatpickr-calendar.hasTime:after{
+  content:"Hora";
+  position:absolute;
+  top:12px;
+  right:34px;
+  font-size:11px;
+  font-weight:800;
+  color:#6d655f;
+  text-transform:uppercase;
+}
+
+/* Servicios adicionales: lista visible */
+.services-list{
+  max-height:360px;
+  overflow:auto;
+  padding:8px;
+  background:#fff;
+  border:1px solid #d9d2ca;
+  border-radius:10px;
+}
+.services-list .multi-option{
+  display:grid;
+  grid-template-columns:22px 1fr;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  border-radius:8px;
+  cursor:pointer;
+}
+.services-list .multi-option:hover{
+  background:#f7f5f0;
+}
+.services-list .multi-option input{
+  width:18px;
+  height:18px;
+  min-height:auto;
+}
+.services-list .multi-option span{
+  text-align:left;
+}
+
+/* Documentos finales */
+.documents-card{
+  margin-top:18px;
+  padding:20px;
+  background:#faf8f4;
+  border:1px solid var(--jp-border);
+  border-radius:10px;
+}
+.document-upload-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+}
+.document-upload-box{
+  min-height:116px;
+  padding:16px;
+  display:grid;
+  grid-template-columns:48px 1fr auto;
+  align-items:center;
+  gap:14px;
+  background:#fff;
+  border:1px dashed #cfc5bb;
+  border-radius:10px;
+  cursor:pointer;
+}
+.document-upload-box:hover{
+  border-color:var(--jp-blue);
+  box-shadow:0 0 0 3px rgba(34,91,138,.08);
+}
+.document-icon{
+  width:48px;
+  height:48px;
+  display:grid;
+  place-items:center;
+  border-radius:8px;
+  background:#eef5fb;
+  color:var(--jp-blue);
+  font-weight:800;
+  font-size:12px;
+}
+.document-copy{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.document-copy strong{
+  color:var(--jp-brown);
+  font-size:13px;
+}
+.document-copy small{
+  color:var(--jp-muted);
+  font-weight:500;
+}
+.document-action{
+  padding:8px 10px;
+  border-radius:8px;
+  background:var(--jp-blue);
+  color:#fff;
+  font-size:11px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+@media(max-width:760px){
+  .flatpickr-calendar.hasTime{width:307px!important}
+  .flatpickr-calendar.hasTime .flatpickr-rContainer{float:none;width:auto}
+  .flatpickr-calendar.hasTime .flatpickr-time{
+    float:none;
+    width:100%;
+    height:auto;
+    min-height:54px;
+    border-left:0;
+    border-top:1px solid #e3ddd5;
+    flex-direction:row;
+    padding:6px 10px;
+  }
+  .flatpickr-calendar.hasTime:after{display:none}
+  .document-upload-grid{grid-template-columns:1fr}
+  .document-upload-box{grid-template-columns:44px 1fr}
+  .document-action{grid-column:1/-1;text-align:center}
+}
