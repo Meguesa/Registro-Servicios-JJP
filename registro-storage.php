@@ -9,7 +9,9 @@ function rs_storage_bootstrap(): array
         throw new RuntimeException('No se encontro el bootstrap del Portal.');
     }
     require_once $bootstrap;
-    portal_require_authentication();
+    if (!portal_is_authenticated()) {
+        throw new RuntimeException('SESSION_REQUIRED');
+    }
     $user = portal_user();
     $email = strtolower(trim((string)($user['email'] ?? '')));
     if ($email === '') throw new RuntimeException('No fue posible identificar el correo del usuario.');
