@@ -230,3 +230,72 @@ input,select,.multi-select-toggle{min-height:50px;padding:12px 14px;font-size:14
   .document-upload-box{grid-template-columns:44px 1fr}
   .document-action{grid-column:1/-1;text-align:center}
 }
+
+/* Ajuste final de tamaño de campos y selector fecha/hora */
+input,select,.multi-select-toggle{
+  min-height:44px;
+  padding:9px 11px;
+  font-size:13px;
+}
+.form-grid{gap:14px}
+.form-section{padding:24px 26px 26px}
+
+.flatpickr-calendar.hasTime{
+  width:374px!important;
+  min-width:374px!important;
+}
+.flatpickr-calendar.hasTime .flatpickr-rContainer{
+  float:left;
+  width:270px!important;
+}
+.flatpickr-calendar.hasTime .flatpickr-days{
+  width:270px!important;
+}
+.flatpickr-calendar.hasTime .dayContainer{
+  width:270px!important;
+  min-width:270px!important;
+  max-width:270px!important;
+}
+.flatpickr-calendar.hasTime .flatpickr-day{
+  width:34px;
+  max-width:34px;
+  height:34px;
+  line-height:34px;
+  flex-basis:34px;
+  font-size:12px;
+}
+.flatpickr-calendar.hasTime .flatpickr-weekday{
+  font-size:11px;
+}
+.flatpickr-calendar.hasTime .flatpickr-current-month{
+  font-size:13px;
+}
+.flatpickr-calendar.hasTime .flatpickr-time{
+  float:right;
+  width:94px!important;
+  min-height:270px;
+  height:270px;
+  padding:42px 8px 12px;
+  gap:4px;
+}
+.flatpickr-calendar.hasTime .flatpickr-time .numInputWrapper{
+  width:100%!important;
+  height:42px;
+}
+.flatpickr-calendar.hasTime .flatpickr-time input{
+  font-size:15px;
+}
+.flatpickr-calendar.hasTime:after{
+  right:23px;
+  top:16px;
+  font-size:10px;
+}
+
+input::placeholder{
+  color:#9a918a;
+  opacity:1;
+  font-style:italic;
+}
+select:invalid{
+  color:#9a918a;
+}
