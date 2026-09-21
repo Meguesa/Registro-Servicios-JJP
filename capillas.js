@@ -216,6 +216,22 @@ syncOperationEmpty();
 /* Mejoras de fecha, multiselección e imagen */
 function parseDisplayDate(value,withTime=true){
   if(!value)return null;
+  let dt=null;
+
+  // Native datetime-local: YYYY-MM-DDTHH:mm
+  if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)){
+    dt=new Date(value);
+    return Number.isNaN(dt.getTime())?null:dt;
+  }
+
+  // Native date: YYYY-MM-DD
+  if(/^\d{4}-\d{2}-\d{2}$/.test(value)){
+    const [y,m,d]=value.split("-").map(Number);
+    dt=new Date(y,m-1,d,0,0,0,0);
+    return Number.isNaN(dt.getTime())?null:dt;
+  }
+
+  // Legacy display fallback: dd/mm/yyyy HH:mm
   const parts=value.trim().split(" ");
   const d=parts[0].split("/");
   if(d.length!==3)return null;
@@ -225,31 +241,11 @@ function parseDisplayDate(value,withTime=true){
     const t=parts[1].split(":");
     hour=Number(t[0]||0);minute=Number(t[1]||0);
   }
-  const dt=new Date(year,month,day,hour,minute,0,0);
+  dt=new Date(year,month,day,hour,minute,0,0);
   return Number.isNaN(dt.getTime())?null:dt;
 }
 
-if(window.flatpickr){
-  flatpickr.localize(flatpickr.l10ns.es);
-  document.querySelectorAll(".datetime-picker").forEach(el=>{
-    flatpickr(el,{
-      enableTime:true,
-      time_24hr:true,
-      dateFormat:"d/m/Y H:i",
-      allowInput:true,
-      minuteIncrement:5,
-      onChange:()=>{ if(el.id==="fechaDefuncion") calcAge(); }
-    });
-  });
-  document.querySelectorAll(".date-only-picker").forEach(el=>{
-    flatpickr(el,{
-      enableTime:false,
-      dateFormat:"d/m/Y",
-      allowInput:true,
-      onChange:()=>{ if(el.id==="fechaNacimiento") calcAge(); }
-    });
-  });
-}
+/* Selectores nativos date/datetime-local. */
 
 calcAge=function(){
   const n=document.getElementById("fechaNacimiento").value;
