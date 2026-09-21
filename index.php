@@ -124,12 +124,7 @@ declare(strict_types=1);
         <label>Personal Venta<input name="personalVenta"></label>
         <label>Precio de Venta<input type="number" min="0" step="0.01" name="precioVenta" id="precioVenta" required></label>
         <label>Servicios Adicionales
-          <div class="multi-select" id="extrasMulti">
-            <button type="button" class="multi-select-toggle" id="extrasToggle">
-              <span id="extrasSummary">Seleccionar servicios adicionales</span><span class="chevron">⌄</span>
-            </button>
-            <div class="multi-select-menu hidden" id="extrasMenu"></div>
-          </div>
+          <div class="services-list" id="extrasMenu" aria-label="Servicios adicionales"></div>
           <select name="serviciosExtra[]" id="serviciosExtra" multiple class="native-multi-hidden" aria-hidden="true" tabindex="-1"></select>
         </label>
       </div>
@@ -162,6 +157,28 @@ declare(strict_types=1);
         </div>
         <input type="hidden" name="esquelaProcesada" id="esquelaProcesada">
       </div>
+
+      <div class="documents-card">
+        <div class="subsection-title">
+          <div><strong>Documentos del servicio</strong><span>Adjunta los documentos necesarios para el expediente.</span></div>
+        </div>
+        <div class="document-upload-grid">
+          <label class="document-upload-box" for="certificadoDefuncion">
+            <span class="document-icon">PDF</span>
+            <span class="document-copy"><strong>Certificado de Defunción</strong><small id="certificadoDefuncionName">PDF o imagen</small></span>
+            <span class="document-action">Seleccionar archivo</span>
+          </label>
+          <input type="file" name="certificadoDefuncion" id="certificadoDefuncion" accept=".pdf,image/*" class="file-input-hidden">
+
+          <label class="document-upload-box" for="ordenInhumacionCremacion">
+            <span class="document-icon">DOC</span>
+            <span class="document-copy"><strong>Orden de Inhumación/Cremación</strong><small id="ordenInhumacionCremacionName">PDF o imagen</small></span>
+            <span class="document-action">Seleccionar archivo</span>
+          </label>
+          <input type="file" name="ordenInhumacionCremacion" id="ordenInhumacionCremacion" accept=".pdf,image/*" class="file-input-hidden">
+        </div>
+      </div>
+
       <div class="preview-warning"><strong>Modo piloto</strong><span>Esta versión no escribe datos en SharePoint ni dispara Power Automate.</span></div>
     </section>
 
