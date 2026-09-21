@@ -552,3 +552,120 @@ setRequired=function(id,on){
 
 /* Reaplicar reglas una vez creados los controles separados */
 updateRules();
+
+
+/* Integración SharePoint: Eventos Capillas */
+function rsMoneyNumber(text){
+  const n=Number(String(text||"").replace(/[^0-9.-]/g,""));
+  return Number.isFinite(n)?n:0;
+}
+
+function rsPayload(){
+  const data=new FormData(form);
+  const extras=selectedExtras();
+  const extraAmounts={};
+  document.querySelectorAll("[data-extra-input]").forEach(input=>{
+    const key=input.dataset.extraInput;
+    if(key) extraAmounts[key]=input.value===""?null:Number(input.value);
+  });
+  return {
+    numeroReferencia:String(data.get("numeroReferencia")||"").trim(),
+    servicio:String(data.get("servicio")||"").trim(),
+    ubicacion:String(data.get("ubicacion")||"").trim(),
+    sala:String(data.get("sala")||"").trim(),
+    inicio:String(document.getElementById("inicio")?.value||""),
+    termino:String(document.getElementById("termino")?.value||""),
+    llevaExequia:document.getElementById("llevaExequia")?.checked===true,
+    tiempoCapillas:String(data.get("tiempoCapillas")||"").trim(),
+    horaExequia:String(document.getElementById("horaExequia")?.value||""),
+    prevision:String(data.get("prevision")||"").trim(),
+    tipoAtaud:String(data.get("tipoAtaud")||"").trim(),
+    numeroServicio:String(data.get("numeroServicio")||"").trim(),
+    codigoServicio:String(document.getElementById("codigoServicio")?.textContent||"").replace("—","").trim(),
+    codigoAtaud:String(document.getElementById("codigoAtaud")?.textContent||"").replace("—","").trim(),
+    referencia:String(document.getElementById("referenciaPreview")?.textContent||"").replace("—","").trim(),
+    requierePlaca:document.getElementById("requierePlaca")?.checked===true,
+    titular:String(data.get("titular")||"").trim(),
+    fallecido:String(data.get("fallecido")||"").trim(),
+    fechaNacimiento:String(document.getElementById("fechaNacimiento")?.value||""),
+    fechaDefuncion:String(document.getElementById("fechaDefuncion")?.value||""),
+    sexo:String(data.get("sexo")||"").trim(),
+    edad:String(document.getElementById("edad")?.value||""),
+    destinoFinal:String(data.get("destinoFinal")||"").trim(),
+    embalsamador:String(data.get("embalsamador")||"").trim(),
+    rescate1:String(data.get("rescate1")||"").trim(),
+    rescate2:String(data.get("rescate2")||"").trim(),
+    ubicacionRescate:String(data.get("ubicacionRescate")||"").trim(),
+    motivo:String(data.get("motivo")||"").trim(),
+    referenciaCrematorio:String(data.get("referenciaCrematorio")||"").trim(),
+    inicioCrematorio:String(document.getElementById("inicioCrematorio")?.value||""),
+    personalCrematorio:String(data.get("personalCrematorio")||"").trim(),
+    fechaHoraInhumacion:String(document.getElementById("fechaHoraInhumacion")?.value||""),
+    fechaCompra:String(document.getElementById("fechaCompra")?.value||""),
+    personalVenta:String(data.get("personalVenta")||"").trim(),
+    precioVenta:data.get("precioVenta")===""?null:Number(data.get("precioVenta")),
+    serviciosExtra:extras,
+    extraAmounts,
+    ventaTotal:rsMoneyNumber(document.getElementById("ventaTotal")?.textContent||"0")
+  };
+}
+
+async function rsCroppedFile(){
+  const value=String(document.getElementById("esquelaProcesada")?.value||"");
+  if(!value.startsWith("data:image/")) return null;
+  const response=await fetch(value);
+  const blob=await response.blob();
+  return new File([blob],"Imagen_Esquela.jpg",{type:blob.type||"image/jpeg"});
+}
+
+async function rsSubmitToSharePoint(){
+  const button=document.getElementById("submitBtn");
+  const status=document.getElementById("status");
+  if(!button)return;
+
+  const original=button.textContent;
+  button.disabled=true;
+  button.textContent="Registrando...";
+  if(status) status.textContent="Enviando información a SharePoint...";
+
+  try{
+    const body=new FormData();
+    body.append("payload",JSON.stringify(rsPayload()));
+
+    const cropped=await rsCroppedFile();
+    if(cropped) body.append("esquelaProcesadaFile",cropped,cropped.name);
+
+    const cert=document.getElementById("certificadoDefuncion")?.files?.[0];
+    if(cert) body.append("certificadoDefuncion",cert,cert.name);
+
+    const orden=document.getElementById("ordenInhumacionCremacion")?.files?.[0];
+    if(orden) body.append("ordenInhumacionCremacion",orden,orden.name);
+
+    const response=await fetch("registro-servicio.php",{
+      method:"POST",
+      body,
+      credentials:"same-origin",
+      headers:{"Accept":"application/json"}
+    });
+    const result=await response.json().catch(()=>null);
+    if(!response.ok || !result?.ok){
+      throw new Error(result?.message||("HTTP "+response.status));
+    }
+
+    if(status) status.textContent="Registro creado correctamente. ID de SharePoint: "+result.itemId+".";
+    alert("Servicio registrado correctamente en SharePoint.\nID: "+result.itemId);
+    button.textContent="Registrado";
+  }catch(error){
+    console.error("Registro SharePoint:",error);
+    if(status) status.textContent="No fue posible registrar: "+(error?.message||error);
+    button.disabled=false;
+    button.textContent=original;
+    return;
+  }
+}
+
+form.addEventListener("submit",async e=>{
+  e.preventDefault();
+  if(!validateCurrentVisualStep()) return;
+  await rsSubmitToSharePoint();
+});
