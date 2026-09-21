@@ -24,9 +24,36 @@ function rs_storage_bootstrap(): array
 
     $configuredBase = function_exists('portal_config') ? trim((string)(portal_config('registro_servicios_storage_path') ?? '')) : '';
     $home = dirname($root);
-    $base = $configuredBase !== '' ? rtrim($configuredBase, '/') : ($home . '/registro-servicios-data');
-    if (!is_dir($base) && !mkdir($base, 0770, true) && !is_dir($base)) {
-        throw new RuntimeException('No fue posible preparar el almacenamiento privado de Registro de Servicios.');
+
+    $candidates = [];
+    if ($configuredBase !== '') $candidates[] = rtrim($configuredBase, '/');
+    $candidates[] = __DIR__ . '/.registro-servicios-data';
+    $candidates[] = $home . '/registro-servicios-data';
+    $candidates[] = rtrim(sys_get_temp_dir(), '/') . '/registro-servicios-data';
+
+    $base = '';
+    $storageErrors = [];
+    foreach (array_values(array_unique($candidates)) as $candidate) {
+        try {
+            if (!is_dir($candidate) && !@mkdir($candidate, 0770, true) && !is_dir($candidate)) {
+                $storageErrors[] = $candidate . ': mkdir';
+                continue;
+            }
+            $probe = $candidate . '/.write-test-' . bin2hex(random_bytes(3));
+            if (@file_put_contents($probe, 'ok') === false) {
+                $storageErrors[] = $candidate . ': write';
+                continue;
+            }
+            @unlink($probe);
+            $base = $candidate;
+            break;
+        } catch (Throwable $probeError) {
+            $storageErrors[] = $candidate . ': ' . $probeError->getMessage();
+        }
+    }
+
+    if ($base === '') {
+        throw new RuntimeException('No fue posible preparar almacenamiento para Registro de Servicios. ' . implode(' | ', $storageErrors));
     }
     $userDir = $base . '/u-' . hash('sha256', $email);
     if (!is_dir($userDir) && !mkdir($userDir, 0770, true) && !is_dir($userDir)) {
