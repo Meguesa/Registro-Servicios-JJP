@@ -189,8 +189,15 @@ try {
         $type = strtolower((string) ($field['TypeAsString'] ?? ''));
 
         if ($type === 'multichoice') {
-            $values = is_array($value) ? array_values(array_filter(array_map('strval', $value), static fn($v) => trim($v) !== '')) : [(string) $value];
-            $fieldsPayload[$internal] = ['__metadata' => ['type' => 'Collection(Edm.String)'], 'results' => $values];
+            $values = is_array($value)
+                ? array_values(array_filter(array_map('strval', $value), static fn($v) => trim($v) !== ''))
+                : [(string) $value];
+
+            // Con application/json;odata=nometadata SharePoint espera
+            // directamente un arreglo JSON para columnas MultiChoice.
+            // Enviar {__metadata,results} provoca InvalidClientQueryException:
+            // "StartObject" inesperado; se esperaba "StartArray".
+            $fieldsPayload[$internal] = $values;
             return;
         }
         if (in_array($type, ['boolean'], true)) {
