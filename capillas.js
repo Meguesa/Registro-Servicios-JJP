@@ -275,6 +275,40 @@ document.getElementById("fechaDefuncion").addEventListener("input",calcAge);
 
 /* Dropdown multiselección */
 const extrasMenu=document.getElementById("extrasMenu");
+const extrasDropdown=document.getElementById("extrasDropdown");
+const extrasToggle=document.getElementById("extrasToggle");
+const extrasToggleText=document.getElementById("extrasToggleText");
+
+function updateExtrasToggleLabel(){
+  const selected=selectedExtras();
+  if(!extrasToggleText)return;
+  if(selected.length===0){
+    extrasToggleText.textContent="Seleccionar servicios";
+  }else if(selected.length===1){
+    extrasToggleText.textContent=selected[0];
+  }else{
+    extrasToggleText.textContent=selected.length+" servicios seleccionados";
+  }
+}
+
+function setExtrasDropdownOpen(open){
+  if(!extrasMenu||!extrasToggle)return;
+  extrasMenu.classList.toggle("hidden",!open);
+  extrasToggle.setAttribute("aria-expanded",open?"true":"false");
+  extrasDropdown?.classList.toggle("open",open);
+}
+
+extrasToggle?.addEventListener("click",e=>{
+  e.preventDefault();
+  e.stopPropagation();
+  setExtrasDropdownOpen(extrasMenu.classList.contains("hidden"));
+});
+
+document.addEventListener("click",e=>{
+  if(!extrasDropdown?.contains(e.target)) setExtrasDropdownOpen(false);
+});
+
+extrasMenu?.addEventListener("click",e=>e.stopPropagation());
 
 function syncExtrasNativeFromChecks(){
   const checked=Array.from(extrasMenu.querySelectorAll('input[type="checkbox"]:checked')).map(i=>i.value);
@@ -287,6 +321,7 @@ function syncExtrasNativeFromChecks(){
   }
   const finalSelected=selectedExtras();
   updateExtras();
+  updateExtrasToggleLabel();
 }
 
 EXTRAS.forEach(name=>{
@@ -369,6 +404,8 @@ document.getElementById("editCropBtn").addEventListener("click",()=>{
 
 document.getElementById("resetBtn").addEventListener("click",()=>{
   extrasMenu.querySelectorAll('input[type="checkbox"]').forEach(i=>i.checked=false);
+  updateExtrasToggleLabel();
+  setExtrasDropdownOpen(false);
 
   if(cropper){cropper.destroy();cropper=null;}
   imageEditor.classList.add("hidden");
