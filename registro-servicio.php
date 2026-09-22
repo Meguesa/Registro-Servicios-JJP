@@ -46,12 +46,12 @@ try {
     }
 
     $config = portal_sharepoint_config();
-    $graphToken = portal_graph_app_token($config);
-    $siteUrl = portal_sharepoint_site_url($graphToken, $config['siteId']);
-    $host = strtolower((string) parse_url($siteUrl, PHP_URL_HOST));
-    if ($host === '') {
-        throw new RuntimeException('No fue posible determinar el host del sitio de SharePoint configurado.');
-    }
+
+    // Eventos Capillas vive en el sitio Operaciones. No debe heredarse el
+    // siteId configurado para otros modulos del Portal (p. ej. Solicitud de Venta),
+    // porque eso provoca HTTP 404 al buscar la lista correcta en otro sitio.
+    $host = 'meguesajdjp.sharepoint.com';
+    $siteUrl = 'https://' . $host . '/sites/Operaciones';
     $listTitle = 'Eventos Capillas';
     $token = portal_sharepoint_token($config, $host);
 
@@ -183,7 +183,24 @@ try {
     try {
         $fieldRows = rs_request('GET', $fieldsUrl, $token)['json']['value'] ?? [];
     } catch (Throwable $e) {
-        throw new RuntimeException('Etapa CONSULTAR COLUMNAS: ' . $e->getMessage(), 0, $e);
+        $message = $e->getMessage();
+        if (strpos($message, 'HTTP 403') !== false) {
+            throw new RuntimeException(
+                'Etapa CONSULTAR COLUMNAS: la aplicacion del Portal no tiene permiso sobre el sitio Operaciones. ' .
+                'Debe autorizarse la app configurada en el Portal para https://meguesajdjp.sharepoint.com/sites/Operaciones. ' .
+                $message,
+                0,
+                $e
+            );
+        }
+        if (strpos($message, 'HTTP 404') !== false) {
+            throw new RuntimeException(
+                'Etapa CONSULTAR COLUMNAS: no se encontro la lista Eventos Capillas en el sitio Operaciones. ' . $message,
+                0,
+                $e
+            );
+        }
+        throw new RuntimeException('Etapa CONSULTAR COLUMNAS: ' . $message, 0, $e);
     }
     $fieldIndex = rs_fields_by_norm(is_array($fieldRows) ? $fieldRows : []);
 
