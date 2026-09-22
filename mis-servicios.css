@@ -7,8 +7,8 @@
 .service-menu-card.active{border-color:#a8c1d5;box-shadow:0 0 0 3px rgba(34,91,138,.08)}.service-menu-card.active>span{background:var(--jp-blue);color:#fff}
 .services-panel{background:#fff;border:1px solid var(--jp-border);border-radius:14px;padding:20px;box-shadow:var(--jp-shadow)}
 .services-panel-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:14px}.services-panel-heading h2{margin:0;color:var(--jp-brown)}.services-panel-heading p{margin:4px 0 0;color:var(--jp-muted)}
-.services-list-cards{display:grid;gap:10px}.service-card{display:grid;grid-template-columns:1.1fr 1.4fr 1fr 1fr 1fr auto;gap:12px;align-items:center;padding:14px;background:#faf8f4;border:1px solid var(--jp-border);border-radius:10px}
+.services-list-cards{display:grid;gap:10px}.service-card{display:grid;grid-template-columns:1.05fr 1.35fr .95fr .95fr .9fr .8fr;gap:12px;align-items:center;padding:14px;background:#faf8f4;border:1px solid var(--jp-border);border-radius:10px}.service-card.has-action{grid-template-columns:1.05fr 1.35fr .95fr .95fr .9fr .8fr auto}
 .service-field{min-width:0}.service-field span,.service-field strong{display:block}.service-field span{font-size:10px;color:var(--jp-muted);text-transform:uppercase}.service-field strong{margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--jp-brown)}
 .service-badge{display:inline-flex!important;width:max-content;padding:5px 8px;border-radius:999px;background:#fff1c9;color:#765700;font-size:10px}.service-badge.published{background:#e8f4ec;color:#23623b}
-.service-open{text-decoration:none}.service-message{min-height:22px;margin:8px 0;color:#a22}
+.service-open{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-width:112px;min-height:38px;padding:0 14px;white-space:nowrap;justify-self:end}.service-message{min-height:22px;margin:8px 0;color:#a22}
 @media(max-width:850px){.service-card{grid-template-columns:repeat(2,minmax(0,1fr))}.service-card .service-open{grid-column:span 2}.service-menu-grid{grid-template-columns:1fr}}
