@@ -84,10 +84,36 @@ try {
         if ($response === false) throw new RuntimeException('La conexion con SharePoint fallo: ' . $error);
         $decoded = json_decode((string) $response, true);
         if ($status < 200 || $status >= 300) {
-            $detail = is_array($decoded)
-                ? (string) ($decoded['error']['message']['value'] ?? $decoded['error']['message'] ?? '')
-                : '';
-            throw new RuntimeException('SharePoint respondio HTTP ' . $status . ($detail !== '' ? ': ' . $detail : '.'));
+        
+            $detail = '';
+        
+            if (is_array($decoded)) {
+        
+                $messageNode = $decoded['error']['message'] ?? '';
+        
+                if (is_array($messageNode)) {
+                    $detail = (string) ($messageNode['value'] ?? '');
+                } elseif (is_string($messageNode)) {
+                    $detail = $messageNode;
+                }
+            }
+        
+            // Si SharePoint no entregó el error en el formato esperado,
+            // mostrar la respuesta original.
+            if ($detail === '') {
+        
+                $raw = trim((string) $response);
+        
+                if ($raw !== '') {
+                    $detail = mb_substr($raw, 0, 1800);
+                }
+            }
+        
+            throw new RuntimeException(
+                'SharePoint respondio HTTP ' .
+                $status .
+                ($detail !== '' ? ': ' . $detail : '.')
+            );
         }
         return ['status' => $status, 'body' => (string) $response, 'json' => is_array($decoded) ? $decoded : []];
     }
@@ -285,7 +311,18 @@ try {
         'Content-Type: application/json;odata=nometadata',
     ])['json'];
     } catch (Throwable $e) {
-        throw new RuntimeException('Etapa CONTEXTINFO: ' . $e->getMessage(), 0, $e);
+    
+        $sentFields = implode(', ', array_keys($sp));
+    
+        throw new RuntimeException(
+            'Etapa CREAR ELEMENTO: ' .
+            $e->getMessage() .
+            ($sentFields !== ''
+                ? ' | Columnas enviadas: ' . $sentFields
+                : ''),
+            0,
+            $e
+        );
     }
     $digest = trim((string) ($digestData['FormDigestValue'] ?? ''));
     if ($digest === '') throw new RuntimeException('SharePoint no devolvio un FormDigest valido.');
