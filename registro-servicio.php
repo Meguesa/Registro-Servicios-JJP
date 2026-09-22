@@ -17,12 +17,12 @@ function rs_json(int $status, array $payload): never
 try {
     $root = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
     $bootstrap = $root . '/includes/bootstrap.php';
-    $sharepoint = $root . '/includes/portal-sharepoint.php';
-    if (!is_file($bootstrap) || !is_file($sharepoint)) {
-        throw new RuntimeException('No se encontraron los componentes compartidos del Portal.');
+    $registroSharePoint = __DIR__ . '/registro-sharepoint.php';
+    if (!is_file($bootstrap) || !is_file($registroSharePoint)) {
+        throw new RuntimeException('No se encontraron los componentes necesarios de Registro de Servicios.');
     }
     require_once $bootstrap;
-    require_once $sharepoint;
+    require_once $registroSharePoint;
     portal_require_authentication();
     $storageCtx = rs_storage_bootstrap();
     $draftIdRaw = trim((string) ($_POST['draftId'] ?? ''));
@@ -45,7 +45,9 @@ try {
         }
     }
 
-    $config = portal_sharepoint_config();
+    // Configuracion AISLADA de Registro de Servicios.
+    // No utiliza portal-sharepoint.php ni modifica la autenticacion de otras herramientas.
+    $config = rs_sharepoint_config();
 
     // Eventos Capillas vive en el sitio Operaciones. No debe heredarse el
     // siteId configurado para otros modulos del Portal (p. ej. Solicitud de Venta),
@@ -53,7 +55,7 @@ try {
     $host = 'meguesajdjp.sharepoint.com';
     $siteUrl = 'https://' . $host . '/sites/Operaciones';
     $listTitle = 'Eventos Capillas';
-    $token = portal_sharepoint_token($config, $host);
+    $token = rs_sharepoint_token($config, $host);
 
     /** @return array{status:int,body:string,json:array<string,mixed>} */
     function rs_request(string $method, string $url, string $token, ?string $body = null, array $headers = []): array
@@ -186,8 +188,8 @@ try {
         $message = $e->getMessage();
         if (strpos($message, 'HTTP 403') !== false) {
             throw new RuntimeException(
-                'Etapa CONSULTAR COLUMNAS: la aplicacion del Portal no tiene permiso sobre el sitio Operaciones. ' .
-                'Debe autorizarse la app configurada en el Portal para https://meguesajdjp.sharepoint.com/sites/Operaciones. ' .
+                'Etapa CONSULTAR COLUMNAS: la aplicacion usada por Registro de Servicios no tiene permiso sobre el sitio Operaciones. ' .
+                'Debe autorizarse la app ' . ($config['clientId'] ?? 'desconocida') . ' para https://meguesajdjp.sharepoint.com/sites/Operaciones. ' .
                 $message,
                 0,
                 $e
