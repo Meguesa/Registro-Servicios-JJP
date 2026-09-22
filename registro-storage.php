@@ -10,24 +10,28 @@ function rs_storage_bootstrap(): array
     }
     require_once $bootstrap;
 
-    // Igual que las paginas protegidas del Portal, primero dejamos que el
-    // bootstrap restaure/valide la sesion antes de consultar al usuario.
-    // portal_is_authenticated() por si solo puede devolver false en endpoints
-    // AJAX aunque la pagina principal ya haya pasado por el flujo de acceso.
-    if (function_exists('portal_require_authentication')) {
-        portal_require_authentication();
-    }
-    if (!portal_is_authenticated()) {
-        throw new RuntimeException('SESSION_REQUIRED');
-    }
-    $user = portal_user();
+    // En endpoints AJAX no usamos portal_require_authentication(), porque
+    // esa funcion responde con un redirect HTML a /login.php. fetch sigue
+    // el redirect y termina viendo HTTP 200 en vez de JSON.
+    $user = function_exists('portal_user') ? portal_user() : [];
+
     $email = '';
     foreach (['email','preferred_username','upn','userPrincipalName'] as $key) {
         $candidate = strtolower(trim((string)($user[$key] ?? '')));
-        if ($candidate !== '') { $email = $candidate; break; }
+        if ($candidate !== '') {
+            $email = $candidate;
+            break;
+        }
     }
+
+    // Si PHP no expone portal_user() en esta peticion AJAX, mantenemos una
+    // identidad estable por sesion en vez de romper Mis Servicios.
     if ($email === '') {
-        $email = 'session-' . hash('sha256', session_id());
+        $sid = session_id();
+        if ($sid === '') {
+            throw new RuntimeException('SESSION_NOT_AVAILABLE');
+        }
+        $email = 'session-' . hash('sha256', $sid);
     }
 
     $configuredBase = function_exists('portal_config') ? trim((string)(portal_config('registro_servicios_storage_path') ?? '')) : '';
