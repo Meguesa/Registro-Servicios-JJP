@@ -46,8 +46,12 @@ try {
     }
 
     $config = portal_sharepoint_config();
-    $host = 'meguesajdjp.sharepoint.com';
-    $siteUrl = 'https://' . $host . '/sites/Operaciones';
+    $graphToken = portal_graph_app_token($config);
+    $siteUrl = portal_sharepoint_site_url($graphToken, $config['siteId']);
+    $host = strtolower((string) parse_url($siteUrl, PHP_URL_HOST));
+    if ($host === '') {
+        throw new RuntimeException('No fue posible determinar el host del sitio de SharePoint configurado.');
+    }
     $listTitle = 'Eventos Capillas';
     $token = portal_sharepoint_token($config, $host);
 
