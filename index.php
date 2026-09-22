@@ -134,7 +134,13 @@ declare(strict_types=1);
         <label>Personal Venta<input name="personalVenta" placeholder="Ej. Nombre del asesor"></label>
         <label>Precio de Venta<input type="number" min="0" step="0.01" name="precioVenta" id="precioVenta" placeholder="Ej. 30000.00" required></label>
         <label>Servicios Adicionales
-          <div class="services-list" id="extrasMenu" aria-label="Servicios adicionales"></div>
+          <div class="multi-select" id="extrasDropdown">
+            <button type="button" class="multi-select-toggle" id="extrasToggle" aria-haspopup="true" aria-expanded="false">
+              <span id="extrasToggleText">Seleccionar servicios</span>
+              <span class="chevron">⌄</span>
+            </button>
+            <div class="multi-select-menu hidden" id="extrasMenu" aria-label="Servicios adicionales"></div>
+          </div>
           <select name="serviciosExtra[]" id="serviciosExtra" multiple class="native-multi-hidden" aria-hidden="true" tabindex="-1"></select>
         </label>
       </div>
