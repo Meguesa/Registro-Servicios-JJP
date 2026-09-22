@@ -12,9 +12,20 @@ const CODIGO_ATAUD={"Ataud Madera Basico":"ATMADBA","Ataud Madera de Lujo":"ATMA
 function fill(id,items,placeholder="Seleccionar"){
   const el=document.getElementById(id);
   if(!el)return;
-  if(!el.multiple) el.innerHTML='<option value="">'+placeholder+'</option>';
+
+  if(!el.multiple){
+    el.innerHTML="";
+    const ph=document.createElement("option");
+    ph.value="";
+    ph.textContent=placeholder;
+    ph.disabled=true;
+    ph.hidden=true;
+    ph.selected=true;
+    el.appendChild(ph);
+  }
+
   items.forEach(v=>{
-    const o=document.createElement('option');
+    const o=document.createElement("option");
     o.value=v;
     o.textContent=v;
     el.appendChild(o);
