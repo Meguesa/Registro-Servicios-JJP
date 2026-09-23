@@ -191,3 +191,132 @@ function rs_sharepoint_token(array $config, string $host): string
 
     return $token;
 }
+
+
+/**
+ * Genera token app-only para Microsoft Graph usando el mismo certificado
+ * configurado EXCLUSIVAMENTE para Registro de Servicios.
+ *
+ * IMPORTANTE:
+ * - Para calendario NO se permite usar implicitamente el backend de Solicitud
+ *   de Venta. La app debe estar configurada con registro_servicios_client_id.
+ * - La app dedicada debe tener Calendars.ReadWrite (Application) con admin consent.
+ */
+function rs_graph_token(array $config): string
+{
+    if (($config['source'] ?? '') !== 'registro_servicios') {
+        throw new RuntimeException(
+            'Calendario interno deshabilitado: configure una app dedicada con registro_servicios_*; ' .
+            'no se usaran credenciales de Solicitud de Venta para Microsoft Graph.'
+        );
+    }
+
+    $bytes = file_get_contents((string)$config['pfxPath']);
+    if ($bytes === false || $bytes === '') {
+        throw new RuntimeException('No fue posible leer el PFX dedicado de Registro de Servicios.');
+    }
+
+    $certs = [];
+    if (!openssl_pkcs12_read($bytes, $certs, (string)$config['pfxPassword'])) {
+        throw new RuntimeException('No fue posible abrir el PFX dedicado de Registro de Servicios.');
+    }
+
+    $privateKey = $certs['pkey'] ?? null;
+    $certificate = (string)($certs['cert'] ?? '');
+    if ($privateKey === null || $certificate === '') {
+        throw new RuntimeException('El PFX dedicado no contiene credenciales utilizables.');
+    }
+
+    $der = preg_replace(
+        '/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s+/',
+        '',
+        $certificate
+    );
+    $derBytes = is_string($der) ? base64_decode($der, true) : false;
+    if ($derBytes === false) {
+        throw new RuntimeException('No fue posible convertir el certificado dedicado.');
+    }
+
+    $thumbprint = rs_sharepoint_base64url(hash('sha1', $derBytes, true));
+    $tokenUrl = 'https://login.microsoftonline.com/'
+        . rawurlencode((string)$config['tenantId'])
+        . '/oauth2/v2.0/token';
+
+    $now = time();
+    $header = rs_sharepoint_base64url((string)json_encode([
+        'alg' => 'RS256',
+        'typ' => 'JWT',
+        'x5t' => $thumbprint,
+    ], JSON_UNESCAPED_SLASHES));
+
+    $claims = rs_sharepoint_base64url((string)json_encode([
+        'aud' => $tokenUrl,
+        'iss' => (string)$config['clientId'],
+        'sub' => (string)$config['clientId'],
+        'jti' => bin2hex(random_bytes(16)),
+        'nbf' => $now - 30,
+        'iat' => $now,
+        'exp' => $now + 300,
+    ], JSON_UNESCAPED_SLASHES));
+
+    $unsigned = $header . '.' . $claims;
+    $signature = '';
+    if (!openssl_sign($unsigned, $signature, $privateKey, OPENSSL_ALGO_SHA256)) {
+        throw new RuntimeException('No fue posible firmar el assertion para Microsoft Graph.');
+    }
+
+    $assertion = $unsigned . '.' . rs_sharepoint_base64url($signature);
+    $body = http_build_query([
+        'client_id' => (string)$config['clientId'],
+        'scope' => 'https://graph.microsoft.com/.default',
+        'grant_type' => 'client_credentials',
+        'client_assertion_type' => 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+        'client_assertion' => $assertion,
+    ], '', '&', PHP_QUERY_RFC3986);
+
+    $curl = curl_init($tokenUrl);
+    if ($curl === false) {
+        throw new RuntimeException('No fue posible inicializar la autenticacion con Microsoft Graph.');
+    }
+
+    curl_setopt_array($curl, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $body,
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/x-www-form-urlencoded',
+            'Accept: application/json',
+        ],
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+    ]);
+
+    $response = curl_exec($curl);
+    $status = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $error = curl_error($curl);
+    curl_close($curl);
+
+    if ($response === false) {
+        throw new RuntimeException('La autenticacion con Microsoft Graph fallo: ' . $error);
+    }
+
+    $data = json_decode((string)$response, true);
+    if ($status < 200 || $status >= 300) {
+        $detail = is_array($data)
+            ? (string)($data['error_description'] ?? $data['error'] ?? '')
+            : '';
+        throw new RuntimeException(
+            'Microsoft Graph/Entra respondio HTTP ' . $status .
+            ($detail !== '' ? ': ' . $detail : '.')
+        );
+    }
+
+    $token = trim((string)($data['access_token'] ?? ''));
+    if ($token === '') {
+        throw new RuntimeException('Microsoft Entra no devolvio token de Microsoft Graph.');
+    }
+
+    return $token;
+}
