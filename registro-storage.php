@@ -181,7 +181,11 @@ function rs_store_uploads(array $ctx, string $id, array $existing = []): array
 
 function rs_publications_path(array $ctx): string
 {
-    return $ctx['userDir'] . '/published.json';
+    // Los servicios publicados pertenecen al modulo, no a un usuario individual.
+    // Usar almacenamiento global evita que un registro creado desde registro-servicio.php
+    // desaparezca en Mis Servicios cuando ambos endpoints resuelven identidades de sesion
+    // ligeramente distintas. Los borradores siguen siendo privados por usuario.
+    return $ctx['base'] . '/published.json';
 }
 
 function rs_read_publications(array $ctx): array
