@@ -174,13 +174,9 @@ function rs_calendar_create_event(array $payload, array $sharePointConfig): arra
         return ['enabled' => false, 'created' => false];
     }
 
-    if (($sharePointConfig['source'] ?? '') !== 'registro_servicios') {
-        throw new RuntimeException(
-            'Calendario Fase 1 requiere credenciales dedicadas registro_servicios_*; ' .
-            'no se utilizara la app de Solicitud de Venta.'
-        );
-    }
-
+    // El calendario usa SIEMPRE las credenciales dedicadas registro_servicios_*
+    // dentro de rs_graph_token(). SharePoint puede seguir usando temporalmente
+    // su backend certificado existente sin mezclar credenciales entre modulos.
     if ($calendar['mailbox'] === '' || $calendar['calendarId'] === '') {
         throw new RuntimeException(
             'Falta configurar registro_servicios_calendar_mailbox o registro_servicios_calendar_id.'
