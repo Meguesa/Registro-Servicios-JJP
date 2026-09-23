@@ -18,11 +18,13 @@ try {
     $root = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
     $bootstrap = $root . '/includes/bootstrap.php';
     $registroSharePoint = __DIR__ . '/registro-sharepoint.php';
-    if (!is_file($bootstrap) || !is_file($registroSharePoint)) {
+    $registroCalendario = __DIR__ . '/registro-calendario.php';
+    if (!is_file($bootstrap) || !is_file($registroSharePoint) || !is_file($registroCalendario)) {
         throw new RuntimeException('No se encontraron los componentes necesarios de Registro de Servicios.');
     }
     require_once $bootstrap;
     require_once $registroSharePoint;
+    require_once $registroCalendario;
     portal_require_authentication();
     $storageCtx = rs_storage_bootstrap();
     $draftIdRaw = trim((string) ($_POST['draftId'] ?? ''));
@@ -438,6 +440,19 @@ try {
         $uploadedNames[] = $safeName;
     }
 
+    // FASE 1: crear evento de calendario de forma interna y aislada.
+    // El modulo queda gobernado por registro_servicios_calendar_enabled.
+    // Mientras este en false, no cambia el comportamiento productivo actual.
+    try {
+        $calendarResult = rs_calendar_create_event($payload, $config);
+    } catch (Throwable $calendarError) {
+        throw new RuntimeException(
+            'Etapa CREAR EVENTO CALENDARIO: ' . $calendarError->getMessage(),
+            0,
+            $calendarError
+        );
+    }
+
     rs_add_publication($storageCtx, [
         'itemId'=>(string)$itemId,
         'status'=>'PUBLICADO',
@@ -458,6 +473,7 @@ try {
         'itemId' => $itemId,
         'message' => 'Servicio registrado correctamente en SharePoint.',
         'attachments' => $uploadedNames,
+        'calendar' => $calendarResult ?? ['enabled' => false, 'created' => false],
     ]);
 } catch (Throwable $error) {
     error_log('Registro Servicios SharePoint: ' . $error->getMessage());
