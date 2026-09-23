@@ -121,6 +121,20 @@ try {
     function rs_norm(string $value): string
     {
         $value = trim($value);
+
+        // SharePoint codifica espacios y caracteres especiales en InternalName
+        // con secuencias como _x0020_. Decodificarlas permite comparar de forma
+        // confiable tanto Title como InternalName.
+        $value = preg_replace_callback(
+            '/_x([0-9a-fA-F]{4})_/',
+            static function (array $m): string {
+                $code = hexdec($m[1]);
+                if ($code <= 0x7F) return chr($code);
+                return html_entity_decode('&#' . $code . ';', ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            },
+            $value
+        ) ?? $value;
+
         $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
         if (is_string($ascii) && $ascii !== '') $value = $ascii;
         $value = strtolower($value);
@@ -258,10 +272,23 @@ try {
     rs_add_value($sp, $fieldIndex, ['Referencia'], trim((string) ($payload['referencia'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['Requiere Placa', 'Requiere Placa de Urna', 'Requiere Placa de Urna?'], (bool) ($payload['requierePlaca'] ?? false), false);
 
-    rs_add_value($sp, $fieldIndex, ['Titular Responsable'], trim((string) ($payload['titular'] ?? '')));
+    rs_add_value($sp, $fieldIndex, [
+        'Titular Responsable',
+        'Titular/Responsable',
+        'Titular / Responsable',
+        'Titular',
+        'Responsable'
+    ], trim((string) ($payload['titular'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['Nombre de Fallecido (a)', 'Nombre Fallecido', 'Nombre de Fallecido(a)'], trim((string) ($payload['fallecido'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['Fecha Nacimiento Fallecido (a)', 'Fecha Nacimiento', 'Fecha de Nacimiento'], rs_date_only((string) ($payload['fechaNacimiento'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Fecha y Hora Defuncion Fallecido (a)', 'Fecha y Hora Defunción Fallecido (a)', 'Fecha y Hora Defuncion'], rs_local_datetime_to_utc((string) ($payload['fechaDefuncion'] ?? '')));
+    rs_add_value($sp, $fieldIndex, [
+        'Fecha y Hora Defuncion Fallecido (a)',
+        'Fecha y Hora Defunción Fallecido (a)',
+        'Fecha y Hora Defuncion',
+        'Fecha y Hora Defunción',
+        'Fecha Defuncion',
+        'Fecha Defunción'
+    ], rs_local_datetime_to_utc((string) ($payload['fechaDefuncion'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['Sexo'], trim((string) ($payload['sexo'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['Edad'], ($payload['edad'] ?? '') === '' ? null : (float) $payload['edad']);
     rs_add_value($sp, $fieldIndex, ['Ubicacion Post Capillas', 'Ubicación Post Capillas', 'Ubicacion Destino Final', 'Ubicación Destino Final'], trim((string) ($payload['destinoFinal'] ?? '')));
