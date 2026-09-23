@@ -37,7 +37,7 @@ function rs_calendar_private_config(): array
     ];
 }
 
-function rs_calendar_to_utc(string $value): string
+function rs_calendar_parse_local(string $value): DateTimeImmutable
 {
     $value = trim($value);
     if ($value === '') {
@@ -51,11 +51,23 @@ function rs_calendar_to_utc(string $value): string
             new DateTimeZone('America/Monterrey')
         );
         if ($dt instanceof DateTimeImmutable) {
-            return $dt->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\\TH:i:s');
+            return $dt;
         }
     }
 
     throw new RuntimeException('Fecha/hora no valida para calendario: ' . $value);
+}
+
+function rs_calendar_local_graph_value(string $value): string
+{
+    return rs_calendar_parse_local($value)->format('Y-m-d\\TH:i:s');
+}
+
+function rs_calendar_to_utc(string $value): string
+{
+    return rs_calendar_parse_local($value)
+        ->setTimezone(new DateTimeZone('UTC'))
+        ->format('Y-m-d\\TH:i:s');
 }
 
 function rs_calendar_date_display(string $value): string
@@ -149,8 +161,9 @@ function rs_graph_request(string $method, string $url, string $token, ?array $js
  * Crea el evento en "Eventos Capillas".
  *
  * Las horas recibidas del formulario se interpretan SIEMPRE como
- * America/Monterrey y se convierten una sola vez a UTC antes de enviarse.
- * Esto elimina la doble conversion que provocaba el desfase de +1 hora.
+ * America/Monterrey. Para Microsoft Graph se conserva la hora local
+ * y se etiqueta con la zona de Outlook "Central Standard Time (Mexico)".
+ * Asi Outlook conserva tambien la zona horaria original del evento.
  *
  * @return array{enabled:bool,created:bool,eventId?:string,webLink?:string}
  */
@@ -174,8 +187,8 @@ function rs_calendar_create_event(array $payload, array $sharePointConfig): arra
         );
     }
 
-    $inicio = rs_calendar_to_utc((string)($payload['inicio'] ?? ''));
-    $termino = rs_calendar_to_utc((string)($payload['termino'] ?? ''));
+    $inicio = rs_calendar_local_graph_value((string)($payload['inicio'] ?? ''));
+    $termino = rs_calendar_local_graph_value((string)($payload['termino'] ?? ''));
 
     $subjectParts = array_filter([
         trim((string)($payload['ubicacion'] ?? '')),
@@ -223,14 +236,15 @@ function rs_calendar_create_event(array $payload, array $sharePointConfig): arra
             'contentType' => 'HTML',
             'content' => $bodyHtml,
         ],
-        // Se envia UTC explicitamente. Outlook mostrara la hora local del buzon.
+        // Se conserva la hora local y la zona original para que tanto la vista
+        // rapida como el editor de Outlook muestren la misma hora.
         'start' => [
             'dateTime' => $inicio,
-            'timeZone' => 'UTC',
+            'timeZone' => 'Central Standard Time (Mexico)',
         ],
         'end' => [
             'dateTime' => $termino,
-            'timeZone' => 'UTC',
+            'timeZone' => 'Central Standard Time (Mexico)',
         ],
         'location' => [
             'displayName' => trim((string)($payload['ubicacion'] ?? '')),
