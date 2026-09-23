@@ -28,7 +28,11 @@ function rs_sharepoint_config(): array
     }
 
     $dedicatedClientId = trim((string)($raw['registro_servicios_client_id'] ?? ''));
-    $usingDedicated = $dedicatedClientId !== '';
+    $dedicatedPfxPath = trim((string)($raw['registro_servicios_sharepoint_pfx_path'] ?? ''));
+    // SharePoint REST sigue usando el backend certificado existente mientras
+    // Registro de Servicios no tenga SU PROPIO certificado de SharePoint.
+    // Tener solo client_id/client_secret para Graph NO cambia SharePoint.
+    $usingDedicated = $dedicatedClientId !== '' && $dedicatedPfxPath !== '';
 
     $config = [
         'tenantId' => trim((string)(
@@ -38,17 +42,17 @@ function rs_sharepoint_config(): array
             ?? ''
         )),
         'clientId' => trim((string)(
-            $raw['registro_servicios_client_id']
+            ($usingDedicated ? $raw['registro_servicios_client_id'] : null)
             ?? $raw['solicitud_backend_client_id']
             ?? ''
         )),
         'pfxPath' => trim((string)(
-            $raw['registro_servicios_sharepoint_pfx_path']
+            ($usingDedicated ? $raw['registro_servicios_sharepoint_pfx_path'] : null)
             ?? $raw['solicitud_sharepoint_pfx_path']
             ?? ''
         )),
         'pfxPassword' => (string)(
-            $raw['registro_servicios_sharepoint_pfx_password']
+            ($usingDedicated ? ($raw['registro_servicios_sharepoint_pfx_password'] ?? '') : null)
             ?? $raw['solicitud_sharepoint_pfx_password']
             ?? ''
         ),
@@ -202,76 +206,39 @@ function rs_sharepoint_token(array $config, string $host): string
  *   de Venta. La app debe estar configurada con registro_servicios_client_id.
  * - La app dedicada debe tener Calendars.ReadWrite (Application) con admin consent.
  */
-function rs_graph_token(array $config): string
+function rs_graph_token(array $config = []): string
 {
-    if (($config['source'] ?? '') !== 'registro_servicios') {
+    // Graph usa exclusivamente la app dedicada "Registro Servicios JJP"
+    // mediante client secret. No reutiliza credenciales de Solicitud de Venta.
+    $configPath = '/home/juanpab1/portal-config/config.php';
+    if (!is_file($configPath)) {
+        throw new RuntimeException('No se encontro la configuracion privada del Portal.');
+    }
+
+    $raw = require $configPath;
+    if (!is_array($raw)) {
+        throw new RuntimeException('La configuracion privada del Portal no es valida.');
+    }
+
+    $tenantId = trim((string)($raw['registro_servicios_tenant_id'] ?? ''));
+    $clientId = trim((string)($raw['registro_servicios_client_id'] ?? ''));
+    $clientSecret = trim((string)($raw['registro_servicios_client_secret'] ?? ''));
+
+    if ($tenantId === '' || $clientId === '' || $clientSecret === '') {
         throw new RuntimeException(
-            'Calendario interno deshabilitado: configure una app dedicada con registro_servicios_*; ' .
-            'no se usaran credenciales de Solicitud de Venta para Microsoft Graph.'
+            'Faltan registro_servicios_tenant_id, registro_servicios_client_id o registro_servicios_client_secret.'
         );
     }
 
-    $bytes = file_get_contents((string)$config['pfxPath']);
-    if ($bytes === false || $bytes === '') {
-        throw new RuntimeException('No fue posible leer el PFX dedicado de Registro de Servicios.');
-    }
-
-    $certs = [];
-    if (!openssl_pkcs12_read($bytes, $certs, (string)$config['pfxPassword'])) {
-        throw new RuntimeException('No fue posible abrir el PFX dedicado de Registro de Servicios.');
-    }
-
-    $privateKey = $certs['pkey'] ?? null;
-    $certificate = (string)($certs['cert'] ?? '');
-    if ($privateKey === null || $certificate === '') {
-        throw new RuntimeException('El PFX dedicado no contiene credenciales utilizables.');
-    }
-
-    $der = preg_replace(
-        '/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s+/',
-        '',
-        $certificate
-    );
-    $derBytes = is_string($der) ? base64_decode($der, true) : false;
-    if ($derBytes === false) {
-        throw new RuntimeException('No fue posible convertir el certificado dedicado.');
-    }
-
-    $thumbprint = rs_sharepoint_base64url(hash('sha1', $derBytes, true));
     $tokenUrl = 'https://login.microsoftonline.com/'
-        . rawurlencode((string)$config['tenantId'])
+        . rawurlencode($tenantId)
         . '/oauth2/v2.0/token';
 
-    $now = time();
-    $header = rs_sharepoint_base64url((string)json_encode([
-        'alg' => 'RS256',
-        'typ' => 'JWT',
-        'x5t' => $thumbprint,
-    ], JSON_UNESCAPED_SLASHES));
-
-    $claims = rs_sharepoint_base64url((string)json_encode([
-        'aud' => $tokenUrl,
-        'iss' => (string)$config['clientId'],
-        'sub' => (string)$config['clientId'],
-        'jti' => bin2hex(random_bytes(16)),
-        'nbf' => $now - 30,
-        'iat' => $now,
-        'exp' => $now + 300,
-    ], JSON_UNESCAPED_SLASHES));
-
-    $unsigned = $header . '.' . $claims;
-    $signature = '';
-    if (!openssl_sign($unsigned, $signature, $privateKey, OPENSSL_ALGO_SHA256)) {
-        throw new RuntimeException('No fue posible firmar el assertion para Microsoft Graph.');
-    }
-
-    $assertion = $unsigned . '.' . rs_sharepoint_base64url($signature);
     $body = http_build_query([
-        'client_id' => (string)$config['clientId'],
+        'client_id' => $clientId,
+        'client_secret' => $clientSecret,
         'scope' => 'https://graph.microsoft.com/.default',
         'grant_type' => 'client_credentials',
-        'client_assertion_type' => 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
-        'client_assertion' => $assertion,
     ], '', '&', PHP_QUERY_RFC3986);
 
     $curl = curl_init($tokenUrl);
