@@ -255,33 +255,35 @@ try {
 
     $sp = [];
     rs_add_value($sp, $fieldIndex, ['ModoPrueba', 'Modo Prueba'], true, false);
-    rs_add_value($sp, $fieldIndex, ['Numero de Referencia', 'Número de Referencia'], trim((string) ($payload['numeroReferencia'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Servicio', 'Tipo de Servicio'], trim((string) ($payload['servicio'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Ubicación Servicio Capillas', 'Ubicacion Servicio Capillas'], trim((string) ($payload['ubicacion'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Sala'], trim((string) ($payload['sala'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Fecha y Hora Inicio'], rs_local_datetime_to_utc((string) ($payload['inicio'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Fecha y Hora Termino', 'Fecha y Hora Término'], rs_local_datetime_to_utc((string) ($payload['termino'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_1', 'Numero de Referencia', 'Número de Referencia'], trim((string) ($payload['numeroReferencia'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_32', 'Servicio', 'Tipo de Servicio'], trim((string) ($payload['servicio'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_39', 'Ubicación Servicio Capillas', 'Ubicacion Servicio Capillas'], trim((string) ($payload['ubicacion'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_40', 'Sala'], trim((string) ($payload['sala'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_36', 'Fecha y Hora Inicio'], rs_local_datetime_to_utc((string) ($payload['inicio'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_37', 'Fecha y Hora Termino', 'Fecha y Hora Término'], rs_local_datetime_to_utc((string) ($payload['termino'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['Misa', 'Lleva exequia', 'Lleva exequia?'], (bool) ($payload['llevaExequia'] ?? false), false);
-    rs_add_value($sp, $fieldIndex, ['Tiempo de Capillas'], trim((string) ($payload['tiempoCapillas'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Hora Misa', 'Fecha y Hora Exequia'], rs_local_datetime_to_utc((string) ($payload['horaExequia'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Prevision/Uso Inmediato', 'Previsión/Uso Inmediato'], trim((string) ($payload['prevision'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Tipo de Ataud/Urna', 'Tipo de Ataúd/Urna'], trim((string) ($payload['tipoAtaud'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Numero de Servicio', 'Número de Servicio'], trim((string) ($payload['numeroServicio'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Codigo', 'Código', 'Codigo de Servicio', 'Código de Servicio'], trim((string) ($payload['codigoServicio'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Ataud/Urna', 'Ataúd/Urna'], trim((string) ($payload['codigoAtaud'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_45', 'Tiempo de Capillas'], trim((string) ($payload['tiempoCapillas'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_44', 'Hora Misa', 'Fecha y Hora Exequia'], rs_local_datetime_to_utc((string) ($payload['horaExequia'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_9', 'Prevision/Uso Inmediato', 'Previsión/Uso Inmediato'], trim((string) ($payload['prevision'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_49', 'Tipo de Ataud/Urna', 'Tipo de Ataúd/Urna'], trim((string) ($payload['tipoAtaud'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_48', 'Numero de Servicio', 'Número de Servicio'], trim((string) ($payload['numeroServicio'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_46', 'Codigo', 'Código', 'Codigo de Servicio', 'Código de Servicio'], trim((string) ($payload['codigoServicio'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_47', 'Ataud/Urna', 'Ataúd/Urna'], trim((string) ($payload['codigoAtaud'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['Referencia'], trim((string) ($payload['referencia'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Requiere Placa', 'Requiere Placa de Urna', 'Requiere Placa de Urna?'], (bool) ($payload['requierePlaca'] ?? false), false);
+    rs_add_value($sp, $fieldIndex, ['RequierePlacadeUrna_x003f_', 'Requiere Placa', 'Requiere Placa de Urna', 'Requiere Placa de Urna?'], (bool) ($payload['requierePlaca'] ?? false), false);
 
     rs_add_value($sp, $fieldIndex, [
+        'field_7',
         'Titular Responsable',
         'Titular/Responsable',
         'Titular / Responsable',
         'Titular',
         'Responsable'
     ], trim((string) ($payload['titular'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Nombre de Fallecido (a)', 'Nombre Fallecido', 'Nombre de Fallecido(a)'], trim((string) ($payload['fallecido'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Fecha Nacimiento Fallecido (a)', 'Fecha Nacimiento', 'Fecha de Nacimiento'], rs_date_only((string) ($payload['fechaNacimiento'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_2', 'Nombre de Fallecido (a)', 'Nombre Fallecido', 'Nombre de Fallecido(a)'], trim((string) ($payload['fallecido'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_4', 'Fecha Nacimiento Fallecido (a)', 'Fecha Nacimiento', 'Fecha de Nacimiento'], rs_date_only((string) ($payload['fechaNacimiento'] ?? '')));
     rs_add_value($sp, $fieldIndex, [
+        'FechaDefuncion',
         'Fecha y Hora Defuncion Fallecido (a)',
         'Fecha y Hora Defunción Fallecido (a)',
         'Fecha y Hora Defuncion',
@@ -290,24 +292,24 @@ try {
         'Fecha Defunción'
     ], rs_local_datetime_to_utc((string) ($payload['fechaDefuncion'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['Sexo'], trim((string) ($payload['sexo'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Edad'], ($payload['edad'] ?? '') === '' ? null : (float) $payload['edad']);
-    rs_add_value($sp, $fieldIndex, ['Ubicacion Post Capillas', 'Ubicación Post Capillas', 'Ubicacion Destino Final', 'Ubicación Destino Final'], trim((string) ($payload['destinoFinal'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Embalsamador'], trim((string) ($payload['embalsamador'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Personal Rescate 1'], trim((string) ($payload['rescate1'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Personal Rescate 2'], trim((string) ($payload['rescate2'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Ubicacion de Rescate', 'Ubicación de Rescate'], trim((string) ($payload['ubicacionRescate'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Motivo de Fallecimiento'], trim((string) ($payload['motivo'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_3', 'Edad'], ($payload['edad'] ?? '') === '' ? null : (float) $payload['edad']);
+    rs_add_value($sp, $fieldIndex, ['field_52', 'Ubicacion Post Capillas', 'Ubicación Post Capillas', 'Ubicacion Destino Final', 'Ubicación Destino Final'], trim((string) ($payload['destinoFinal'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_69', 'Embalsamador'], trim((string) ($payload['embalsamador'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_28', 'Personal Rescate 1'], trim((string) ($payload['rescate1'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_29', 'Personal Rescate 2'], trim((string) ($payload['rescate2'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_31', 'Ubicacion de Rescate', 'Ubicación de Rescate'], trim((string) ($payload['ubicacionRescate'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_30', 'Motivo de Fallecimiento'], trim((string) ($payload['motivo'] ?? '')));
 
-    rs_add_value($sp, $fieldIndex, ['Referencia Crematorio'], trim((string) ($payload['referenciaCrematorio'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Fecha y Hora Inicio Crematorio'], rs_local_datetime_to_utc((string) ($payload['inicioCrematorio'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Personal de Crematorio', 'Personal Crematorio'], trim((string) ($payload['personalCrematorio'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Fecha y Hora Inhumacion', 'Fecha y Hora Inhumación'], rs_local_datetime_to_utc((string) ($payload['fechaHoraInhumacion'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_64', 'Referencia Crematorio'], trim((string) ($payload['referenciaCrematorio'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['FechayHoraInicioCrematorio', 'Fecha y Hora Inicio Crematorio'], rs_local_datetime_to_utc((string) ($payload['inicioCrematorio'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_68', 'Personal de Crematorio', 'Personal Crematorio'], trim((string) ($payload['personalCrematorio'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['FechayHoraInhumaci_x00f3_n', 'Fecha y Hora Inhumacion', 'Fecha y Hora Inhumación'], rs_local_datetime_to_utc((string) ($payload['fechaHoraInhumacion'] ?? '')));
 
-    rs_add_value($sp, $fieldIndex, ['Fecha Compra'], rs_date_only((string) ($payload['fechaCompra'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Personal Venta'], trim((string) ($payload['personalVenta'] ?? '')));
-    rs_add_value($sp, $fieldIndex, ['Precio de Venta', 'Precio Venta'], ($payload['precioVenta'] ?? '') === '' ? null : (float) $payload['precioVenta']);
-    rs_add_value($sp, $fieldIndex, ['Servicios Extra', 'Servicios Adicionales'], is_array($payload['serviciosExtra'] ?? null) ? $payload['serviciosExtra'] : []);
-    rs_add_value($sp, $fieldIndex, ['Venta Total Servicio'], ($payload['ventaTotal'] ?? '') === '' ? null : (float) $payload['ventaTotal']);
+    rs_add_value($sp, $fieldIndex, ['field_10', 'Fecha Compra'], rs_date_only((string) ($payload['fechaCompra'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_11', 'Personal Venta'], trim((string) ($payload['personalVenta'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['field_12', 'Precio de Venta', 'Precio Venta'], ($payload['precioVenta'] ?? '') === '' ? null : (float) $payload['precioVenta']);
+    rs_add_value($sp, $fieldIndex, ['ServiciosExtra', 'Servicios Extra', 'Servicios Adicionales'], is_array($payload['serviciosExtra'] ?? null) ? $payload['serviciosExtra'] : []);
+    rs_add_value($sp, $fieldIndex, ['field_27', 'Venta Total Servicio'], ($payload['ventaTotal'] ?? '') === '' ? null : (float) $payload['ventaTotal']);
 
     $extraAliases = [
         'Misa y Coro' => ['Misa y Coro'],
