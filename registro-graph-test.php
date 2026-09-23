@@ -76,8 +76,8 @@ try {
     $inicioLocal = '2026-09-24T13:00:00';
     $terminoLocal = '2026-09-24T14:00:00';
 
-    $inicioUtc = rs_calendar_to_utc($inicioLocal);
-    $terminoUtc = rs_calendar_to_utc($terminoLocal);
+    $inicioGraph = rs_calendar_local_graph_value($inicioLocal);
+    $terminoGraph = rs_calendar_local_graph_value($terminoLocal);
 
     $event = [
         'subject' => '[PRUEBA GITHUB] Registro de Servicios - Calendario',
@@ -89,12 +89,12 @@ try {
                 . 'No proviene de Power Automate.',
         ],
         'start' => [
-            'dateTime' => $inicioUtc,
-            'timeZone' => 'UTC',
+            'dateTime' => $inicioGraph,
+            'timeZone' => 'Central Standard Time (Mexico)',
         ],
         'end' => [
-            'dateTime' => $terminoUtc,
-            'timeZone' => 'UTC',
+            'dateTime' => $terminoGraph,
+            'timeZone' => 'Central Standard Time (Mexico)',
         ],
         'location' => [
             'displayName' => 'PRUEBA - Capillas',
@@ -102,7 +102,6 @@ try {
         'showAs' => 'busy',
         'isReminderOn' => false,
         'allowNewTimeProposals' => false,
-        'transactionId' => '7d6af0ef-a22f-4ebc-a3e6-5e8184fd0b91',
     ];
 
     $eventsUrl = 'https://graph.microsoft.com/v1.0/users/'
@@ -122,9 +121,10 @@ try {
             'end' => '24/09/2026 14:00',
             'timeZone' => 'America/Monterrey',
         ],
-        'sentToGraphUtc' => [
-            'start' => $inicioUtc . 'Z',
-            'end' => $terminoUtc . 'Z',
+        'sentToGraphLocal' => [
+            'start' => $inicioGraph,
+            'end' => $terminoGraph,
+            'timeZone' => 'Central Standard Time (Mexico)',
         ],
         'event' => [
             'id' => (string)($created['id'] ?? ''),
