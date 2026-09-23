@@ -193,10 +193,15 @@ function rs_read_publications(array $ctx): array
     return is_array($data) ? array_values($data) : [];
 }
 
+function rs_write_publications(array $ctx, array $rows): void
+{
+    rs_write_json_atomic(rs_publications_path($ctx), array_values($rows));
+}
+
 function rs_add_publication(array $ctx, array $row): void
 {
     $rows = rs_read_publications($ctx);
     $rows[] = $row;
     if (count($rows) > 500) $rows = array_slice($rows, -500);
-    rs_write_json_atomic(rs_publications_path($ctx), $rows);
+    rs_write_publications($ctx, $rows);
 }
