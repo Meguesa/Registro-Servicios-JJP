@@ -195,6 +195,9 @@ function rs_calendar_create_event(array $payload, array $sharePointConfig): arra
     if ($subject === '') {
         $subject = 'Evento de Capillas';
     }
+    // Mientras Registro de Servicios opere en preview, todos los eventos
+    // creados internamente deben ser claramente identificables.
+    $subject = '(PRUEBA) ' . $subject;
 
     $lines = [];
     $lines[] = '<strong>EVENTO:</strong> de ' . rs_calendar_escape(rs_calendar_date_display((string)($payload['inicio'] ?? '')))
@@ -260,10 +263,60 @@ function rs_calendar_create_event(array $payload, array $sharePointConfig): arra
 
     $created = rs_graph_request('POST', $url, $graphToken, $event)['json'];
 
-    return [
+    $result = [
         'enabled' => true,
         'created' => true,
         'eventId' => trim((string)($created['id'] ?? '')),
         'webLink' => trim((string)($created['webLink'] ?? '')),
+        'exequiaCreated' => false,
     ];
+
+    // La exequia es un evento independiente en el mismo calendario.
+    // Solo se crea cuando el usuario activo "Lleva exequia" y existe fecha/hora.
+    $llevaExequia = (bool)($payload['llevaExequia'] ?? false);
+    $horaExequiaRaw = trim((string)($payload['horaExequia'] ?? ''));
+    if ($llevaExequia && $horaExequiaRaw !== '') {
+        $exequiaStart = rs_calendar_parse_local($horaExequiaRaw);
+        $exequiaEnd = $exequiaStart->modify('+1 hour');
+
+        $fallecido = trim((string)($payload['fallecido'] ?? ''));
+        $ubicacion = trim((string)($payload['ubicacion'] ?? ''));
+        $sala = trim((string)($payload['sala'] ?? ''));
+
+        $exequiaParts = array_values(array_filter([
+            $fallecido !== '' ? 'Exequia: ' . $fallecido : 'Exequia',
+            $ubicacion,
+            $sala,
+        ], static fn(string $v): bool => $v !== ''));
+
+        $exequiaEvent = [
+            'subject' => '(PRUEBA) ' . implode(' - ', $exequiaParts),
+            'body' => [
+                'contentType' => 'HTML',
+                'content' => $bodyHtml,
+            ],
+            'start' => [
+                'dateTime' => $exequiaStart->format('Y-m-d\\TH:i:s'),
+                'timeZone' => 'Central Standard Time (Mexico)',
+            ],
+            'end' => [
+                'dateTime' => $exequiaEnd->format('Y-m-d\\TH:i:s'),
+                'timeZone' => 'Central Standard Time (Mexico)',
+            ],
+            'location' => [
+                'displayName' => trim($ubicacion . ($sala !== '' ? ' - ' . $sala : '')),
+            ],
+            'showAs' => 'busy',
+            'isReminderOn' => true,
+            'reminderMinutesBeforeStart' => 30,
+            'allowNewTimeProposals' => false,
+        ];
+
+        $exequiaCreated = rs_graph_request('POST', $url, $graphToken, $exequiaEvent)['json'];
+        $result['exequiaCreated'] = true;
+        $result['exequiaEventId'] = trim((string)($exequiaCreated['id'] ?? ''));
+        $result['exequiaWebLink'] = trim((string)($exequiaCreated['webLink'] ?? ''));
+    }
+
+    return $result;
 }
