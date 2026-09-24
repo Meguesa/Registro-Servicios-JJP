@@ -12,41 +12,84 @@ declare(strict_types=1);
  * - No ejecuta Tellmebye.
  */
 
-function rs_image_font_path(): ?string
+function rs_image_fontconfig_match(bool $bold = false): ?string
 {
-    static $resolved = false;
-    static $font = null;
-
-    if ($resolved) {
-        return $font;
+    if (!function_exists('shell_exec')) {
+        return null;
     }
-    $resolved = true;
 
-    $candidates = [
-        __DIR__ . '/assets/fonts/DejaVuSans.ttf',
-        __DIR__ . '/assets/fonts/NotoSans-Regular.ttf',
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-        '/usr/share/fonts/dejavu/DejaVuSans.ttf',
-        '/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf',
-        '/usr/share/fonts/liberation/LiberationSans-Regular.ttf',
-        '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
-        '/usr/share/fonts/noto/NotoSans-Regular.ttf',
-        '/usr/share/fonts/google-noto/NotoSans-Regular.ttf',
-        '/usr/local/share/fonts/DejaVuSans.ttf',
-    ];
+    $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+    if (in_array('shell_exec', $disabled, true)) {
+        return null;
+    }
 
-    foreach ($candidates as $candidate) {
-        if (is_file($candidate) && is_readable($candidate)) {
-            $font = $candidate;
-            return $font;
+    $query = $bold ? 'Arial:style=Bold' : 'Arial';
+    $command = 'fc-match -f ' . escapeshellarg('%{file}\\n') . ' ' . escapeshellarg($query) . ' 2>/dev/null';
+    $output = @shell_exec($command);
+    if (!is_string($output) || trim($output) === '') {
+        return null;
+    }
+
+    foreach (preg_split('/\\R/', trim($output)) ?: [] as $candidate) {
+        $candidate = trim($candidate);
+        if ($candidate !== '' && is_file($candidate) && is_readable($candidate)) {
+            return $candidate;
         }
     }
 
-    foreach ([
+    return null;
+}
+
+function rs_image_find_system_font(bool $bold = false): ?string
+{
+    $specific = $bold
+        ? [
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+            '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
+            '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf',
+            '/usr/local/share/fonts/DejaVuSans-Bold.ttf',
+            '/usr/local/share/fonts/TTF/DejaVuSans-Bold.ttf',
+            '/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf',
+            '/usr/share/fonts/liberation/LiberationSans-Bold.ttf',
+            '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf',
+            '/usr/share/fonts/noto/NotoSans-Bold.ttf',
+            '/usr/local/cpanel/3rdparty/share/fonts/DejaVuSans-Bold.ttf',
+            '/opt/cpanel/ea-php82/root/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
+        ]
+        : [
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+            '/usr/share/fonts/dejavu/DejaVuSans.ttf',
+            '/usr/share/fonts/TTF/DejaVuSans.ttf',
+            '/usr/local/share/fonts/DejaVuSans.ttf',
+            '/usr/local/share/fonts/TTF/DejaVuSans.ttf',
+            '/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf',
+            '/usr/share/fonts/liberation/LiberationSans-Regular.ttf',
+            '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
+            '/usr/share/fonts/noto/NotoSans-Regular.ttf',
+            '/usr/local/cpanel/3rdparty/share/fonts/DejaVuSans.ttf',
+            '/opt/cpanel/ea-php82/root/usr/share/fonts/dejavu/DejaVuSans.ttf',
+        ];
+
+    foreach ($specific as $candidate) {
+        if (is_file($candidate) && is_readable($candidate)) {
+            return $candidate;
+        }
+    }
+
+    $fontConfig = rs_image_fontconfig_match($bold);
+    if ($fontConfig !== null) {
+        return $fontConfig;
+    }
+
+    $directories = [
         '/usr/share/fonts',
         '/usr/local/share/fonts',
         '/usr/local/cpanel/3rdparty/share/fonts',
-    ] as $dir) {
+        '/opt/cpanel/ea-php82/root/usr/share/fonts',
+    ];
+
+    $fallback = null;
+    foreach ($directories as $dir) {
         if (!is_dir($dir) || !is_readable($dir)) {
             continue;
         }
@@ -57,32 +100,103 @@ function rs_image_font_path(): ?string
             );
             $checked = 0;
             foreach ($iterator as $file) {
-                if (++$checked > 1500) {
+                if (++$checked > 12000) {
                     break;
                 }
                 if (!$file instanceof SplFileInfo || !$file->isFile()) {
                     continue;
                 }
+
                 $name = strtolower($file->getFilename());
-                if (!str_ends_with($name, '.ttf')) {
+                if (!str_ends_with($name, '.ttf') && !str_ends_with($name, '.otf')) {
                     continue;
                 }
-                if (
-                    str_contains($name, 'sans') ||
-                    str_contains($name, 'arial') ||
-                    str_contains($name, 'dejavu') ||
-                    str_contains($name, 'noto')
-                ) {
-                    $font = $file->getPathname();
-                    return $font;
+
+                $isSans = str_contains($name, 'sans')
+                    || str_contains($name, 'arial')
+                    || str_contains($name, 'dejavu')
+                    || str_contains($name, 'noto')
+                    || str_contains($name, 'liberation')
+                    || str_contains($name, 'roboto');
+
+                if (!$isSans) {
+                    continue;
+                }
+
+                $isBold = str_contains($name, 'bold')
+                    || str_contains($name, 'semibold')
+                    || str_contains($name, 'demi');
+
+                if ($bold === $isBold) {
+                    return $file->getPathname();
+                }
+
+                if ($fallback === null) {
+                    $fallback = $file->getPathname();
                 }
             }
         } catch (Throwable) {
-            // fallback a fuente bitmap de GD
+            // Se conserva el siguiente fallback disponible.
         }
     }
 
-    return null;
+    return $fallback;
+}
+
+function rs_image_font_path(): ?string
+{
+    static $resolved = false;
+    static $font = null;
+
+    if ($resolved) {
+        return $font;
+    }
+    $resolved = true;
+
+    $localCandidates = [
+        __DIR__ . '/assets/fonts/DejaVuSans.ttf',
+        __DIR__ . '/assets/fonts/NotoSans-Regular.ttf',
+        __DIR__ . '/assets/fonts/Roboto-Regular.ttf',
+        __DIR__ . '/assets/fonts/LiberationSans-Regular.ttf',
+    ];
+
+    foreach ($localCandidates as $candidate) {
+        if (is_file($candidate) && is_readable($candidate)) {
+            $font = $candidate;
+            return $font;
+        }
+    }
+
+    $font = rs_image_find_system_font(false);
+    return $font;
+}
+
+function rs_image_bold_font_path(): ?string
+{
+    static $resolved = false;
+    static $font = null;
+
+    if ($resolved) {
+        return $font;
+    }
+    $resolved = true;
+
+    $localCandidates = [
+        __DIR__ . '/assets/fonts/DejaVuSans-Bold.ttf',
+        __DIR__ . '/assets/fonts/NotoSans-Bold.ttf',
+        __DIR__ . '/assets/fonts/Roboto-Bold.ttf',
+        __DIR__ . '/assets/fonts/LiberationSans-Bold.ttf',
+    ];
+
+    foreach ($localCandidates as $candidate) {
+        if (is_file($candidate) && is_readable($candidate)) {
+            $font = $candidate;
+            return $font;
+        }
+    }
+
+    $font = rs_image_find_system_font(true);
+    return $font;
 }
 
 function rs_image_require_gd(): void
@@ -95,7 +209,7 @@ function rs_image_require_gd(): void
 function rs_image_clean_text(mixed $value): string
 {
     if (is_bool($value)) {
-        return $value ? 'Si' : 'No';
+        return $value ? 'Sí' : 'No';
     }
     if ($value === null) {
         return '';
@@ -255,6 +369,27 @@ function rs_image_draw_text(GdImage $image, int $x, int $y, string $text, int $c
     imagestring($image, $bitmapFont, $x, max(0, $y - imagefontheight($bitmapFont)), rs_image_builtin_text($text), $color);
 }
 
+function rs_image_draw_text_bold(GdImage $image, int $x, int $y, string $text, int $color, ?string $fontPath, float $fontSize, int $bitmapFont = 5): void
+{
+    $boldFont = rs_image_bold_font_path();
+
+    if ($boldFont !== null && function_exists('imagettftext')) {
+        @imagettftext($image, $fontSize, 0, $x, $y, $color, $boldFont, $text);
+        return;
+    }
+
+    if ($fontPath !== null && function_exists('imagettftext')) {
+        @imagettftext($image, $fontSize, 0, $x, $y, $color, $fontPath, $text);
+        @imagettftext($image, $fontSize, 0, $x + 1, $y, $color, $fontPath, $text);
+        return;
+    }
+
+    $bitmapText = rs_image_builtin_text($text);
+    $bitmapY = max(0, $y - imagefontheight($bitmapFont));
+    imagestring($image, $bitmapFont, $x, $bitmapY, $bitmapText, $color);
+    imagestring($image, $bitmapFont, $x + 1, $bitmapY, $bitmapText, $color);
+}
+
 function rs_image_line_height(?string $fontPath, float $fontSize, int $bitmapFont = 5): int
 {
     if ($fontPath !== null && function_exists('imagettfbbox')) {
@@ -281,12 +416,12 @@ function rs_image_render_start(int $width, int $height): array
 
     $c = [
         'white' => imagecolorallocate($image, 255, 255, 255),
-        'ink' => imagecolorallocate($image, 55, 38, 33),
-        'muted' => imagecolorallocate($image, 100, 90, 86),
-        'navy' => imagecolorallocate($image, 15, 83, 124),
-        'gold' => imagecolorallocate($image, 246, 179, 33),
-        'labelBg' => imagecolorallocate($image, 244, 248, 251),
-        'line' => imagecolorallocate($image, 220, 224, 227),
+        'ink' => imagecolorallocate($image, 44, 39, 36),
+        'muted' => imagecolorallocate($image, 107, 99, 94),
+        'navy' => imagecolorallocate($image, 20, 82, 122),
+        'gold' => imagecolorallocate($image, 244, 181, 43),
+        'labelBg' => imagecolorallocate($image, 246, 248, 250),
+        'line' => imagecolorallocate($image, 222, 226, 230),
     ];
 
     imagefilledrectangle($image, 0, 0, $width, $height, $c['white']);
@@ -311,11 +446,18 @@ function rs_image_draw_header(GdImage $image, array $c, ?string $fontPath, strin
     imagefilledrectangle($image, 0, 0, $width, 12, $c['gold']);
     imagefilledrectangle($image, 0, 12, 14, $headerHeight - 1, $c['navy']);
 
-    rs_image_draw_text($image, $margin, 60, $title, $c['ink'], $fontPath, 32.0, 5);
+    $titleY = 58;
+    rs_image_draw_text_bold($image, $margin, $titleY, $title, $c['ink'], $fontPath, 27.0, 5);
+
     if ($subtitle !== '') {
-        rs_image_draw_text($image, $margin, 98, $subtitle, $c['muted'], $fontPath, 18.0, 5);
+        rs_image_draw_text($image, $margin, 94, $subtitle, $c['muted'], $fontPath, 15.0, 4);
     }
+
+    imageline($image, $margin, $headerHeight - 8, $width - $margin, $headerHeight - 8, $c['line']);
 }
+
+/**
+ * @param array<int,array{label:string,value:string}> $rows
 
 /**
  * @param array<int,array{label:string,value:string}> $rows
@@ -324,11 +466,11 @@ function rs_image_render_table(string $title, string $subtitle, array $rows): st
 {
     $width = 1400;
     $margin = 46;
-    $labelWidth = 390;
+    $labelWidth = 350;
     $gap = 26;
     $headerHeight = 132;
     $footerHeight = 42;
-    $fontSize = 22.0;
+    $fontSize = 18.0;
     $bitmapFont = 5;
 
     [$image, $fontPath, $c] = rs_image_render_start($width, 100);
@@ -341,7 +483,7 @@ function rs_image_render_table(string $title, string $subtitle, array $rows): st
         $labelLines = rs_image_wrap_lines(rs_image_clean_text($row['label'] ?? ''), $labelWidth - 30, $fontPath, $fontSize, $bitmapFont);
         $valueLines = rs_image_wrap_lines(rs_image_clean_text($row['value'] ?? ''), $valueWidth - 30, $fontPath, $fontSize, $bitmapFont);
         $lines = max(count($labelLines), count($valueLines));
-        $rowHeight = max(54, ($lines * $lineHeight) + 22);
+        $rowHeight = max(50, ($lines * $lineHeight) + 18);
         $prepared[] = [$labelLines, $valueLines, $rowHeight];
         $bodyHeight += $rowHeight;
     }
@@ -359,7 +501,7 @@ function rs_image_render_table(string $title, string $subtitle, array $rows): st
 
         $textY = $y + 31;
         foreach ($labelLines as $lineText) {
-            rs_image_draw_text($image, $margin + 16, $textY, $lineText, $c['navy'], $fontPath, $fontSize, $bitmapFont);
+            rs_image_draw_text_bold($image, $margin + 16, $textY, $lineText, $c['navy'], $fontPath, $fontSize, $bitmapFont);
             $textY += $lineHeight;
         }
 
@@ -388,14 +530,14 @@ function rs_image_render_two_column_table(string $title, string $subtitle, array
     $headerHeight = 132;
     $footerHeight = 42;
     $columnGap = 26;
-    $fontSize = 19.0;
+    $fontSize = 17.0;
     $bitmapFont = 5;
 
     [$image, $fontPath, $c] = rs_image_render_start($width, 100);
     $lineHeight = rs_image_line_height($fontPath, $fontSize, $bitmapFont);
     $contentWidth = $width - ($margin * 2);
     $columnWidth = (int) floor(($contentWidth - $columnGap) / 2);
-    $labelWidth = 240;
+    $labelWidth = 228;
     $innerGap = 16;
     $valueWidth = $columnWidth - $labelWidth - $innerGap;
 
@@ -413,7 +555,7 @@ function rs_image_render_two_column_table(string $title, string $subtitle, array
         $rightValueLines = rs_image_wrap_lines(rs_image_clean_text($right['value'] ?? ''), $valueWidth - 10, $fontPath, $fontSize, $bitmapFont);
 
         $lines = max(count($leftLabelLines), count($leftValueLines), count($rightLabelLines), count($rightValueLines));
-        $rowHeight = max(54, ($lines * $lineHeight) + 18);
+        $rowHeight = max(48, ($lines * $lineHeight) + 16);
         $prepared[] = [
             $leftLabelLines, $leftValueLines,
             $rightLabelLines, $rightValueLines,
@@ -439,7 +581,7 @@ function rs_image_render_two_column_table(string $title, string $subtitle, array
 
         $textY = $y + 28;
         foreach ($leftLabelLines as $lineText) {
-            rs_image_draw_text($image, $leftX + 12, $textY, $lineText, $c['navy'], $fontPath, $fontSize, $bitmapFont);
+            rs_image_draw_text_bold($image, $leftX + 12, $textY, $lineText, $c['navy'], $fontPath, $fontSize, $bitmapFont);
             $textY += $lineHeight;
         }
         $textY = $y + 28;
@@ -450,7 +592,7 @@ function rs_image_render_two_column_table(string $title, string $subtitle, array
 
         $textY = $y + 28;
         foreach ($rightLabelLines as $lineText) {
-            rs_image_draw_text($image, $rightX + 12, $textY, $lineText, $c['navy'], $fontPath, $fontSize, $bitmapFont);
+            rs_image_draw_text_bold($image, $rightX + 12, $textY, $lineText, $c['navy'], $fontPath, $fontSize, $bitmapFont);
             $textY += $lineHeight;
         }
         $textY = $y + 28;
@@ -486,11 +628,11 @@ function rs_image_rescate(array $payload): string
 function rs_image_service_columns(array $payload): array
 {
     $left = [
-        ['label' => 'Ubicacion servicio capilla', 'value' => rs_image_clean_text($payload['ubicacion'] ?? '')],
+        ['label' => 'Ubicación servicio capilla', 'value' => rs_image_clean_text($payload['ubicacion'] ?? '')],
         ['label' => 'Sala', 'value' => rs_image_clean_text($payload['sala'] ?? '')],
-        ['label' => 'Prevision / Uso inmediato', 'value' => rs_image_clean_text($payload['prevision'] ?? '')],
+        ['label' => 'Previsión / Uso inmediato', 'value' => rs_image_clean_text($payload['prevision'] ?? '')],
         ['label' => 'Servicio', 'value' => rs_image_clean_text($payload['servicio'] ?? '')],
-        ['label' => 'Ubicacion de rescate', 'value' => rs_image_clean_text($payload['ubicacionRescate'] ?? '')],
+        ['label' => 'Ubicación de rescate', 'value' => rs_image_clean_text($payload['ubicacionRescate'] ?? '')],
         ['label' => 'Motivo de fallecimiento', 'value' => rs_image_clean_text($payload['motivo'] ?? '')],
         ['label' => 'Personal de rescate', 'value' => rs_image_rescate($payload)],
         ['label' => 'Vendedor', 'value' => rs_image_clean_text($payload['personalVenta'] ?? '')],
@@ -500,11 +642,11 @@ function rs_image_service_columns(array $payload): array
         ['label' => 'Titular', 'value' => rs_image_clean_text($payload['titular'] ?? '')],
         ['label' => 'Fallecido(a)', 'value' => rs_image_clean_text($payload['fallecido'] ?? '')],
         ['label' => 'Fecha de nacimiento', 'value' => rs_image_date((string) ($payload['fechaNacimiento'] ?? ''), false)],
-        ['label' => 'Fecha de defuncion', 'value' => rs_image_date((string) ($payload['fechaDefuncion'] ?? ''), false)],
+        ['label' => 'Fecha de defunción', 'value' => rs_image_date((string) ($payload['fechaDefuncion'] ?? ''), false)],
         ['label' => 'Edad', 'value' => rs_image_clean_text($payload['edad'] ?? '')],
         ['label' => 'Referencia', 'value' => rs_image_reference($payload)],
-        ['label' => 'Numero de servicio', 'value' => rs_image_clean_text($payload['numeroServicio'] ?? $payload['numeroReferencia'] ?? '')],
-        ['label' => 'Ataud / Urna', 'value' => rs_image_clean_text($payload['tipoAtaud'] ?? '')],
+        ['label' => 'Número de servicio', 'value' => rs_image_clean_text($payload['numeroServicio'] ?? $payload['numeroReferencia'] ?? '')],
+        ['label' => 'Ataúd / Urna', 'value' => rs_image_clean_text($payload['tipoAtaud'] ?? '')],
     ];
 
     $servicio = rs_image_lower((string)($payload['servicio'] ?? ''));
@@ -514,7 +656,7 @@ function rs_image_service_columns(array $payload): array
         $right[] = ['label' => 'Personal crematorio', 'value' => rs_image_clean_text($payload['personalCrematorio'] ?? '')];
     }
     if (str_contains($servicio, 'inhum')) {
-        $left[] = ['label' => 'Fecha y hora inhumacion', 'value' => rs_image_date((string) ($payload['fechaHoraInhumacion'] ?? ''))];
+        $left[] = ['label' => 'Fecha y hora inhumación', 'value' => rs_image_date((string) ($payload['fechaHoraInhumacion'] ?? ''))];
     }
 
     return [$left, $right];
@@ -525,15 +667,15 @@ function rs_image_obituario_rows(array $payload): array
     return [
         ['label' => 'Fallecido(a)', 'value' => rs_image_clean_text($payload['fallecido'] ?? '')],
         ['label' => 'Edad', 'value' => rs_image_clean_text($payload['edad'] ?? '')],
-        ['label' => 'Ubicacion servicio capilla', 'value' => rs_image_clean_text($payload['ubicacion'] ?? '')],
+        ['label' => 'Ubicación servicio capilla', 'value' => rs_image_clean_text($payload['ubicacion'] ?? '')],
         ['label' => 'Sala', 'value' => rs_image_clean_text($payload['sala'] ?? '')],
         ['label' => 'Fecha de inicio', 'value' => rs_image_date((string) ($payload['inicio'] ?? ''), false)],
         ['label' => 'Hora de inicio', 'value' => rs_image_time((string) ($payload['inicio'] ?? ''))],
-        ['label' => 'Fecha de termino', 'value' => rs_image_date((string) ($payload['termino'] ?? ''), false)],
-        ['label' => 'Hora de termino', 'value' => rs_image_time((string) ($payload['termino'] ?? ''))],
+        ['label' => 'Fecha de término', 'value' => rs_image_date((string) ($payload['termino'] ?? ''), false)],
+        ['label' => 'Hora de término', 'value' => rs_image_time((string) ($payload['termino'] ?? ''))],
         ['label' => 'Fecha exequia', 'value' => (bool) ($payload['llevaExequia'] ?? false) ? rs_image_date((string) ($payload['horaExequia'] ?? ''), false) : ''],
         ['label' => 'Hora exequia', 'value' => (bool) ($payload['llevaExequia'] ?? false) ? rs_image_time((string) ($payload['horaExequia'] ?? '')) : ''],
-        ['label' => 'Ubicacion post capillas', 'value' => rs_image_clean_text($payload['destinoFinal'] ?? '')],
+        ['label' => 'Ubicación post capillas', 'value' => rs_image_clean_text($payload['destinoFinal'] ?? '')],
     ];
 }
 
@@ -573,11 +715,11 @@ function rs_generate_service_information_images(array $payload): array
 
     return [
         'serviceName' => 'Informacion_Servicio.png',
-        'servicePng' => rs_image_render_two_column_table('INFORMACION DEL SERVICIO', $subtitle, $serviceLeft, $serviceRight),
+        'servicePng' => rs_image_render_two_column_table('INFORMACIÓN DEL SERVICIO', $subtitle, $serviceLeft, $serviceRight),
         'obitName' => 'Obituario.png',
         'obitPng' => rs_image_render_table('OBITUARIO', $subtitle, rs_image_obituario_rows($payload)),
         'saleName' => 'Informacion_Venta.png',
-        'salePng' => rs_image_render_table('INFORMACION DE VENTA', $subtitle, rs_image_sale_rows($payload)),
+        'salePng' => rs_image_render_table('INFORMACIÓN DE VENTA', $subtitle, rs_image_sale_rows($payload)),
         'font' => rs_image_font_path(),
     ];
 }
