@@ -63,6 +63,92 @@ function rs_sync_publications_with_sharepoint(array $ctx, array $rows): array
     return ['rows'=>$filtered, 'removed'=>$removed];
 }
 
+
+function rs_sharepoint_value(mixed $value): string
+{
+    if (is_array($value)) {
+        return trim((string)($value['Value'] ?? $value['value'] ?? ''));
+    }
+    return trim((string)$value);
+}
+
+/**
+ * En PREVIEW, SharePoint es la fuente de verdad para "Servicios publicados".
+ * Esto evita depender de published.json y hace que altas/bajas se reflejen
+ * inmediatamente. Solo incluye registros con ModoPrueba = Sí.
+ *
+ * @return array<int,array<string,string>>
+ */
+function rs_preview_publications_from_sharepoint(): array
+{
+    $config = rs_sharepoint_config();
+    $host = 'meguesajdjp.sharepoint.com';
+    $siteUrl = 'https://' . $host . '/sites/Operaciones';
+    $token = rs_sharepoint_token($config, $host);
+
+    $query = http_build_query([
+        '$select' => 'Id,field_1,Referencia,field_2,field_32,field_39,field_36,Created,ModoPrueba',
+        '$filter' => 'ModoPrueba eq 1',
+        '$orderby' => 'Created desc',
+        '$top' => '5000',
+    ], '', '&', PHP_QUERY_RFC3986);
+
+    $url = $siteUrl . "/_api/web/lists/getbytitle('Eventos%20Capillas')/items?" . $query;
+    $curl = curl_init($url);
+    if ($curl === false) {
+        throw new RuntimeException('No fue posible iniciar la consulta de publicaciones en SharePoint.');
+    }
+
+    curl_setopt_array($curl, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . $token,
+            'Accept: application/json;odata=nometadata',
+        ],
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+    ]);
+
+    $response = curl_exec($curl);
+    $status = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $error = curl_error($curl);
+    curl_close($curl);
+
+    if ($response === false) {
+        throw new RuntimeException('SharePoint no respondio: ' . $error);
+    }
+
+    $decoded = json_decode((string)$response, true);
+    if ($status < 200 || $status >= 300 || !is_array($decoded)) {
+        throw new RuntimeException('SharePoint respondio HTTP ' . $status . ' al cargar Servicios publicados.');
+    }
+
+    $rows = [];
+    foreach (($decoded['value'] ?? []) as $item) {
+        if (!is_array($item)) continue;
+
+        $itemId = trim((string)($item['Id'] ?? $item['ID'] ?? ''));
+        if ($itemId === '') continue;
+
+        $rows[] = [
+            'itemId' => $itemId,
+            'status' => 'PUBLICADO',
+            'numeroReferencia' => rs_sharepoint_value($item['field_1'] ?? ''),
+            'referencia' => rs_sharepoint_value($item['Referencia'] ?? ''),
+            'fallecido' => rs_sharepoint_value($item['field_2'] ?? ''),
+            'servicio' => rs_sharepoint_value($item['field_32'] ?? ''),
+            'ubicacion' => rs_sharepoint_value($item['field_39'] ?? ''),
+            'fechaServicio' => rs_sharepoint_value($item['field_36'] ?? ''),
+            'publishedAt' => rs_sharepoint_value($item['Created'] ?? ''),
+        ];
+    }
+
+    return $rows;
+}
+
 try {
     $ctx = rs_storage_bootstrap();
     $draftRoot = $ctx['userDir'] . '/drafts';
@@ -87,15 +173,21 @@ try {
     }
     usort($drafts, static fn($a,$b)=>strcmp((string)$b['updatedAt'], (string)$a['updatedAt']));
 
-    $published = rs_read_publications($ctx);
-    $sync = ['ok'=>false, 'removed'=>0];
+    // PREVIEW: cargar directamente desde Eventos Capillas.
+    // SharePoint es la fuente de verdad: si un registro se elimina de la lista,
+    // deja de aparecer aquí sin necesidad de limpiar archivos locales.
+    $published = [];
+    $sync = ['ok'=>false, 'removed'=>0, 'source'=>'sharepoint'];
     try {
-        $syncResult = rs_sync_publications_with_sharepoint($ctx, $published);
-        $published = $syncResult['rows'];
-        $sync = ['ok'=>true, 'removed'=>(int)$syncResult['removed']];
+        $published = rs_preview_publications_from_sharepoint();
+        $sync = ['ok'=>true, 'removed'=>0, 'source'=>'sharepoint'];
     } catch (Throwable $syncError) {
-        error_log('Registro Servicios sync publicaciones: ' . $syncError->getMessage());
+        // Fallback defensivo al índice local para no dejar el módulo inutilizable
+        // si SharePoint presenta una falla temporal.
+        error_log('Registro Servicios publicaciones SharePoint: ' . $syncError->getMessage());
+        $published = rs_read_publications($ctx);
         $sync['message'] = $syncError->getMessage();
+        $sync['source'] = 'local-fallback';
     }
 
     usort($published, static fn($a,$b)=>strcmp((string)($b['publishedAt']??''), (string)($a['publishedAt']??'')));
