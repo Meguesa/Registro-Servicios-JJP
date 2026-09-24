@@ -15,52 +15,53 @@ if (is_file($bootstrap)) {
 require_once __DIR__ . '/registro-imagenes.php';
 
 $sample = [
-    'numeroReferencia' => '0000',
-    'referencia' => 'VI - ATMADBA - 1234',
-    'servicio' => 'Inhumacion',
-    'ubicacion' => 'Churubusco',
-    'sala' => 'Sala 1',
-    'inicio' => '2026-09-25T10:00',
-    'termino' => '2026-09-25T22:00',
-    'llevaExequia' => true,
-    'horaExequia' => '2026-09-25T14:00',
+    'numeroReferencia' => '0672',
+    'numeroServicio' => '0672',
+    'referencia' => 'VI - ATMADBA - 4274-AF',
+    'servicio' => 'Inhumación',
+    'ubicacion' => 'Apodaca',
+    'sala' => 'Sala 2',
+    'inicio' => '2026-09-24T12:00',
+    'termino' => '2026-09-25T12:00',
+    'llevaExequia' => false,
+    'horaExequia' => '',
     'prevision' => 'Uso Inmediato',
     'tipoAtaud' => 'Ataud Madera Basico',
-    'titular' => 'PRUEBA TITULAR',
-    'fallecido' => 'PRUEBA FALLECIDO',
-    'fechaNacimiento' => '2000-09-01',
+    'titular' => 'ROSA ISELA SANCHEZ TOTO',
+    'fallecido' => 'MIGUEL ANGEL SANCHEZ TOTO',
+    'fechaNacimiento' => '1981-03-28',
     'fechaDefuncion' => '2026-09-23T10:30',
-    'edad' => '26',
+    'edad' => '45',
     'sexo' => 'Masculino',
-    'destinoFinal' => 'Panteon Jardines de Juan Pablo',
-    'embalsamador' => 'PRUEBA EMBALSAMADOR',
-    'rescate1' => 'PRUEBA RESCATE 1',
-    'rescate2' => 'PRUEBA RESCATE 2',
-    'ubicacionRescate' => 'DOMICILIO',
-    'motivo' => 'INFARTO',
+    'destinoFinal' => 'Jardines de Juan Pablo',
+    'embalsamador' => 'No Aplica',
+    'rescate1' => 'ELIAS',
+    'rescate2' => 'RAFAEL',
+    'ubicacionRescate' => 'CLINICA 33',
+    'motivo' => 'ENCEFALOPATIA HEPATICA',
     'fechaHoraInhumacion' => '2026-09-25T23:00',
     'fechaCompra' => '2026-09-20',
-    'personalVenta' => 'PRUEBA ASESOR',
-    'precioVenta' => 32500,
-    'serviciosExtra' => ['Misa y Coro', 'Flores'],
-    'extraAmounts' => ['Misa y Coro' => 2500, 'Flores' => 1800],
-    'ventaTotal' => 36800,
+    'personalVenta' => 'MARTHA MARTINEZ',
+    'precioVenta' => 39280,
+    'serviciosExtra' => ['Misa y Coro'],
+    'extraAmounts' => ['Misa y Coro' => 2100],
+    'ventaTotal' => 41380,
 ];
 
 $type = strtolower(trim((string)($_GET['tipo'] ?? '')));
-
-if ($type === 'servicio' || $type === 'venta') {
+if (in_array($type, ['servicio', 'obituario', 'venta'], true)) {
     try {
         $images = rs_generate_service_information_images($sample);
-
-        $isService = $type === 'servicio';
-        $name = $isService ? $images['serviceName'] : $images['saleName'];
-        $png = $isService ? $images['servicePng'] : $images['salePng'];
+        $map = [
+            'servicio' => ['name' => $images['serviceName'], 'png' => $images['servicePng']],
+            'obituario' => ['name' => $images['obitName'], 'png' => $images['obitPng']],
+            'venta' => ['name' => $images['saleName'], 'png' => $images['salePng']],
+        ];
 
         header('Content-Type: image/png');
-        header('Content-Disposition: inline; filename="' . $name . '"');
-        header('Content-Length: ' . strlen($png));
-        echo $png;
+        header('Content-Disposition: inline; filename="' . $map[$type]['name'] . '"');
+        header('Content-Length: ' . strlen($map[$type]['png']));
+        echo $map[$type]['png'];
         exit;
     } catch (Throwable $e) {
         header('Content-Type: application/json; charset=utf-8');
@@ -82,7 +83,7 @@ $font = rs_image_font_path();
 
 echo json_encode([
     'ok' => true,
-    'purpose' => 'Fase 2 aislada - generacion de Informacion_Servicio.png e Informacion_Venta.png.',
+    'purpose' => 'Fase 2 aislada - generacion de Informacion_Servicio.png, Obituario.png e Informacion_Venta.png.',
     'gd' => [
         'available' => $gd,
         'freetype' => (bool)($gdInfo['FreeType Support'] ?? false),
@@ -99,6 +100,7 @@ echo json_encode([
     ],
     'tests' => [
         'serviceImage' => 'registro-imagen-test.php?tipo=servicio',
+        'obitImage' => 'registro-imagen-test.php?tipo=obituario',
         'saleImage' => 'registro-imagen-test.php?tipo=venta',
     ],
     'integration' => [
