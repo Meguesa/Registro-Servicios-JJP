@@ -610,7 +610,12 @@ function rsMoneyNumber(text){
 
 function rsPayload(){
   const data=new FormData(form);
-  const extras=selectedExtras();
+  const servicioActual=String(data.get("servicio")||"").trim();
+  const sinVelacion=servicioActual==="Cremación Directa (sin velación)";
+  const extrasSeleccionados=selectedExtras();
+  // SharePoint tiene "Servicios Extra" como obligatorio.
+  // Si el usuario no selecciona adicionales, registrar explicitamente "No Aplica".
+  const extras=extrasSeleccionados.length?extrasSeleccionados:["No Aplica"];
   const extraAmounts={};
   document.querySelectorAll("[data-extra-input]").forEach(input=>{
     const key=input.dataset.extraInput;
@@ -618,14 +623,15 @@ function rsPayload(){
   });
   return {
     numeroReferencia:String(data.get("numeroReferencia")||"").trim(),
-    servicio:String(data.get("servicio")||"").trim(),
+    servicio:servicioActual,
     ubicacion:String(data.get("ubicacion")||"").trim(),
-    sala:String(data.get("sala")||"").trim(),
-    inicio:String(document.getElementById("inicio")?.value||""),
-    termino:String(document.getElementById("termino")?.value||""),
-    llevaExequia:document.getElementById("llevaExequia")?.checked===true,
-    tiempoCapillas:String(data.get("tiempoCapillas")||"").trim(),
-    horaExequia:String(document.getElementById("horaExequia")?.value||""),
+    // Cremacion directa sin velacion no usa datos de capilla ni crea evento de velacion.
+    sala:sinVelacion?"":String(data.get("sala")||"").trim(),
+    inicio:sinVelacion?"":String(document.getElementById("inicio")?.value||""),
+    termino:sinVelacion?"":String(document.getElementById("termino")?.value||""),
+    llevaExequia:sinVelacion?false:document.getElementById("llevaExequia")?.checked===true,
+    tiempoCapillas:sinVelacion?"":String(data.get("tiempoCapillas")||"").trim(),
+    horaExequia:sinVelacion?"":String(document.getElementById("horaExequia")?.value||""),
     prevision:String(data.get("prevision")||"").trim(),
     tipoAtaud:String(data.get("tipoAtaud")||"").trim(),
     numeroServicio:String(data.get("numeroServicio")||"").trim(),
