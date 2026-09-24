@@ -33,27 +33,29 @@ try {
         exit;
     }
 
-    if ($formato === 'pdf') {
-        header('Content-Type: application/pdf');
-        header('Content-Disposition: inline; filename="' . $plate['pdfName'] . '"');
-        header('Content-Length: ' . strlen($plate['pdf']));
-        echo $plate['pdf'];
+    if ($formato !== '') {
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(400);
+        echo json_encode([
+            'ok' => false,
+            'message' => 'La placa final solo se genera en PNG.',
+            'png' => 'registro-placa-test.php?formato=png',
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
         exit;
     }
 
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode([
         'ok' => true,
-        'purpose' => 'Fase 3 aislada - generacion de placa de urna para servicios de cremacion.',
+        'purpose' => 'Fase 3 aislada - generacion final de placa de urna exclusivamente en PNG.',
         'templateReference' => 'Eventos Capillas / Plantillas / plantilla_placa_urna.pdf',
         'tests' => [
             'png' => 'registro-placa-test.php?formato=png',
-            'pdf' => 'registro-placa-test.php?formato=pdf',
         ],
         'integration' => [
             'registroServicio' => false,
+            'sharepointPlacas' => false,
             'email' => false,
-            'sharepoint' => false,
             'tellmebye' => false,
         ],
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
