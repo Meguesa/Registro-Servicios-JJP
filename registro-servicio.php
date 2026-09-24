@@ -383,7 +383,7 @@ try {
     // FASE 3: placa de urna generada internamente.
     // Resultado final: SOLO PNG, con nombre historico Placa-<ID>.png.
     // Se guarda en la misma carpeta utilizada actualmente:
-    // Operaciones > Documentos > Automatizaciones > Eventos Capillas > Placas.
+    // Operaciones > Documentos > Automaticaciones > Eventos Capillas > Placas.
     $plateResult = [
         'required' => false,
         'created' => false,
@@ -414,7 +414,7 @@ try {
             $plateResult['created'] = true;
             $plateResult['fileName'] = $plateFileName;
 
-            $platesFolder = '/sites/Operaciones/Documentos compartidos/Automatizaciones/Eventos Capillas/Placas';
+            $platesFolder = '/sites/Operaciones/Documentos compartidos/Automaticaciones/Eventos Capillas/Placas';
             $folderArg = rawurlencode("'" . $platesFolder . "'");
             $fileArg = rawurlencode("'" . $plateFileName . "'");
             $plateUploadUrl = $siteUrl
