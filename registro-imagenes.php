@@ -347,6 +347,23 @@ function rs_image_builtin_text(string $value): string
     return $value;
 }
 
+function rs_image_ascii(string $value): string
+{
+    $value = rs_image_clean_text($value);
+    if ($value === '') {
+        return '';
+    }
+
+    if (function_exists('iconv')) {
+        $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+        if (is_string($converted) && $converted !== '') {
+            return $converted;
+        }
+    }
+
+    return preg_replace('/[^\\x20-\\x7E]/', '', $value) ?? $value;
+}
+
 function rs_image_date(string $value, bool $withTime = true): string
 {
     $value = trim($value);
