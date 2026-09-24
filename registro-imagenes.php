@@ -12,6 +12,131 @@ declare(strict_types=1);
  * - No ejecuta Tellmebye.
  */
 
+function rs_image_font_cache_dir(): string
+{
+    $candidates = [
+        __DIR__ . '/.registro-servicios-data/fonts',
+        rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'registro-servicios-fonts',
+    ];
+
+    foreach ($candidates as $dir) {
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0750, true);
+        }
+        if (is_dir($dir) && is_writable($dir)) {
+            return $dir;
+        }
+    }
+
+    return rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR);
+}
+
+function rs_image_valid_font_file(string $path): bool
+{
+    if (!is_file($path) || !is_readable($path)) {
+        return false;
+    }
+
+    $size = @filesize($path);
+    if (!is_int($size) || $size < 20000) {
+        return false;
+    }
+
+    $handle = @fopen($path, 'rb');
+    if ($handle === false) {
+        return false;
+    }
+    $magic = (string) fread($handle, 4);
+    fclose($handle);
+
+    return $magic === "\x00\x01\x00\x00"
+        || $magic === 'OTTO'
+        || $magic === 'ttcf';
+}
+
+function rs_image_download_font(string $url, string $filename): ?string
+{
+    if (!function_exists('curl_init')) {
+        return null;
+    }
+
+    $cacheDir = rs_image_font_cache_dir();
+    $target = rtrim($cacheDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $filename;
+
+    if (rs_image_valid_font_file($target)) {
+        return $target;
+    }
+
+    $curl = curl_init($url);
+    if ($curl === false) {
+        return null;
+    }
+
+    curl_setopt_array($curl, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_CONNECTTIMEOUT => 6,
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_USERAGENT => 'JdJP-Registro-Servicios/1.0',
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+    ]);
+
+    $bytes = curl_exec($curl);
+    $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    curl_close($curl);
+
+    if (!is_string($bytes) || $status < 200 || $status >= 300 || strlen($bytes) < 20000) {
+        return null;
+    }
+
+    $tmp = $target . '.tmp-' . bin2hex(random_bytes(4));
+    if (@file_put_contents($tmp, $bytes, LOCK_EX) === false) {
+        @unlink($tmp);
+        return null;
+    }
+
+    if (!rs_image_valid_font_file($tmp)) {
+        @unlink($tmp);
+        return null;
+    }
+
+    @rename($tmp, $target);
+    @chmod($target, 0640);
+
+    return rs_image_valid_font_file($target) ? $target : null;
+}
+
+function rs_image_carlito_font_path(bool $bold = false): ?string
+{
+    $filename = $bold ? 'Carlito-Bold.ttf' : 'Carlito-Regular.ttf';
+
+    $localCandidates = [
+        __DIR__ . '/assets/fonts/' . $filename,
+        __DIR__ . '/fonts/' . $filename,
+    ];
+
+    foreach ($localCandidates as $candidate) {
+        if (rs_image_valid_font_file($candidate)) {
+            return $candidate;
+        }
+    }
+
+    $remoteUrls = [
+        'https://raw.githubusercontent.com/googlefonts/carlito/main/fonts/ttf/' . $filename,
+        'https://raw.githubusercontent.com/google/fonts/main/ofl/carlito/' . $filename,
+    ];
+
+    foreach ($remoteUrls as $url) {
+        $downloaded = rs_image_download_font($url, $filename);
+        if ($downloaded !== null) {
+            return $downloaded;
+        }
+    }
+
+    return null;
+}
+
 function rs_image_fontconfig_match(bool $bold = false): ?string
 {
     if (!function_exists('shell_exec')) {
@@ -32,7 +157,7 @@ function rs_image_fontconfig_match(bool $bold = false): ?string
 
     foreach (preg_split('/\\R/', trim($output)) ?: [] as $candidate) {
         $candidate = trim($candidate);
-        if ($candidate !== '' && is_file($candidate) && is_readable($candidate)) {
+        if ($candidate !== '' && rs_image_valid_font_file($candidate)) {
             return $candidate;
         }
     }
@@ -71,7 +196,7 @@ function rs_image_find_system_font(bool $bold = false): ?string
         ];
 
     foreach ($specific as $candidate) {
-        if (is_file($candidate) && is_readable($candidate)) {
+        if (rs_image_valid_font_file($candidate)) {
             return $candidate;
         }
     }
@@ -123,16 +248,21 @@ function rs_image_find_system_font(bool $bold = false): ?string
                     continue;
                 }
 
+                $path = $file->getPathname();
+                if (!rs_image_valid_font_file($path)) {
+                    continue;
+                }
+
                 $isBold = str_contains($name, 'bold')
                     || str_contains($name, 'semibold')
                     || str_contains($name, 'demi');
 
                 if ($bold === $isBold) {
-                    return $file->getPathname();
+                    return $path;
                 }
 
                 if ($fallback === null) {
-                    $fallback = $file->getPathname();
+                    $fallback = $path;
                 }
             }
         } catch (Throwable) {
@@ -153,18 +283,11 @@ function rs_image_font_path(): ?string
     }
     $resolved = true;
 
-    $localCandidates = [
-        __DIR__ . '/assets/fonts/DejaVuSans.ttf',
-        __DIR__ . '/assets/fonts/NotoSans-Regular.ttf',
-        __DIR__ . '/assets/fonts/Roboto-Regular.ttf',
-        __DIR__ . '/assets/fonts/LiberationSans-Regular.ttf',
-    ];
-
-    foreach ($localCandidates as $candidate) {
-        if (is_file($candidate) && is_readable($candidate)) {
-            $font = $candidate;
-            return $font;
-        }
+    // Carlito es metricamente compatible con Calibri y mantiene un aspecto
+    // corporativo limpio sin depender de una licencia de Microsoft.
+    $font = rs_image_carlito_font_path(false);
+    if ($font !== null) {
+        return $font;
     }
 
     $font = rs_image_find_system_font(false);
@@ -181,18 +304,9 @@ function rs_image_bold_font_path(): ?string
     }
     $resolved = true;
 
-    $localCandidates = [
-        __DIR__ . '/assets/fonts/DejaVuSans-Bold.ttf',
-        __DIR__ . '/assets/fonts/NotoSans-Bold.ttf',
-        __DIR__ . '/assets/fonts/Roboto-Bold.ttf',
-        __DIR__ . '/assets/fonts/LiberationSans-Bold.ttf',
-    ];
-
-    foreach ($localCandidates as $candidate) {
-        if (is_file($candidate) && is_readable($candidate)) {
-            $font = $candidate;
-            return $font;
-        }
+    $font = rs_image_carlito_font_path(true);
+    if ($font !== null) {
+        return $font;
     }
 
     $font = rs_image_find_system_font(true);
