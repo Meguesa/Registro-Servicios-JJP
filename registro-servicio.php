@@ -19,12 +19,14 @@ try {
     $bootstrap = $root . '/includes/bootstrap.php';
     $registroSharePoint = __DIR__ . '/registro-sharepoint.php';
     $registroCalendario = __DIR__ . '/registro-calendario.php';
-    if (!is_file($bootstrap) || !is_file($registroSharePoint) || !is_file($registroCalendario)) {
+    $registroPlaca = __DIR__ . '/registro-placa.php';
+    if (!is_file($bootstrap) || !is_file($registroSharePoint) || !is_file($registroCalendario) || !is_file($registroPlaca)) {
         throw new RuntimeException('No se encontraron los componentes necesarios de Registro de Servicios.');
     }
     require_once $bootstrap;
     require_once $registroSharePoint;
     require_once $registroCalendario;
+    require_once $registroPlaca;
     portal_require_authentication();
     $storageCtx = rs_storage_bootstrap();
     $draftIdRaw = trim((string) ($_POST['draftId'] ?? ''));
@@ -378,6 +380,63 @@ try {
     $itemId = (int) ($created['Id'] ?? $created['ID'] ?? 0);
     if ($itemId <= 0) throw new RuntimeException('SharePoint creo el registro, pero no devolvio un ID utilizable.');
 
+    // FASE 3: placa de urna generada internamente.
+    // Resultado final: SOLO PNG, con nombre historico Placa-<ID>.png.
+    // Se guarda en la misma carpeta utilizada actualmente:
+    // Operaciones > Documentos > Automatizaciones > Eventos Capillas > Placas.
+    $plateResult = [
+        'required' => false,
+        'created' => false,
+        'savedToSharePoint' => false,
+        'fileName' => null,
+        'error' => null,
+    ];
+
+    $serviceNorm = rs_norm((string) ($payload['servicio'] ?? ''));
+    $plateRequired = (bool) ($payload['requierePlaca'] ?? false)
+        || str_contains($serviceNorm, 'cremacion')
+        || str_contains($serviceNorm, 'cremaciondirecta');
+
+    if ($plateRequired) {
+        $plateResult['required'] = true;
+
+        try {
+            $platePayload = $payload;
+            $platePayload['itemId'] = (string) $itemId;
+            $plate = rs_generate_urna_plate($platePayload);
+
+            $plateBytes = (string) ($plate['png'] ?? '');
+            $plateFileName = trim((string) ($plate['pngName'] ?? ''));
+            if ($plateBytes === '' || $plateFileName === '') {
+                throw new RuntimeException('La generacion de placa no devolvio un PNG utilizable.');
+            }
+
+            $plateResult['created'] = true;
+            $plateResult['fileName'] = $plateFileName;
+
+            $platesFolder = '/sites/Operaciones/Documentos compartidos/Automatizaciones/Eventos Capillas/Placas';
+            $folderArg = rawurlencode("'" . $platesFolder . "'");
+            $fileArg = rawurlencode("'" . $plateFileName . "'");
+            $plateUploadUrl = $siteUrl
+                . '/_api/web/GetFolderByServerRelativePath(decodedurl=@f)'
+                . '/Files/AddUsingPath(decodedurl=@n,overwrite=true)'
+                . '?@f=' . $folderArg
+                . '&@n=' . $fileArg;
+
+            rs_request('POST', $plateUploadUrl, $token, $plateBytes, [
+                'Content-Type: image/png',
+                'X-RequestDigest: ' . $digest,
+            ]);
+
+            $plateResult['savedToSharePoint'] = true;
+        } catch (Throwable $plateError) {
+            // La placa no debe provocar que el usuario duplique el servicio.
+            // El registro ya existe en SharePoint; se informa el error para seguimiento.
+            $plateResult['error'] = $plateError->getMessage();
+            error_log('Registro Servicios Placa item ' . $itemId . ': ' . $plateError->getMessage());
+        }
+    }
+
     /** @return array<int,array{key:string,name:string,tmp:string,size:int,type:string}> */
     function rs_uploaded_files(): array
     {
@@ -474,6 +533,7 @@ try {
         'message' => 'Servicio registrado correctamente en SharePoint.',
         'attachments' => $uploadedNames,
         'calendar' => $calendarResult ?? ['enabled' => false, 'created' => false],
+        'plate' => $plateResult,
     ]);
 } catch (Throwable $error) {
     error_log('Registro Servicios SharePoint: ' . $error->getMessage());
