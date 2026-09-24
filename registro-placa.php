@@ -307,98 +307,140 @@ function rs_plate_pdf_baseline_to_png(float $placementY, float $localBaselineY, 
 }
 
 /**
- * Rasteriza el PDF final de la placa a PNG.
- *
- * IMPORTANTE: el PNG NO vuelve a dibujar el nombre ni las fechas con GD.
- * Se convierte el mismo PDF final generado con la plantilla original, por lo
- * que tipografia, posiciones, interlineado y proporciones son exactamente los
- * mismos que en el PDF de referencia.
+ * Devuelve los bytes de un stream PDF por numero de objeto.
+ * Soporta streams directos y FlateDecode, que es el formato usado por las
+ * fuentes incrustadas de plantilla_placa_urna.pdf.
  */
-function rs_plate_pdf_to_png(string $pdf): string
+function rs_plate_pdf_stream_bytes(string $pdf, int $objectNumber): string
 {
-    if ($pdf === '' || !str_starts_with($pdf, '%PDF-')) {
-        throw new RuntimeException('El contenido recibido para rasterizar no es un PDF valido.');
+    if (!preg_match('/(?:^|[\\r\\n])' . $objectNumber . ' 0 obj\\s*/', $pdf, $match, PREG_OFFSET_CAPTURE)) {
+        throw new RuntimeException('Objeto PDF ' . $objectNumber . ' no encontrado.');
     }
 
-    $baseDir = __DIR__ . '/.registro-servicios-data/tmp';
-    if (!is_dir($baseDir) && !@mkdir($baseDir, 0750, true) && !is_dir($baseDir)) {
-        throw new RuntimeException('No fue posible preparar el directorio temporal de la placa.');
+    $objectStart = (int) $match[0][1];
+    $streamPos = strpos($pdf, 'stream', $objectStart);
+    if ($streamPos === false) {
+        throw new RuntimeException('El objeto PDF ' . $objectNumber . ' no contiene stream.');
     }
 
-    $suffix = bin2hex(random_bytes(8));
-    $pdfPath = $baseDir . '/placa-' . $suffix . '.pdf';
-    $outBase = $baseDir . '/placa-' . $suffix;
-    $pngPath = $outBase . '.png';
-
-    if (@file_put_contents($pdfPath, $pdf, LOCK_EX) === false) {
-        throw new RuntimeException('No fue posible escribir el PDF temporal de la placa.');
+    $dict = substr($pdf, $objectStart, $streamPos - $objectStart);
+    $dataPos = $streamPos + strlen('stream');
+    if (substr($pdf, $dataPos, 2) === "\r\n") {
+        $dataPos += 2;
+    } elseif (substr($pdf, $dataPos, 1) === "\n" || substr($pdf, $dataPos, 1) === "\r") {
+        $dataPos += 1;
     }
 
-    $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
-    $canShell = function_exists('shell_exec') && !in_array('shell_exec', $disabled, true);
-
-    try {
-        if (!$canShell) {
-            throw new RuntimeException(
-                'El servidor no permite shell_exec; no es posible convertir el PDF final a PNG conservando exactamente su tipografia.'
-            );
+    $length = null;
+    if (preg_match('/\\/Length\\s+(\\d+)\\b/', $dict, $lm)) {
+        $length = (int) $lm[1];
+    } elseif (preg_match('/\\/Length\\s+(\\d+)\\s+0\\s+R/', $dict, $lm)) {
+        $lengthObj = (int) $lm[1];
+        $lengthBody = rs_plate_obj($pdf, $lengthObj);
+        if (preg_match('/(\\d+)/', $lengthBody, $num)) {
+            $length = (int) $num[1];
         }
-
-        $commands = [
-            // Poppler: primera opcion por fidelidad y disponibilidad comun en Linux/cPanel.
-            'pdftoppm -f 1 -singlefile -png -r 300 ' . escapeshellarg($pdfPath) . ' ' . escapeshellarg($outBase) . ' 2>&1',
-            // Alternativa Poppler.
-            'pdftocairo -f 1 -singlefile -png -r 300 ' . escapeshellarg($pdfPath) . ' ' . escapeshellarg($outBase) . ' 2>&1',
-            // MuPDF.
-            'mutool draw -q -r 300 -o ' . escapeshellarg($pngPath) . ' ' . escapeshellarg($pdfPath) . ' 1 2>&1',
-            // Ghostscript.
-            'gs -q -dSAFER -dBATCH -dNOPAUSE -dFirstPage=1 -dLastPage=1 -sDEVICE=png16m -r300 '
-                . '-sOutputFile=' . escapeshellarg($pngPath) . ' ' . escapeshellarg($pdfPath) . ' 2>&1',
-        ];
-
-        $errors = [];
-        foreach ($commands as $command) {
-            @unlink($pngPath);
-            $output = @shell_exec($command);
-
-            if (is_file($pngPath) && filesize($pngPath) > 100) {
-                $png = @file_get_contents($pngPath);
-                if (is_string($png) && str_starts_with($png, "\x89PNG\r\n\x1a\n")) {
-                    return $png;
-                }
-            }
-
-            $message = trim((string) $output);
-            if ($message !== '') {
-                $errors[] = $message;
-            }
-        }
-
-        $detail = $errors !== [] ? ' Detalle: ' . implode(' | ', array_slice($errors, 0, 2)) : '';
-        throw new RuntimeException(
-            'No se encontro un rasterizador PDF disponible (pdftoppm, pdftocairo, mutool o Ghostscript).' . $detail
-        );
-    } finally {
-        @unlink($pdfPath);
-        @unlink($pngPath);
-        @unlink($outBase . '-1.png');
     }
+
+    if (is_int($length) && $length > 0) {
+        $raw = substr($pdf, $dataPos, $length);
+    } else {
+        $endStream = strpos($pdf, 'endstream', $dataPos);
+        if ($endStream === false) {
+            throw new RuntimeException('No se encontro endstream para el objeto PDF ' . $objectNumber . '.');
+        }
+        $raw = substr($pdf, $dataPos, $endStream - $dataPos);
+        $raw = rtrim($raw, "\r\n");
+    }
+
+    if (str_contains($dict, '/FlateDecode')) {
+        $decoded = @gzuncompress($raw);
+        if (!is_string($decoded)) {
+            $decoded = @gzinflate($raw);
+        }
+        if (!is_string($decoded)) {
+            throw new RuntimeException('No fue posible descomprimir el stream PDF ' . $objectNumber . '.');
+        }
+        return $decoded;
+    }
+
+    return $raw;
+}
+
+/**
+ * Extrae la fuente REAL incrustada en la plantilla PDF.
+ *
+ * fontObject 7 = Palatino Linotype del nombre.
+ * fontObject 6 = fuente usada por las fechas.
+ *
+ * Esto evita depender de fuentes del servidor y hace que el PNG utilice
+ * exactamente la misma tipografia que el PDF original.
+ */
+function rs_plate_embedded_font_path(int $fontObject, string $cacheName): string
+{
+    $cacheDir = __DIR__ . '/.registro-servicios-data/fonts';
+    if (!is_dir($cacheDir) && !@mkdir($cacheDir, 0750, true) && !is_dir($cacheDir)) {
+        throw new RuntimeException('No fue posible preparar el cache de fuentes de la placa.');
+    }
+
+    foreach (['ttf', 'otf'] as $ext) {
+        $cached = $cacheDir . '/' . $cacheName . '.' . $ext;
+        if (function_exists('rs_image_valid_font_file') && rs_image_valid_font_file($cached)) {
+            return $cached;
+        }
+    }
+
+    $pdf = rs_plate_template_pdf();
+    $fontBody = rs_plate_obj($pdf, $fontObject);
+
+    // Algunas fuentes PDF son Type0 y apuntan a un DescendantFont.
+    if (preg_match('/\\/DescendantFonts\\s*\\[\\s*(\\d+)\\s+0\\s+R/', $fontBody, $dm)) {
+        $fontBody = rs_plate_obj($pdf, (int) $dm[1]);
+    }
+
+    if (!preg_match('/\\/FontDescriptor\\s+(\\d+)\\s+0\\s+R/', $fontBody, $fdm)) {
+        throw new RuntimeException('FontDescriptor no encontrado para la fuente PDF ' . $fontObject . '.');
+    }
+
+    $descriptor = rs_plate_obj($pdf, (int) $fdm[1]);
+    if (!preg_match('/\\/(FontFile2|FontFile3|FontFile)\\s+(\\d+)\\s+0\\s+R/', $descriptor, $ffm)) {
+        throw new RuntimeException('La fuente PDF ' . $fontObject . ' no contiene un archivo de fuente incrustado.');
+    }
+
+    $fontBytes = rs_plate_pdf_stream_bytes($pdf, (int) $ffm[2]);
+    if (strlen($fontBytes) < 20000) {
+        throw new RuntimeException('La fuente incrustada de la placa esta incompleta.');
+    }
+
+    $magic = substr($fontBytes, 0, 4);
+    $extension = $magic === 'OTTO' ? 'otf' : 'ttf';
+    $target = $cacheDir . '/' . $cacheName . '.' . $extension;
+
+    if (@file_put_contents($target, $fontBytes, LOCK_EX) === false) {
+        throw new RuntimeException('No fue posible guardar la fuente incrustada de la placa.');
+    }
+
+    if (!function_exists('rs_image_valid_font_file') || !rs_image_valid_font_file($target)) {
+        @unlink($target);
+        throw new RuntimeException('La fuente extraida de la plantilla no es compatible con FreeType/GD.');
+    }
+
+    return $target;
 }
 
 /**
  * Genera la placa final EXCLUSIVAMENTE como PNG.
  *
- * El PDF original es la fuente maestra. Primero se rellena y aplana
- * plantilla_placa_urna.pdf con su propia Palatino Linotype y con las posiciones
- * exactas de la plantilla. Despues se rasteriza ESE MISMO PDF a PNG.
- *
- * Resultado: el PNG mantiene exactamente la misma tipografia y composicion
- * visual que el PDF de referencia; no existe una segunda version dibujada con GD.
+ * Usa el fondo fijo extraido de plantilla_placa_urna.pdf y las MISMAS fuentes
+ * incrustadas dentro de esa plantilla. No requiere shell_exec, Ghostscript,
+ * Poppler ni ImageMagick.
  *
  * @return array{pngName:string,png:string}
  */
 function rs_generate_urna_plate(array $payload): array
 {
+    rs_image_require_gd();
+
     $name = trim((string) ($payload['fallecido'] ?? ''));
     $birthRaw = trim((string) ($payload['fechaNacimiento'] ?? ''));
     $deathRaw = trim((string) ($payload['fechaDefuncion'] ?? ''));
@@ -432,22 +474,99 @@ function rs_generate_urna_plate(array $payload): array
         throw new RuntimeException('No fue posible interpretar las fechas para la placa.');
     }
 
-    $displayName = mb_strtoupper($name, 'UTF-8');
+    $background = rs_plate_background_png();
+    $image = @imagecreatefromstring($background);
+    if (!$image instanceof GdImage) {
+        throw new RuntimeException('No fue posible abrir el fondo fijo de la placa.');
+    }
 
-    // FUENTE MAESTRA:
-    // rellena la plantilla PDF original con sus fuentes/metricas originales.
-    $finalPdf = rs_plate_fill_original_template(
-        $displayName,
-        $birth->format('d/m/Y'),
-        $death->format('d/m/Y')
-    );
+    if (!function_exists('imagettftext') || !function_exists('imagettfbbox')) {
+        imagedestroy($image);
+        throw new RuntimeException('GD/FreeType no esta disponible para generar la placa.');
+    }
 
-    // RESULTADO FINAL:
-    // rasteriza el PDF ya terminado; el PNG no redibuja ningun texto.
-    $png = rs_plate_pdf_to_png($finalPdf);
+    try {
+        // Fuentes exactas de la plantilla.
+        $nameFont = rs_plate_embedded_font_path(7, 'palatino-linotype-placa');
+        $dateFont = rs_plate_embedded_font_path(6, 'fecha-placa');
+
+        $displayName = mb_strtoupper($name, 'UTF-8');
+        $templatePdf = rs_plate_template_pdf();
+        $widths = rs_plate_widths($templatePdf);
+        $lines = rs_plate_name_lines($displayName, $widths);
+        $baselines = rs_plate_name_baselines(count($lines));
+
+        $canvasW = imagesx($image);
+        $canvasH = imagesy($image);
+        $pageWidthPt = 544.8;
+        $pageHeightPt = 271.2;
+        $scaleX = $canvasW / $pageWidthPt;
+        $scaleY = $canvasH / $pageHeightPt;
+
+        $black = imagecolorallocate($image, 0, 0, 0);
+
+        // PDF: Palatino Linotype 28 pt.
+        // GD/FreeType usa 96 dpi; el fondo de la plantilla esta a 300 dpi.
+        $nameSize = 28.0 * (300.0 / 96.0);
+        $nameBoxX = 63.9765 * $scaleX;
+        $nameBoxWidth = 334.877 * $scaleX;
+
+        foreach ($lines as $i => $line) {
+            $baseline = rs_plate_pdf_baseline_to_png(
+                118.087,
+                (float) $baselines[$i],
+                $pageHeightPt,
+                $scaleY
+            );
+            rs_plate_draw_centered_box_text(
+                $image,
+                $nameFont,
+                $nameSize,
+                $nameBoxX,
+                $nameBoxWidth,
+                $baseline,
+                $line,
+                $black
+            );
+        }
+
+        // PDF: fuente F0 de la propia plantilla a 26 pt.
+        $dateSize = 26.0 * (300.0 / 96.0);
+        $birthX = (66.9754 + 4.9223022) * $scaleX;
+        $birthY = rs_plate_pdf_baseline_to_png(83.0613, 5.1378517, $pageHeightPt, $scaleY);
+        $deathX = (285.975 + 4.9224854) * $scaleX;
+        $deathY = rs_plate_pdf_baseline_to_png(83.0613, 5.1378517, $pageHeightPt, $scaleY);
+
+        imagettftext(
+            $image,
+            $dateSize,
+            0,
+            (int) round($birthX),
+            (int) round($birthY),
+            $black,
+            $dateFont,
+            $birth->format('d/m/Y')
+        );
+        imagettftext(
+            $image,
+            $dateSize,
+            0,
+            (int) round($deathX),
+            (int) round($deathY),
+            $black,
+            $dateFont,
+            $death->format('d/m/Y')
+        );
+
+        ob_start();
+        imagepng($image, null, 6);
+        $png = (string) ob_get_clean();
+    } finally {
+        imagedestroy($image);
+    }
 
     if ($png === '') {
-        throw new RuntimeException('No fue posible generar la placa PNG desde el PDF final.');
+        throw new RuntimeException('No fue posible generar la placa PNG.');
     }
 
     $itemId = preg_replace('/[^0-9A-Za-z_-]+/', '', trim((string) ($payload['itemId'] ?? '')));
