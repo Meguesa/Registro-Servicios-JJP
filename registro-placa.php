@@ -142,67 +142,186 @@ function rs_plate_draw_logo(GdImage $canvas, int $x, int $y, int $maxW, int $max
     imagedestroy($src);
 }
 
-function rs_plate_png_to_pdf(string $pngBytes, int $pixelWidth, int $pixelHeight): string
+function rs_plate_font_path(): ?string
 {
-    $src = @imagecreatefromstring($pngBytes);
-    if (!$src instanceof GdImage) {
-        throw new RuntimeException('No fue posible convertir la placa PNG a PDF.');
+    static $resolved = false;
+    static $font = null;
+
+    if ($resolved) {
+        return $font;
+    }
+    $resolved = true;
+
+    $candidates = [
+        '/usr/share/fonts/truetype/msttcorefonts/pala.ttf',
+        '/usr/share/fonts/truetype/msttcorefonts/Palatino_Linotype.ttf',
+        '/usr/share/fonts/opentype/urw-base35/P052-Roman.otf',
+        '/usr/share/fonts/OTF/P052-Roman.otf',
+        '/usr/share/fonts/truetype/urw-base35/P052-Roman.ttf',
+        '/usr/share/fonts/truetype/liberation2/LiberationSerif-Regular.ttf',
+        '/usr/share/fonts/liberation/LiberationSerif-Regular.ttf',
+    ];
+
+    foreach ($candidates as $candidate) {
+        if (function_exists('rs_image_valid_font_file') && rs_image_valid_font_file($candidate)) {
+            $font = $candidate;
+            return $font;
+        }
     }
 
-    ob_start();
-    imagejpeg($src, null, 95);
-    $jpeg = (string)ob_get_clean();
-    imagedestroy($src);
-
-    if ($jpeg === '') {
-        throw new RuntimeException('No fue posible generar el JPEG temporal de la placa.');
+    if (function_exists('shell_exec')) {
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+        if (!in_array('shell_exec', $disabled, true)) {
+            foreach (['Palatino Linotype', 'Palatino', 'P052', 'URW Palladio L', 'TeX Gyre Pagella', 'Liberation Serif'] as $query) {
+                $command = 'fc-match -f ' . escapeshellarg('%{file}\\n') . ' ' . escapeshellarg($query) . ' 2>/dev/null';
+                $output = @shell_exec($command);
+                if (!is_string($output) || trim($output) === '') {
+                    continue;
+                }
+                foreach (preg_split('/\\R/', trim($output)) ?: [] as $candidate) {
+                    $candidate = trim($candidate);
+                    if ($candidate !== '' && function_exists('rs_image_valid_font_file') && rs_image_valid_font_file($candidate)) {
+                        $font = $candidate;
+                        return $font;
+                    }
+                }
+            }
+        }
     }
 
-    $pageW = 544.8;
-    $pageH = 271.2;
-    $objects = [];
-
-    $objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";
-    $objects[2] = "<< /Type /Pages /Kids [3 0 R] /Count 1 >>";
-    $objects[3] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {$pageW} {$pageH}] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>";
-
-    $content = "q\n{$pageW} 0 0 {$pageH} 0 0 cm\n/Im0 Do\nQ\n";
-    $objects[4] = "<< /Length " . strlen($content) . " >>\nstream\n" . $content . "endstream";
-
-    $objects[5] = "<< /Type /XObject /Subtype /Image /Width {$pixelWidth} /Height {$pixelHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " . strlen($jpeg) . " >>\nstream\n" . $jpeg . "\nendstream";
-
-    $pdf = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
-    $offsets = [0 => 0];
-    foreach ($objects as $num => $body) {
-        $offsets[$num] = strlen($pdf);
-        $pdf .= $num . " 0 obj\n" . $body . "\nendobj\n";
-    }
-
-    $xref = strlen($pdf);
-    $pdf .= "xref\n0 " . (count($objects) + 1) . "\n";
-    $pdf .= "0000000000 65535 f \n";
-    for ($i = 1; $i <= count($objects); $i++) {
-        $pdf .= str_pad((string)$offsets[$i], 10, '0', STR_PAD_LEFT) . " 00000 n \n";
-    }
-    $pdf .= "trailer\n<< /Size " . (count($objects) + 1) . " /Root 1 0 R >>\n";
-    $pdf .= "startxref\n{$xref}\n%%EOF";
-
-    return $pdf;
+    $font = rs_image_font_path();
+    return $font;
 }
 
+function rs_plate_png_chunk(string $type, string $data): string
+{
+    $crc = crc32($type . $data);
+    if ($crc < 0) {
+        $crc += 4294967296;
+    }
+    return pack('N', strlen($data)) . $type . $data . pack('N', $crc);
+}
+
+function rs_plate_background_png(): string
+{
+    $cacheDir = __DIR__ . '/.registro-servicios-data/templates';
+    if (!is_dir($cacheDir)) {
+        @mkdir($cacheDir, 0750, true);
+    }
+    $cache = $cacheDir . '/fondo_placa_urna.png';
+    if (is_file($cache) && is_readable($cache) && (time() - (int) @filemtime($cache) < 86400)) {
+        $cached = @file_get_contents($cache);
+        if (is_string($cached) && str_starts_with($cached, "\x89PNG\r\n\x1a\n")) {
+            return $cached;
+        }
+    }
+
+    $pdf = rs_plate_template_pdf();
+    $marker = '18 0 obj';
+    $objPos = strpos($pdf, $marker);
+    if ($objPos === false) {
+        throw new RuntimeException('No se encontro el fondo fijo dentro de plantilla_placa_urna.pdf.');
+    }
+
+    $streamPos = strpos($pdf, 'stream', $objPos);
+    if ($streamPos === false) {
+        throw new RuntimeException('No se encontro el stream del fondo fijo de la placa.');
+    }
+
+    $dict = substr($pdf, $objPos, $streamPos - $objPos);
+    if (!preg_match('/\/Width\s+(\d+)/', $dict, $wm)
+        || !preg_match('/\/Height\s+(\d+)/', $dict, $hm)
+        || !preg_match('/\/Length\s+(\d+)/', $dict, $lm)
+        || !str_contains($dict, '/Filter/FlateDecode')
+        || !str_contains($dict, '/ColorSpace/DeviceRGB')) {
+        throw new RuntimeException('El fondo fijo de la placa no tiene el formato RGB esperado.');
+    }
+
+    $width = (int) $wm[1];
+    $height = (int) $hm[1];
+    $length = (int) $lm[1];
+    if ($width <= 0 || $height <= 0 || $length <= 0) {
+        throw new RuntimeException('Las dimensiones del fondo fijo de la placa no son validas.');
+    }
+
+    $dataPos = $streamPos + strlen('stream');
+    if (substr($pdf, $dataPos, 2) === "\r\n") {
+        $dataPos += 2;
+    } elseif (substr($pdf, $dataPos, 1) === "\n" || substr($pdf, $dataPos, 1) === "\r") {
+        $dataPos += 1;
+    }
+
+    $compressed = substr($pdf, $dataPos, $length);
+    $raw = @gzuncompress($compressed);
+    if (!is_string($raw)) {
+        $raw = @gzinflate($compressed);
+    }
+    if (!is_string($raw)) {
+        throw new RuntimeException('No fue posible descomprimir el fondo fijo de la placa.');
+    }
+
+    $expected = $width * $height * 3;
+    if (strlen($raw) !== $expected) {
+        throw new RuntimeException('El fondo fijo de la placa no tiene la longitud RGB esperada.');
+    }
+
+    $scanlines = '';
+    $rowBytes = $width * 3;
+    for ($y = 0; $y < $height; $y++) {
+        $scanlines .= "\x00" . substr($raw, $y * $rowBytes, $rowBytes);
+    }
+
+    $idat = gzcompress($scanlines, 9);
+    if (!is_string($idat)) {
+        throw new RuntimeException('No fue posible codificar el fondo fijo como PNG.');
+    }
+
+    $png = "\x89PNG\r\n\x1a\n"
+        . rs_plate_png_chunk('IHDR', pack('NNCCCCC', $width, $height, 8, 2, 0, 0, 0))
+        . rs_plate_png_chunk('IDAT', $idat)
+        . rs_plate_png_chunk('IEND', '');
+
+    @file_put_contents($cache, $png, LOCK_EX);
+    return $png;
+}
+
+function rs_plate_draw_centered_box_text(
+    GdImage $image,
+    string $font,
+    float $size,
+    float $boxX,
+    float $boxWidth,
+    float $baselineY,
+    string $text,
+    int $color
+): void {
+    $box = imagettfbbox($size, 0, $font, $text);
+    $width = is_array($box) ? abs((int) $box[2] - (int) $box[0]) : 0;
+    $x = (int) round($boxX + max(0, ($boxWidth - $width) / 2));
+    imagettftext($image, $size, 0, $x, (int) round($baselineY), $color, $font, $text);
+}
+
+function rs_plate_pdf_baseline_to_png(float $placementY, float $localBaselineY, float $pageHeightPt, float $scale): float
+{
+    return ($pageHeightPt - ($placementY + $localBaselineY)) * $scale;
+}
+
+/**
+ * Genera la placa final EXCLUSIVAMENTE como PNG.
+ *
+ * El fondo fijo se extrae directamente de plantilla_placa_urna.pdf para
+ * conservar logo, estrella, cruz, slogan, proporciones y posiciones originales.
+ * Solo se dibujan encima los tres datos variables: nombre, nacimiento y defuncion.
+ *
+ * @return array{pngName:string,png:string}
+ */
 function rs_generate_urna_plate(array $payload): array
 {
     rs_image_require_gd();
 
-    $font = rs_image_font_path();
-    $bold = rs_image_bold_font_path() ?? $font;
-    if ($font === null || $bold === null) {
-        throw new RuntimeException('No hay una fuente TrueType disponible para generar la placa.');
-    }
-
-    $name = trim((string)($payload['fallecido'] ?? ''));
-    $birthRaw = trim((string)($payload['fechaNacimiento'] ?? ''));
-    $deathRaw = trim((string)($payload['fechaDefuncion'] ?? ''));
+    $name = trim((string) ($payload['fallecido'] ?? ''));
+    $birthRaw = trim((string) ($payload['fechaNacimiento'] ?? ''));
+    $deathRaw = trim((string) ($payload['fechaDefuncion'] ?? ''));
 
     if ($name === '' || $birthRaw === '' || $deathRaw === '') {
         throw new RuntimeException('La placa requiere fallecido, fecha de nacimiento y fecha de defuncion.');
@@ -232,65 +351,69 @@ function rs_generate_urna_plate(array $payload): array
         throw new RuntimeException('No fue posible interpretar las fechas para la placa.');
     }
 
-    $w = 1514;
-    $h = 754;
-    $img = imagecreatetruecolor($w, $h);
-    imageantialias($img, true);
+    $background = rs_plate_background_png();
+    $image = @imagecreatefromstring($background);
+    if (!$image instanceof GdImage) {
+        throw new RuntimeException('No fue posible abrir el fondo fijo de la placa.');
+    }
 
-    $white = imagecolorallocate($img, 255, 255, 255);
-    $black = imagecolorallocate($img, 0, 0, 0);
-    imagefill($img, 0, 0, $white);
+    $font = rs_plate_font_path();
+    if ($font === null || !function_exists('imagettftext') || !function_exists('imagettfbbox')) {
+        imagedestroy($image);
+        throw new RuntimeException('No hay una fuente serif TrueType compatible con la plantilla de placa.');
+    }
 
     $displayName = mb_strtoupper($name, 'UTF-8');
-    $fontSize = 62.0;
-    $maxNameWidth = 930;
-    $lines = rs_plate_wrap_words($displayName, $font, $fontSize, $maxNameWidth);
-    while (count($lines) > 3 && $fontSize > 44) {
-        $fontSize -= 2;
-        $lines = rs_plate_wrap_words($displayName, $font, $fontSize, $maxNameWidth);
+    $templatePdf = rs_plate_template_pdf();
+    $widths = rs_plate_widths($templatePdf);
+    $lines = rs_plate_name_lines($displayName, $widths);
+    $baselines = rs_plate_name_baselines(count($lines));
+
+    $canvasW = imagesx($image);
+    $canvasH = imagesy($image);
+    $pageWidthPt = 544.8;
+    $pageHeightPt = 271.2;
+    $scaleX = $canvasW / $pageWidthPt;
+    $scaleY = $canvasH / $pageHeightPt;
+
+    $black = imagecolorallocate($image, 0, 0, 0);
+
+    // El PDF original usa Palatino Linotype a 28 pt. GD trabaja normalmente
+    // a ~96 dpi, por lo que se escala a la resolucion de 300 dpi del fondo fijo.
+    $nameSize = 28.0 * (300.0 / 96.0);
+    $nameBoxX = 63.9765 * $scaleX;
+    $nameBoxWidth = 334.877 * $scaleX;
+    foreach ($lines as $i => $line) {
+        $baseline = rs_plate_pdf_baseline_to_png(118.087, (float) $baselines[$i], $pageHeightPt, $scaleY);
+        rs_plate_draw_centered_box_text($image, $font, $nameSize, $nameBoxX, $nameBoxWidth, $baseline, $line, $black);
     }
 
-    $lineHeight = (int)round($fontSize * 1.17);
-    $startY = 150;
-    if (count($lines) === 1) $startY = 215;
-    elseif (count($lines) === 2) $startY = 175;
+    // Fechas: mismos puntos de insercion de los campos de la plantilla PDF.
+    $dateSize = 26.0 * (300.0 / 96.0);
+    $birthX = (66.9754 + 4.9223022) * $scaleX;
+    $birthY = rs_plate_pdf_baseline_to_png(83.0613, 5.1378517, $pageHeightPt, $scaleY);
+    $deathX = (285.975 + 4.9224854) * $scaleX;
+    $deathY = rs_plate_pdf_baseline_to_png(83.0613, 5.1378517, $pageHeightPt, $scaleY);
 
-    foreach ($lines as $idx => $line) {
-        rs_plate_draw_centered_text($img, $font, $fontSize, $startY + ($idx * $lineHeight), $line, $black, $w);
-    }
-
-    $dateY = 505;
-    rs_plate_draw_star($img, 138, 478, 30, 13, $black);
-    imagettftext($img, 45, 0, 205, $dateY, $black, $bold, $birth->format('d/m/Y'));
-
-    rs_plate_draw_cross($img, 755, 478, 65, 14, $black);
-    imagettftext($img, 45, 0, 815, $dateY, $black, $bold, $death->format('d/m/Y'));
-
-    rs_plate_draw_logo($img, 20, 575, 165, 150);
-
-    $phrase = 'Siempre en nuestro corazón';
-    $phraseSize = 34.0;
-    $phraseBox = imagettfbbox($phraseSize, 0, $font, $phrase);
-    $phraseWidth = is_array($phraseBox) ? abs((int)$phraseBox[2] - (int)$phraseBox[0]) : 0;
-    $phraseX = max(235, (int)(($w - $phraseWidth) / 2) + 55);
-    imagettftext($img, $phraseSize, 0, $phraseX, 700, $black, $font, $phrase);
+    imagettftext($image, $dateSize, 0, (int) round($birthX), (int) round($birthY), $black, $font, $birth->format('d/m/Y'));
+    imagettftext($image, $dateSize, 0, (int) round($deathX), (int) round($deathY), $black, $font, $death->format('d/m/Y'));
 
     ob_start();
-    imagepng($img, null, 6);
-    $png = (string)ob_get_clean();
-    imagedestroy($img);
+    imagepng($image, null, 6);
+    $png = (string) ob_get_clean();
+    imagedestroy($image);
 
     if ($png === '') {
-        throw new RuntimeException('No fue posible generar la imagen de la placa.');
+        throw new RuntimeException('No fue posible generar la placa PNG.');
     }
 
-    $pdf = rs_plate_fill_original_template($displayName, $birth->format('d/m/Y'), $death->format('d/m/Y'));
-    $safe = preg_replace('/[^A-Za-z0-9_-]+/', '_', rs_image_ascii($displayName)) ?: 'FALLECIDO';
+    $itemId = preg_replace('/[^0-9A-Za-z_-]+/', '', trim((string) ($payload['itemId'] ?? '')));
+    if ($itemId === '') {
+        $itemId = 'PRUEBA';
+    }
 
     return [
-        'pngName' => 'Placa_Urna_' . $safe . '.png',
-        'pdfName' => 'Placa_Urna_' . $safe . '.pdf',
+        'pngName' => 'Placa-' . $itemId . '.png',
         'png' => $png,
-        'pdf' => $pdf,
     ];
 }
