@@ -702,8 +702,20 @@ async function rsSubmitToSharePoint(){
       throw new Error(result?.message||("HTTP "+response.status));
     }
 
-    if(status) status.textContent="Registro creado correctamente. ID de SharePoint: "+result.itemId+".";
-    alert("Servicio registrado correctamente en SharePoint.\nID: "+result.itemId);
+    const plate=result?.plate||null;
+    if(plate?.required===true){
+      if(plate?.savedToSharePoint===true){
+        if(status) status.textContent="Registro creado correctamente. ID de SharePoint: "+result.itemId+". Placa "+(plate.fileName||"PNG")+" guardada en SharePoint.";
+        alert("Servicio registrado correctamente en SharePoint.\nID: "+result.itemId+"\nPlaca: "+(plate.fileName||"PNG")+" guardada correctamente.");
+      }else{
+        const detail=plate?.error?("\nDetalle placa: "+plate.error):"";
+        if(status) status.textContent="Registro creado correctamente. ID de SharePoint: "+result.itemId+". ATENCION: la placa no pudo guardarse."+ (plate?.error?(" "+plate.error):"");
+        alert("Servicio registrado correctamente en SharePoint.\nID: "+result.itemId+"\nATENCION: la placa no pudo guardarse."+detail);
+      }
+    }else{
+      if(status) status.textContent="Registro creado correctamente. ID de SharePoint: "+result.itemId+".";
+      alert("Servicio registrado correctamente en SharePoint.\nID: "+result.itemId);
+    }
     button.textContent="Registrado";
   }catch(error){
     console.error("Registro SharePoint:",error);
