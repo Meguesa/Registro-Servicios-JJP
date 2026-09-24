@@ -174,6 +174,18 @@ function rs_calendar_create_event(array $payload, array $sharePointConfig): arra
         return ['enabled' => false, 'created' => false];
     }
 
+    // Cremacion Directa (sin velacion) no ocupa sala ni horario de capillas.
+    // Por lo tanto, no debe intentar crear un evento de velacion en Outlook.
+    $servicio = trim((string)($payload['servicio'] ?? ''));
+    if ($servicio === 'Cremación Directa (sin velación)') {
+        return [
+            'enabled' => true,
+            'created' => false,
+            'skipped' => true,
+            'reason' => 'Servicio sin velacion: no requiere evento de capillas.',
+        ];
+    }
+
     // El calendario usa SIEMPRE las credenciales dedicadas registro_servicios_*
     // dentro de rs_graph_token(). SharePoint puede seguir usando temporalmente
     // su backend certificado existente sin mezclar credenciales entre modulos.
