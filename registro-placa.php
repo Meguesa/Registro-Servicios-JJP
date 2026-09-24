@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/registro-imagenes.php';
+require_once __DIR__ . '/registro-placa-template.php';
 
 function rs_plate_escape_pdf_text(string $value): string
 {
@@ -283,7 +284,7 @@ function rs_generate_urna_plate(array $payload): array
         throw new RuntimeException('No fue posible generar la imagen de la placa.');
     }
 
-    $pdf = rs_plate_png_to_pdf($png, $w, $h);
+    $pdf = rs_plate_fill_original_template($displayName, $birth->format('d/m/Y'), $death->format('d/m/Y'));
     $safe = preg_replace('/[^A-Za-z0-9_-]+/', '_', rs_image_ascii($displayName)) ?: 'FALLECIDO';
 
     return [
