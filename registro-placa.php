@@ -429,6 +429,87 @@ function rs_plate_embedded_font_path(int $fontObject, string $cacheName): string
 }
 
 /**
+ * Resuelve una fuente visualmente equivalente a Palatino Linotype para el PNG.
+ *
+ * La plantilla PDF declara /PalatinoLinotype pero NO incrusta el archivo de
+ * fuente. Los visores PDF la sustituyen con una fuente instalada localmente;
+ * en cPanel no existe ese archivo. Para mantener la misma familia tipografica
+ * usamos TeX Gyre Pagella (compatible con Palatino) y la dejamos en cache.
+ */
+function rs_plate_pagella_font_path(): string
+{
+    $candidates = [
+        __DIR__ . '/assets/fonts/texgyrepagella-regular.otf',
+        __DIR__ . '/fonts/texgyrepagella-regular.otf',
+        '/usr/share/texmf/fonts/opentype/public/tex-gyre/texgyrepagella-regular.otf',
+        '/usr/share/texlive/texmf-dist/fonts/opentype/public/tex-gyre/texgyrepagella-regular.otf',
+        '/usr/share/fonts/opentype/texgyre/texgyrepagella-regular.otf',
+        '/usr/share/fonts/opentype/tex-gyre/texgyrepagella-regular.otf',
+    ];
+
+    foreach ($candidates as $candidate) {
+        if (function_exists('rs_image_valid_font_file') && rs_image_valid_font_file($candidate)) {
+            return $candidate;
+        }
+    }
+
+    if (function_exists('rs_image_download_font')) {
+        $urls = [
+            'https://tug.ctan.org/fonts/tex-gyre/opentype/texgyrepagella-regular.otf',
+            'https://mirrors.ibiblio.org/pub/mirrors/CTAN/fonts/tex-gyre/opentype/texgyrepagella-regular.otf',
+            'https://mirror.math.princeton.edu/pub/CTAN/fonts/tex-gyre/opentype/texgyrepagella-regular.otf',
+        ];
+
+        foreach ($urls as $url) {
+            $downloaded = rs_image_download_font($url, 'texgyrepagella-regular.otf');
+            if ($downloaded !== null) {
+                return $downloaded;
+            }
+        }
+    }
+
+    // Ultimo recurso: intenta una Palatino/Palladio instalada en el servidor.
+    $fallback = rs_plate_font_path();
+    if (is_string($fallback) && $fallback !== ''
+        && function_exists('rs_image_valid_font_file')
+        && rs_image_valid_font_file($fallback)) {
+        return $fallback;
+    }
+
+    throw new RuntimeException(
+        'No fue posible cargar una fuente compatible con Palatino Linotype para la placa PNG.'
+    );
+}
+
+/**
+ * Intenta usar la fuente incrustada del PDF. Si la plantilla solamente
+ * referencia una fuente local (sin FontFile), aplica una sustitucion adecuada.
+ */
+function rs_plate_resolve_png_font(int $fontObject, string $cacheName): string
+{
+    try {
+        return rs_plate_embedded_font_path($fontObject, $cacheName);
+    } catch (Throwable $e) {
+        if ($fontObject === 7) {
+            return rs_plate_pagella_font_path();
+        }
+
+        // La fuente de fechas normalmente es sans-serif. Carlito/Arial compatible
+        // ya se resuelve y cachea en registro-imagenes.php sin shell_exec.
+        if (function_exists('rs_image_font_path')) {
+            $fallback = rs_image_font_path();
+            if (is_string($fallback) && $fallback !== '') {
+                return $fallback;
+            }
+        }
+
+        throw new RuntimeException(
+            'No fue posible resolver la fuente de la plantilla para el objeto PDF ' . $fontObject . '.'
+        );
+    }
+}
+
+/**
  * Genera la placa final EXCLUSIVAMENTE como PNG.
  *
  * Usa el fondo fijo extraido de plantilla_placa_urna.pdf y las MISMAS fuentes
@@ -486,9 +567,11 @@ function rs_generate_urna_plate(array $payload): array
     }
 
     try {
-        // Fuentes exactas de la plantilla.
-        $nameFont = rs_plate_embedded_font_path(7, 'palatino-linotype-placa');
-        $dateFont = rs_plate_embedded_font_path(6, 'fecha-placa');
+        // La plantilla referencia Palatino Linotype, pero no siempre incrusta
+        // el archivo de fuente. Resolvemos una equivalente Palatino-compatible
+        // para el PNG y conservamos la fuente incrustada cuando si existe.
+        $nameFont = rs_plate_resolve_png_font(7, 'palatino-linotype-placa');
+        $dateFont = rs_plate_resolve_png_font(6, 'fecha-placa');
 
         $displayName = mb_strtoupper($name, 'UTF-8');
         $templatePdf = rs_plate_template_pdf();
