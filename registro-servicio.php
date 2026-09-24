@@ -312,7 +312,20 @@ try {
     rs_add_value($sp, $fieldIndex, ['field_10', 'Fecha Compra'], rs_date_only((string) ($payload['fechaCompra'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['field_11', 'Personal Venta'], trim((string) ($payload['personalVenta'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['field_12', 'Precio de Venta', 'Precio Venta'], ($payload['precioVenta'] ?? '') === '' ? null : (float) $payload['precioVenta']);
-    rs_add_value($sp, $fieldIndex, ['ServiciosExtra', 'Servicios Extra', 'Servicios Adicionales'], is_array($payload['serviciosExtra'] ?? null) ? $payload['serviciosExtra'] : []);
+
+    // "Servicios Extra" es obligatorio en Eventos Capillas.
+    // No obligar al usuario a elegir un concepto inexistente: si no hay extras,
+    // guardar "No Aplica" de forma automatica.
+    $serviciosExtra = is_array($payload['serviciosExtra'] ?? null)
+        ? array_values(array_filter(
+            array_map(static fn($v): string => trim((string)$v), $payload['serviciosExtra']),
+            static fn(string $v): bool => $v !== ''
+        ))
+        : [];
+    if ($serviciosExtra === []) {
+        $serviciosExtra = ['No Aplica'];
+    }
+    rs_add_value($sp, $fieldIndex, ['ServiciosExtra', 'Servicios Extra', 'Servicios Adicionales'], $serviciosExtra, false);
     rs_add_value($sp, $fieldIndex, ['field_27', 'Venta Total Servicio'], ($payload['ventaTotal'] ?? '') === '' ? null : (float) $payload['ventaTotal']);
 
     $extraAliases = [
