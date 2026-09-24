@@ -307,18 +307,98 @@ function rs_plate_pdf_baseline_to_png(float $placementY, float $localBaselineY, 
 }
 
 /**
+ * Rasteriza el PDF final de la placa a PNG.
+ *
+ * IMPORTANTE: el PNG NO vuelve a dibujar el nombre ni las fechas con GD.
+ * Se convierte el mismo PDF final generado con la plantilla original, por lo
+ * que tipografia, posiciones, interlineado y proporciones son exactamente los
+ * mismos que en el PDF de referencia.
+ */
+function rs_plate_pdf_to_png(string $pdf): string
+{
+    if ($pdf === '' || !str_starts_with($pdf, '%PDF-')) {
+        throw new RuntimeException('El contenido recibido para rasterizar no es un PDF valido.');
+    }
+
+    $baseDir = __DIR__ . '/.registro-servicios-data/tmp';
+    if (!is_dir($baseDir) && !@mkdir($baseDir, 0750, true) && !is_dir($baseDir)) {
+        throw new RuntimeException('No fue posible preparar el directorio temporal de la placa.');
+    }
+
+    $suffix = bin2hex(random_bytes(8));
+    $pdfPath = $baseDir . '/placa-' . $suffix . '.pdf';
+    $outBase = $baseDir . '/placa-' . $suffix;
+    $pngPath = $outBase . '.png';
+
+    if (@file_put_contents($pdfPath, $pdf, LOCK_EX) === false) {
+        throw new RuntimeException('No fue posible escribir el PDF temporal de la placa.');
+    }
+
+    $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+    $canShell = function_exists('shell_exec') && !in_array('shell_exec', $disabled, true);
+
+    try {
+        if (!$canShell) {
+            throw new RuntimeException(
+                'El servidor no permite shell_exec; no es posible convertir el PDF final a PNG conservando exactamente su tipografia.'
+            );
+        }
+
+        $commands = [
+            // Poppler: primera opcion por fidelidad y disponibilidad comun en Linux/cPanel.
+            'pdftoppm -f 1 -singlefile -png -r 300 ' . escapeshellarg($pdfPath) . ' ' . escapeshellarg($outBase) . ' 2>&1',
+            // Alternativa Poppler.
+            'pdftocairo -f 1 -singlefile -png -r 300 ' . escapeshellarg($pdfPath) . ' ' . escapeshellarg($outBase) . ' 2>&1',
+            // MuPDF.
+            'mutool draw -q -r 300 -o ' . escapeshellarg($pngPath) . ' ' . escapeshellarg($pdfPath) . ' 1 2>&1',
+            // Ghostscript.
+            'gs -q -dSAFER -dBATCH -dNOPAUSE -dFirstPage=1 -dLastPage=1 -sDEVICE=png16m -r300 '
+                . '-sOutputFile=' . escapeshellarg($pngPath) . ' ' . escapeshellarg($pdfPath) . ' 2>&1',
+        ];
+
+        $errors = [];
+        foreach ($commands as $command) {
+            @unlink($pngPath);
+            $output = @shell_exec($command);
+
+            if (is_file($pngPath) && filesize($pngPath) > 100) {
+                $png = @file_get_contents($pngPath);
+                if (is_string($png) && str_starts_with($png, "\x89PNG\r\n\x1a\n")) {
+                    return $png;
+                }
+            }
+
+            $message = trim((string) $output);
+            if ($message !== '') {
+                $errors[] = $message;
+            }
+        }
+
+        $detail = $errors !== [] ? ' Detalle: ' . implode(' | ', array_slice($errors, 0, 2)) : '';
+        throw new RuntimeException(
+            'No se encontro un rasterizador PDF disponible (pdftoppm, pdftocairo, mutool o Ghostscript).' . $detail
+        );
+    } finally {
+        @unlink($pdfPath);
+        @unlink($pngPath);
+        @unlink($outBase . '-1.png');
+    }
+}
+
+/**
  * Genera la placa final EXCLUSIVAMENTE como PNG.
  *
- * El fondo fijo se extrae directamente de plantilla_placa_urna.pdf para
- * conservar logo, estrella, cruz, slogan, proporciones y posiciones originales.
- * Solo se dibujan encima los tres datos variables: nombre, nacimiento y defuncion.
+ * El PDF original es la fuente maestra. Primero se rellena y aplana
+ * plantilla_placa_urna.pdf con su propia Palatino Linotype y con las posiciones
+ * exactas de la plantilla. Despues se rasteriza ESE MISMO PDF a PNG.
+ *
+ * Resultado: el PNG mantiene exactamente la misma tipografia y composicion
+ * visual que el PDF de referencia; no existe una segunda version dibujada con GD.
  *
  * @return array{pngName:string,png:string}
  */
 function rs_generate_urna_plate(array $payload): array
 {
-    rs_image_require_gd();
-
     $name = trim((string) ($payload['fallecido'] ?? ''));
     $birthRaw = trim((string) ($payload['fechaNacimiento'] ?? ''));
     $deathRaw = trim((string) ($payload['fechaDefuncion'] ?? ''));
@@ -328,6 +408,7 @@ function rs_generate_urna_plate(array $payload): array
     }
 
     $tz = new DateTimeZone('America/Monterrey');
+
     $birth = null;
     foreach (['Y-m-d', 'd/m/Y'] as $fmt) {
         $candidate = DateTimeImmutable::createFromFormat($fmt, substr($birthRaw, 0, 10), $tz);
@@ -351,60 +432,22 @@ function rs_generate_urna_plate(array $payload): array
         throw new RuntimeException('No fue posible interpretar las fechas para la placa.');
     }
 
-    $background = rs_plate_background_png();
-    $image = @imagecreatefromstring($background);
-    if (!$image instanceof GdImage) {
-        throw new RuntimeException('No fue posible abrir el fondo fijo de la placa.');
-    }
-
-    $font = rs_plate_font_path();
-    if ($font === null || !function_exists('imagettftext') || !function_exists('imagettfbbox')) {
-        imagedestroy($image);
-        throw new RuntimeException('No hay una fuente serif TrueType compatible con la plantilla de placa.');
-    }
-
     $displayName = mb_strtoupper($name, 'UTF-8');
-    $templatePdf = rs_plate_template_pdf();
-    $widths = rs_plate_widths($templatePdf);
-    $lines = rs_plate_name_lines($displayName, $widths);
-    $baselines = rs_plate_name_baselines(count($lines));
 
-    $canvasW = imagesx($image);
-    $canvasH = imagesy($image);
-    $pageWidthPt = 544.8;
-    $pageHeightPt = 271.2;
-    $scaleX = $canvasW / $pageWidthPt;
-    $scaleY = $canvasH / $pageHeightPt;
+    // FUENTE MAESTRA:
+    // rellena la plantilla PDF original con sus fuentes/metricas originales.
+    $finalPdf = rs_plate_fill_original_template(
+        $displayName,
+        $birth->format('d/m/Y'),
+        $death->format('d/m/Y')
+    );
 
-    $black = imagecolorallocate($image, 0, 0, 0);
-
-    // El PDF original usa Palatino Linotype a 28 pt. GD trabaja normalmente
-    // a ~96 dpi, por lo que se escala a la resolucion de 300 dpi del fondo fijo.
-    $nameSize = 28.0 * (300.0 / 96.0);
-    $nameBoxX = 63.9765 * $scaleX;
-    $nameBoxWidth = 334.877 * $scaleX;
-    foreach ($lines as $i => $line) {
-        $baseline = rs_plate_pdf_baseline_to_png(118.087, (float) $baselines[$i], $pageHeightPt, $scaleY);
-        rs_plate_draw_centered_box_text($image, $font, $nameSize, $nameBoxX, $nameBoxWidth, $baseline, $line, $black);
-    }
-
-    // Fechas: mismos puntos de insercion de los campos de la plantilla PDF.
-    $dateSize = 26.0 * (300.0 / 96.0);
-    $birthX = (66.9754 + 4.9223022) * $scaleX;
-    $birthY = rs_plate_pdf_baseline_to_png(83.0613, 5.1378517, $pageHeightPt, $scaleY);
-    $deathX = (285.975 + 4.9224854) * $scaleX;
-    $deathY = rs_plate_pdf_baseline_to_png(83.0613, 5.1378517, $pageHeightPt, $scaleY);
-
-    imagettftext($image, $dateSize, 0, (int) round($birthX), (int) round($birthY), $black, $font, $birth->format('d/m/Y'));
-    imagettftext($image, $dateSize, 0, (int) round($deathX), (int) round($deathY), $black, $font, $death->format('d/m/Y'));
-
-    ob_start();
-    imagepng($image, null, 6);
-    $png = (string) ob_get_clean();
-    imagedestroy($image);
+    // RESULTADO FINAL:
+    // rasteriza el PDF ya terminado; el PNG no redibuja ningun texto.
+    $png = rs_plate_pdf_to_png($finalPdf);
 
     if ($png === '') {
-        throw new RuntimeException('No fue posible generar la placa PNG.');
+        throw new RuntimeException('No fue posible generar la placa PNG desde el PDF final.');
     }
 
     $itemId = preg_replace('/[^0-9A-Za-z_-]+/', '', trim((string) ($payload['itemId'] ?? '')));
