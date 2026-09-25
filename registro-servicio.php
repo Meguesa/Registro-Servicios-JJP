@@ -324,6 +324,175 @@ function rs_send_controlled_test_email(array $payload, array $attachments): arra
     ];
 }
 
+
+/**
+ * Correo independiente de solicitud de placa de urna.
+ * Se envia solo cuando existe una placa generada.
+ *
+ * @param array{name:string,contentType:string,bytes:string} $plateAttachment
+ */
+function rs_send_plate_email(array $payload, array $plateAttachment): array
+{
+    if (!rs_is_preview_mode()) {
+        return [
+            'enabled' => false,
+            'sent' => false,
+            'recipients' => [],
+            'attachmentNames' => [],
+        ];
+    }
+
+    $name = trim((string)($plateAttachment['name'] ?? ''));
+    $bytes = (string)($plateAttachment['bytes'] ?? '');
+    $contentType = trim((string)($plateAttachment['contentType'] ?? 'image/png'));
+
+    if ($name === '' || $bytes === '') {
+        return [
+            'enabled' => true,
+            'sent' => false,
+            'recipients' => [],
+            'attachmentNames' => [],
+            'error' => 'No se recibio una placa valida para enviar.',
+        ];
+    }
+
+    $sender = 'sistemas@juanpablo.com.mx';
+    $recipients = [
+        'sistemas@juanpablo.com.mx',
+        'gabriel.guerra@juanpablo.com.mx',
+        'it@juanpablo.com.mx',
+    ];
+
+    $numeroServicio = trim((string)($payload['numeroServicio'] ?? ''));
+    $fallecido = trim((string)($payload['fallecido'] ?? ''));
+    $fechaNacimiento = trim((string)($payload['fechaNacimiento'] ?? ''));
+    $fechaDefuncion = trim((string)($payload['fechaDefuncion'] ?? ''));
+    $termino = trim((string)($payload['termino'] ?? ''));
+
+    $fmtDate = static function (string $value): string {
+        $value = trim($value);
+        if ($value === '') return '';
+
+        foreach (['Y-m-d\\TH:i:s', 'Y-m-d\\TH:i', 'Y-m-d', 'd/m/Y H:i:s', 'd/m/Y H:i', 'd/m/Y'] as $format) {
+            $dt = DateTimeImmutable::createFromFormat(
+                $format,
+                $value,
+                new DateTimeZone('America/Monterrey')
+            );
+            if ($dt instanceof DateTimeImmutable) {
+                return $dt->format($format === 'Y-m-d' || $format === 'd/m/Y' ? 'Y-m-d' : 'd-m-Y H:i:s');
+            }
+        }
+
+        return $value;
+    };
+
+    $subject = 'Solicitud de Placa Urna Servicio: '
+        . ($numeroServicio !== '' ? $numeroServicio : 'Sin numero');
+
+    $bodyHtml = ''
+        . '<div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.45;color:#111;">'
+        . '<p><strong>Referencia:</strong> ' . rs_email_escape($numeroServicio) . '</p>'
+        . '<br>'
+        . '<p><strong>Nombre de Fallecido:</strong> ' . rs_email_escape($fallecido) . '</p>'
+        . '<br>'
+        . '<p><strong>Fecha Nacimiento:</strong> ' . rs_email_escape($fmtDate($fechaNacimiento)) . '<br>'
+        . '<strong>Fecha Defuncion:</strong> ' . rs_email_escape($fmtDate($fechaDefuncion)) . '</p>'
+        . '<br>'
+        . '<p style="color:#c00000;font-style:italic;"><strong>***Tenerla lista para antes de:</strong> '
+        . rs_email_escape($fmtDate($termino))
+        . '<strong>***</strong></p>'
+        . '</div>';
+
+    $toRecipients = array_map(
+        static fn(string $address): array => [
+            'emailAddress' => ['address' => $address],
+        ],
+        $recipients
+    );
+
+    $request = [
+        'message' => [
+            'subject' => $subject,
+            'importance' => 'high',
+            'body' => [
+                'contentType' => 'HTML',
+                'content' => $bodyHtml,
+            ],
+            'toRecipients' => $toRecipients,
+            'attachments' => [[
+                '@odata.type' => '#microsoft.graph.fileAttachment',
+                'name' => $name,
+                'contentType' => $contentType !== '' ? $contentType : 'image/png',
+                'contentBytes' => base64_encode($bytes),
+            ]],
+        ],
+        'saveToSentItems' => true,
+    ];
+
+    $token = rs_graph_token();
+    $url = 'https://graph.microsoft.com/v1.0/users/'
+        . rawurlencode($sender)
+        . '/sendMail';
+
+    $curl = curl_init($url);
+    if ($curl === false) {
+        throw new RuntimeException('No fue posible inicializar el correo de placa.');
+    }
+
+    $json = json_encode($request, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($json)) {
+        throw new RuntimeException('No fue posible preparar el correo de placa.');
+    }
+
+    curl_setopt_array($curl, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 60,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $json,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . $token,
+            'Accept: application/json',
+            'Content-Type: application/json',
+        ],
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+    ]);
+
+    $response = curl_exec($curl);
+    $status = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $error = curl_error($curl);
+    curl_close($curl);
+
+    if ($response === false) {
+        throw new RuntimeException('El envio del correo de placa fallo: ' . $error);
+    }
+
+    $decoded = json_decode((string)$response, true);
+    if ($status < 200 || $status >= 300) {
+        $detail = is_array($decoded)
+            ? trim((string)($decoded['error']['message'] ?? ''))
+            : '';
+        if ($detail === '') {
+            $detail = mb_substr(trim((string)$response), 0, 1600);
+        }
+        throw new RuntimeException(
+            'Microsoft Graph correo placa respondio HTTP ' . $status
+            . ($detail !== '' ? ': ' . $detail : '.')
+        );
+    }
+
+    return [
+        'enabled' => true,
+        'sent' => true,
+        'sender' => $sender,
+        'recipients' => $recipients,
+        'attachmentNames' => [$name],
+    ];
+}
+
 try {
     $root = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
     $bootstrap = $root . '/includes/bootstrap.php';
@@ -709,6 +878,7 @@ try {
 
     // Archivos que formaran parte del correo controlado de Preview.
     $emailAttachments = [];
+    $plateEmailAttachment = null;
 
     // FASE 3: placa de urna generada internamente.
     // Resultado final: SOLO PNG, con nombre historico Placa-<ID>.png.
@@ -743,11 +913,12 @@ try {
 
             $plateResult['created'] = true;
             $plateResult['fileName'] = $plateFileName;
-            $emailAttachments[] = [
+            $plateEmailAttachment = [
                 'name' => $plateFileName,
                 'contentType' => 'image/png',
                 'bytes' => $plateBytes,
             ];
+            $emailAttachments[] = $plateEmailAttachment;
 
             $platesFolder = '/sites/Operaciones/Documentos compartidos/Automaticaciones/Eventos Capillas/Placas';
             $folderArg = rawurlencode("'" . $platesFolder . "'");
@@ -956,6 +1127,25 @@ try {
         }
     }
 
+    $plateEmailResult = [
+        'enabled' => rs_is_preview_mode() && is_array($plateEmailAttachment),
+        'sent' => false,
+        'recipients' => [],
+        'attachmentNames' => [],
+        'error' => null,
+    ];
+    if (rs_is_preview_mode() && is_array($plateEmailAttachment)) {
+        try {
+            $plateEmailResult = array_merge(
+                $plateEmailResult,
+                rs_send_plate_email($payload, $plateEmailAttachment)
+            );
+        } catch (Throwable $plateEmailError) {
+            $plateEmailResult['error'] = $plateEmailError->getMessage();
+            error_log('Registro Servicios Correo Placa item ' . $itemId . ': ' . $plateEmailError->getMessage());
+        }
+    }
+
     rs_add_publication($storageCtx, [
         'itemId'=>(string)$itemId,
         'status'=>'PUBLICADO',
@@ -980,6 +1170,7 @@ try {
         'plate' => $plateResult,
         'letter' => $letterResult,
         'email' => $emailResult ?? ['enabled' => false, 'sent' => false],
+        'plateEmail' => $plateEmailResult ?? ['enabled' => false, 'sent' => false],
     ]);
 } catch (Throwable $error) {
     error_log('Registro Servicios SharePoint: ' . $error->getMessage());
