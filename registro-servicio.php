@@ -52,11 +52,51 @@ function rs_send_controlled_test_email(array $payload, array $attachments): arra
         'it@juanpablo.com.mx',
     ];
 
+    // Orden operativo solicitado para el correo:
+    // 1) Informacion_Servicio, 2) Obituario, 3) Informacion_Venta,
+    // 4) Placa, 5) Esquela, 6) Carta, 7) documentos adjuntos.
+    $rankedAttachments = [];
+    foreach (array_values($attachments) as $index => $attachment) {
+        $name = trim((string)($attachment['name'] ?? ''));
+        $normalizedName = mb_strtolower($name, 'UTF-8');
+
+        $rank = 70;
+        if (str_contains($normalizedName, 'informacion_servicio')) {
+            $rank = 10;
+        } elseif (str_contains($normalizedName, 'obituario')) {
+            $rank = 20;
+        } elseif (str_contains($normalizedName, 'informacion_venta')) {
+            $rank = 30;
+        } elseif (str_starts_with($normalizedName, 'placa-') || str_contains($normalizedName, 'placa_')) {
+            $rank = 40;
+        } elseif (str_contains($normalizedName, 'esquela')) {
+            $rank = 50;
+        } elseif (str_contains($normalizedName, 'carta_servicio_otorgado')) {
+            $rank = 60;
+        }
+
+        $rankedAttachments[] = [
+            'rank' => $rank,
+            'index' => $index,
+            'attachment' => $attachment,
+        ];
+    }
+
+    usort(
+        $rankedAttachments,
+        static fn(array $a, array $b): int =>
+            ($a['rank'] <=> $b['rank']) ?: ($a['index'] <=> $b['index'])
+    );
+
     $graphAttachments = [];
     $attachmentNames = [];
     $seen = [];
 
-    foreach ($attachments as $attachment) {
+    foreach ($rankedAttachments as $ranked) {
+        $attachment = is_array($ranked['attachment'] ?? null)
+            ? $ranked['attachment']
+            : [];
+
         $name = trim((string)($attachment['name'] ?? ''));
         $bytes = (string)($attachment['bytes'] ?? '');
         $contentType = trim((string)($attachment['contentType'] ?? 'application/octet-stream'));
@@ -76,30 +116,123 @@ function rs_send_controlled_test_email(array $payload, array $attachments): arra
         $attachmentNames[] = $name;
     }
 
-    $numero = trim((string)($payload['numeroReferencia'] ?? ''));
+    $formatDateTime = static function (string $value): string {
+        $value = trim($value);
+        if ($value === '') return '';
+
+        foreach (['Y-m-d\\TH:i:s', 'Y-m-d\\TH:i', 'd/m/Y H:i:s', 'd/m/Y H:i'] as $format) {
+            $dt = DateTimeImmutable::createFromFormat(
+                $format,
+                $value,
+                new DateTimeZone('America/Monterrey')
+            );
+            if ($dt instanceof DateTimeImmutable) {
+                return $dt->format('d-m-Y H:i:s');
+            }
+        }
+
+        return $value;
+    };
+
+    $formatDate = static function (string $value): string {
+        $value = trim($value);
+        if ($value === '') return '';
+
+        foreach (['Y-m-d\\TH:i:s', 'Y-m-d\\TH:i', 'Y-m-d', 'd/m/Y H:i:s', 'd/m/Y H:i', 'd/m/Y'] as $format) {
+            $dt = DateTimeImmutable::createFromFormat(
+                $format,
+                $value,
+                new DateTimeZone('America/Monterrey')
+            );
+            if ($dt instanceof DateTimeImmutable) {
+                return $dt->format('d-m-Y');
+            }
+        }
+
+        return $value;
+    };
+
+    $numeroServicio = trim((string)($payload['numeroServicio'] ?? ''));
     $fallecido = trim((string)($payload['fallecido'] ?? ''));
     $servicio = trim((string)($payload['servicio'] ?? ''));
     $referencia = trim((string)($payload['referencia'] ?? ''));
     $ubicacion = trim((string)($payload['ubicacion'] ?? ''));
     $sala = trim((string)($payload['sala'] ?? ''));
+    $inicio = $formatDateTime((string)($payload['inicio'] ?? ''));
+    $termino = $formatDateTime((string)($payload['termino'] ?? ''));
+    $llevaExequia = (bool)($payload['llevaExequia'] ?? false);
+    $horaExequia = $formatDateTime((string)($payload['horaExequia'] ?? ''));
+    $prevision = trim((string)($payload['prevision'] ?? ''));
+    $ubicacionRescate = trim((string)($payload['ubicacionRescate'] ?? ''));
+    $motivo = trim((string)($payload['motivo'] ?? ''));
+    $rescate1 = trim((string)($payload['rescate1'] ?? ''));
+    $rescate2 = trim((string)($payload['rescate2'] ?? ''));
+    $titular = trim((string)($payload['titular'] ?? ''));
+    $fechaNacimiento = $formatDate((string)($payload['fechaNacimiento'] ?? ''));
+    $fechaDefuncion = $formatDate((string)($payload['fechaDefuncion'] ?? ''));
+    $edad = trim((string)($payload['edad'] ?? ''));
+    $vendedor = trim((string)($payload['personalVenta'] ?? ''));
 
-    $subject = '[PRUEBA CONTROLADA] Registro de Servicio'
-        . ($numero !== '' ? ' ' . $numero : '')
-        . ($fallecido !== '' ? ' - ' . $fallecido : '');
+    $personalRescate = implode(
+        ' Y ',
+        array_values(array_filter(
+            [$rescate1, $rescate2],
+            static fn(string $value): bool => $value !== ''
+        ))
+    );
+
+    $evento = '';
+    if ($inicio !== '' && $termino !== '') {
+        $evento = 'de ' . $inicio . ' a ' . $termino;
+    } elseif ($inicio !== '') {
+        $evento = 'de ' . $inicio;
+    }
+
+    $exequia = $llevaExequia
+        ? ($horaExequia !== '' ? $horaExequia : 'PENDIENTE')
+        : 'NO APLICA';
+
+    $subject = '[PRUEBA CONTROLADA] Nuevo evento de Capillas: '
+        . ($ubicacion !== '' ? $ubicacion : 'Sin ubicación')
+        . ($sala !== '' ? ', ' . $sala : '')
+        . ($referencia !== '' ? ', ' . $referencia : '');
+
+    $line = static function (string $label, string $value): string {
+        return '<div style="margin:0 0 3px 0;"><strong>'
+            . rs_email_escape($label)
+            . ':</strong> '
+            . rs_email_escape($value !== '' ? $value : 'NO CAPTURADO')
+            . '</div>';
+    };
 
     $bodyHtml = ''
-        . '<p><strong>PRUEBA CONTROLADA - REGISTRO DE SERVICIOS</strong></p>'
-        . '<p>Este correo fue generado desde el módulo Preview. '
-        . '<strong>No se agregó ningún evento al calendario.</strong></p>'
-        . '<table cellpadding="5" cellspacing="0" style="border-collapse:collapse;">'
-        . '<tr><td><strong>Número de servicio:</strong></td><td>' . rs_email_escape($numero) . '</td></tr>'
-        . '<tr><td><strong>Fallecido(a):</strong></td><td>' . rs_email_escape($fallecido) . '</td></tr>'
-        . '<tr><td><strong>Servicio:</strong></td><td>' . rs_email_escape($servicio) . '</td></tr>'
-        . '<tr><td><strong>Referencia:</strong></td><td>' . rs_email_escape($referencia) . '</td></tr>'
-        . '<tr><td><strong>Ubicación:</strong></td><td>' . rs_email_escape($ubicacion) . '</td></tr>'
-        . '<tr><td><strong>Sala:</strong></td><td>' . rs_email_escape($sala) . '</td></tr>'
-        . '</table>'
-        . '<p>Se adjuntan los documentos generados y cargados durante esta prueba.</p>';
+        . '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.35;color:#111;">'
+        . '<div style="margin:0 0 14px 0;padding:10px 12px;border:1px solid #d8b45a;background:#fff8e6;">'
+        . '<strong>PRUEBA CONTROLADA - REGISTRO DE SERVICIOS</strong><br>'
+        . 'Este correo fue generado desde el módulo Preview. '
+        . '<strong>No se agregó ningún evento al calendario.</strong>'
+        . '</div>'
+        . $line('EVENTO', $evento)
+        . $line('EXEQUIA', $exequia)
+        . '<br>'
+        . $line('UBICACIÓN', $ubicacion)
+        . $line('SALA', $sala)
+        . $line('PREVISIÓN/USO INMEDIATO', $prevision)
+        . $line('UBICACIÓN DE RESCATE', $ubicacionRescate)
+        . $line('MOTIVO DE FALLECIMIENTO', $motivo)
+        . $line('SERVICIO', $servicio)
+        . $line('PERSONAL DE RESCATE', $personalRescate)
+        . '<br>'
+        . $line('TITULAR', $titular)
+        . $line('FALLECIDO(A)', $fallecido)
+        . $line('FECHA DE NACIMIENTO', $fechaNacimiento)
+        . $line('FECHA DE DEFUNCIÓN', $fechaDefuncion)
+        . $line('EDAD', $edad)
+        . '<br>'
+        . $line('REFERENCIA', $referencia)
+        . $line('NÚMERO DE SERVICIO', $numeroServicio)
+        . $line('VENDEDOR', $vendedor)
+        . '</div>';
 
     $toRecipients = array_map(
         static fn(string $address): array => [
