@@ -708,20 +708,63 @@ async function rsSubmitToSharePoint(){
       throw new Error(result?.message||("HTTP "+response.status));
     }
 
+    console.log("Resultado completo Registro Servicios:",result);
+
     const plate=result?.plate||null;
+    const letter=result?.letter||null;
+    const email=result?.email||null;
+    const calendar=result?.calendar||null;
+
+    const lines=[
+      "Servicio registrado correctamente en SharePoint.",
+      "ID: "+result.itemId
+    ];
+
     if(plate?.required===true){
       if(plate?.savedToSharePoint===true){
-        if(status) status.textContent="Registro creado correctamente. ID de SharePoint: "+result.itemId+". Placa "+(plate.fileName||"PNG")+" guardada en SharePoint.";
-        alert("Servicio registrado correctamente en SharePoint.\nID: "+result.itemId+"\nPlaca: "+(plate.fileName||"PNG")+" guardada correctamente.");
+        lines.push("Placa: OK - "+(plate.fileName||"PNG"));
       }else{
-        const detail=plate?.error?("\nDetalle placa: "+plate.error):"";
-        if(status) status.textContent="Registro creado correctamente. ID de SharePoint: "+result.itemId+". ATENCION: la placa no pudo guardarse."+ (plate?.error?(" "+plate.error):"");
-        alert("Servicio registrado correctamente en SharePoint.\nID: "+result.itemId+"\nATENCION: la placa no pudo guardarse."+detail);
+        lines.push("Placa: ERROR"+(plate?.error?(" - "+plate.error):""));
       }
     }else{
-      if(status) status.textContent="Registro creado correctamente. ID de SharePoint: "+result.itemId+".";
-      alert("Servicio registrado correctamente en SharePoint.\nID: "+result.itemId);
+      lines.push("Placa: no requerida");
     }
+
+    if(letter?.required===true){
+      if(letter?.attachedToSharePoint===true || letter?.created===true){
+        lines.push("Carta: OK"+(letter?.fileName?(" - "+letter.fileName):""));
+      }else{
+        lines.push("Carta: ERROR"+(letter?.error?(" - "+letter.error):""));
+      }
+    }
+
+    if(calendar?.skipped===true){
+      lines.push("Calendario: OMITIDO (prueba controlada)");
+    }else if(calendar?.created===true){
+      lines.push("Calendario: CREADO");
+    }else if(calendar?.enabled===false){
+      lines.push("Calendario: deshabilitado");
+    }
+
+    if(email?.sent===true){
+      lines.push("Correo: ENVIADO");
+      if(Array.isArray(email?.recipients) && email.recipients.length){
+        lines.push("Destinatarios: "+email.recipients.join(", "));
+      }
+      if(Array.isArray(email?.attachmentNames) && email.attachmentNames.length){
+        lines.push("Adjuntos enviados ("+email.attachmentNames.length+"): "+email.attachmentNames.join(", "));
+      }
+    }else if(email?.enabled===true){
+      lines.push("Correo: ERROR");
+      lines.push("Detalle correo: "+(email?.error||"El servidor no confirmó el envío."));
+    }else{
+      lines.push("Correo: no habilitado");
+    }
+
+    const finalMessage=lines.join("\n");
+    if(status) status.textContent=lines.join(" | ");
+    alert(finalMessage);
+
     button.textContent="Registrado";
   }catch(error){
     console.error("Registro SharePoint:",error);
