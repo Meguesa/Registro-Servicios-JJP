@@ -714,8 +714,10 @@ async function rsSubmitToSharePoint(){
     console.log("Resultado completo Registro Servicios:",result);
 
     const plate=result?.plate||null;
+    const plateEmail=result?.plateEmail||null;
     const letter=result?.letter||null;
     const email=result?.email||null;
+    const tellmebye=result?.tellmebye||null;
     const calendar=result?.calendar||null;
 
     const lines=[
@@ -731,6 +733,12 @@ async function rsSubmitToSharePoint(){
       }
     }else{
       lines.push("Placa: no requerida");
+    }
+
+    if(plateEmail?.sent===true){
+      lines.push("Correo de placa: ENVIADO");
+    }else if(plateEmail?.enabled===true){
+      lines.push("Correo de placa: ERROR"+(plateEmail?.error?(" - "+plateEmail.error):""));
     }
 
     if(letter?.required===true){
@@ -762,6 +770,19 @@ async function rsSubmitToSharePoint(){
       lines.push("Detalle correo: "+(email?.error||"El servidor no confirmó el envío."));
     }else{
       lines.push("Correo: no habilitado");
+    }
+
+    if(tellmebye?.triggered===true){
+      lines.push("TellMeBye: DISPARADO ("+(tellmebye.mode||"modo no indicado")+")");
+      if(tellmebye.mode==="publicar"){
+        lines.push("Esquela: se enviará en correo independiente al terminar TellMeBye");
+      }else{
+        lines.push("Esquela: modo preview, no se publica ni envía cartulina final");
+      }
+    }else if(tellmebye?.enabled===true){
+      lines.push("TellMeBye: NO DISPARADO"+(tellmebye?.error?(" - "+tellmebye.error):""));
+    }else{
+      lines.push("TellMeBye: no habilitado");
     }
 
     const finalMessage=lines.join("\n");
