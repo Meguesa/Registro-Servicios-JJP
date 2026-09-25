@@ -25,6 +25,8 @@ $cases = [
         'fallecido' => 'EMMA ALICIA LOPEZ SARMIENTO',
         'titular' => 'GINA YADIRA LOPEZ SARMIENTO',
         'destinoFinal' => 'Crematorio Jardines de Juan Pablo',
+        'tiempoCapillas' => '12H',
+        'inicio' => '2026-09-25T10:00',
     ],
     'atmadba' => [
         'itemId' => 'PRUEBA-ATMADBA',
@@ -36,6 +38,8 @@ $cases = [
         'fallecido' => 'MIGUEL ANGEL SANCHEZ TOTO',
         'titular' => 'ROSA ISELA SANCHEZ TOTO',
         'destinoFinal' => 'Parque de Descanso Jardines de Juan Pablo',
+        'tiempoCapillas' => '12H',
+        'inicio' => '2026-09-24T12:00',
     ],
     'atmadex' => [
         'itemId' => 'PRUEBA-ATMADEX',
@@ -47,6 +51,8 @@ $cases = [
         'fallecido' => 'PRUEBA NOMBRE SERVICIO EXCLUSIVO',
         'titular' => 'PRUEBA TITULAR',
         'destinoFinal' => 'Crematorio Jardines de Juan Pablo',
+        'tiempoCapillas' => '12H',
+        'inicio' => '2026-09-25T13:00',
     ],
     'atmadlx' => [
         'itemId' => 'PRUEBA-ATMADLX',
@@ -58,6 +64,8 @@ $cases = [
         'fallecido' => 'PRUEBA NOMBRE SERVICIO DE LUJO',
         'titular' => 'PRUEBA TITULAR',
         'destinoFinal' => 'Crematorio Jardines de Juan Pablo',
+        'tiempoCapillas' => '24H',
+        'inicio' => '2026-09-26T10:00',
     ],
     'directa-con' => [
         'itemId' => 'PRUEBA-CD-CON',
@@ -69,6 +77,8 @@ $cases = [
         'fallecido' => 'PRUEBA CREMACION DIRECTA CON VELACION',
         'titular' => 'PRUEBA TITULAR',
         'destinoFinal' => 'Crematorio Jardines de Juan Pablo',
+        'tiempoCapillas' => '2H',
+        'inicio' => '2026-09-27T14:00',
     ],
     'directa-sin' => [
         'itemId' => 'PRUEBA-CD-SIN',
@@ -80,6 +90,7 @@ $cases = [
         'fallecido' => 'PRUEBA CREMACION DIRECTA SIN VELACION',
         'titular' => 'PRUEBA TITULAR',
         'destinoFinal' => 'Crematorio Jardines de Juan Pablo',
+        'inicioCrematorio' => '2026-09-28T09:00',
     ],
 ];
 
