@@ -20,13 +20,15 @@ try {
     $registroSharePoint = __DIR__ . '/registro-sharepoint.php';
     $registroCalendario = __DIR__ . '/registro-calendario.php';
     $registroPlaca = __DIR__ . '/registro-placa.php';
-    if (!is_file($bootstrap) || !is_file($registroSharePoint) || !is_file($registroCalendario) || !is_file($registroPlaca)) {
+    $registroCarta = __DIR__ . '/registro-carta.php';
+    if (!is_file($bootstrap) || !is_file($registroSharePoint) || !is_file($registroCalendario) || !is_file($registroPlaca) || !is_file($registroCarta)) {
         throw new RuntimeException('No se encontraron los componentes necesarios de Registro de Servicios.');
     }
     require_once $bootstrap;
     require_once $registroSharePoint;
     require_once $registroCalendario;
     require_once $registroPlaca;
+    require_once $registroCarta;
     portal_require_authentication();
     $storageCtx = rs_storage_bootstrap();
     $draftIdRaw = trim((string) ($_POST['draftId'] ?? ''));
@@ -450,6 +452,53 @@ try {
         }
     }
 
+    // FASE 4: carta / constancia de servicio otorgado.
+    // Se genera con la informacion real capturada y se adjunta al elemento de
+    // SharePoint como PDF. Todavia NO se envia por correo; ese paso se integrara
+    // despues de validar el comportamiento con registros reales.
+    $letterResult = [
+        'required' => true,
+        'created' => false,
+        'attachedToItem' => false,
+        'fileName' => null,
+        'error' => null,
+    ];
+
+    try {
+        $letterPayload = $payload;
+        $letterPayload['itemId'] = (string) $itemId;
+
+        $letter = rs_generate_service_letter($letterPayload);
+        $letterBytes = (string) ($letter['pdf'] ?? '');
+        $letterFileName = trim((string) ($letter['pdfName'] ?? ''));
+
+        if ($letterBytes === '' || $letterFileName === '') {
+            throw new RuntimeException('La generacion de la carta no devolvio un PDF utilizable.');
+        }
+
+        $letterResult['created'] = true;
+        $letterResult['fileName'] = $letterFileName;
+
+        $safeLetterName = preg_replace('/[^A-Za-z0-9._() -]+/u', '_', $letterFileName) ?: ('Carta_Servicio_Otorgado_' . $itemId . '.pdf');
+        $safeLetterName = str_replace("'", "''", $safeLetterName);
+
+        $letterAttachmentUrl = $siteUrl
+            . "/_api/web/lists/getbytitle('" . $listEsc . "')/items(" . $itemId . ")"
+            . "/AttachmentFiles/add(FileName='" . rawurlencode($safeLetterName) . "')";
+
+        rs_request('POST', $letterAttachmentUrl, $token, $letterBytes, [
+            'Content-Type: application/pdf',
+            'X-RequestDigest: ' . $digest,
+        ]);
+
+        $letterResult['attachedToItem'] = true;
+    } catch (Throwable $letterError) {
+        // Igual que la placa: el servicio ya fue creado. Un fallo al generar
+        // la carta no debe provocar que el usuario duplique el registro.
+        $letterResult['error'] = $letterError->getMessage();
+        error_log('Registro Servicios Carta item ' . $itemId . ': ' . $letterError->getMessage());
+    }
+
     /** @return array<int,array{key:string,name:string,tmp:string,size:int,type:string}> */
     function rs_uploaded_files(): array
     {
@@ -547,6 +596,7 @@ try {
         'attachments' => $uploadedNames,
         'calendar' => $calendarResult ?? ['enabled' => false, 'created' => false],
         'plate' => $plateResult,
+        'letter' => $letterResult,
     ]);
 } catch (Throwable $error) {
     error_log('Registro Servicios SharePoint: ' . $error->getMessage());
