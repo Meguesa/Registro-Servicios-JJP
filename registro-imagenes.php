@@ -532,6 +532,54 @@ function rs_image_line_height(?string $fontPath, float $fontSize, int $bitmapFon
     return imagefontheight($bitmapFont) + 8;
 }
 
+
+function rs_image_text_width(string $text, ?string $fontPath, float $fontSize, int $bitmapFont = 5, bool $bold = false): int
+{
+    $text = rs_image_clean_text($text);
+    if ($text === '') {
+        return 0;
+    }
+
+    $measureFont = $bold ? (rs_image_bold_font_path() ?? $fontPath) : $fontPath;
+    if ($measureFont !== null && function_exists('imagettfbbox')) {
+        $box = @imagettfbbox($fontSize, 0, $measureFont, $text);
+        if (is_array($box)) {
+            return abs((int)$box[2] - (int)$box[0]);
+        }
+    }
+
+    return strlen(rs_image_builtin_text($text)) * imagefontwidth($bitmapFont);
+}
+
+/**
+ * Calcula anchos compactos segun el contenido, evitando columnas vacias
+ * excesivamente grandes sin sacrificar legibilidad.
+ *
+ * @param array<int,array{label:string,value:string}> $rows
+ * @return array{label:int,value:int}
+ */
+function rs_image_compact_widths(array $rows, ?string $fontPath, float $fontSize, int $bitmapFont = 5): array
+{
+    $maxLabel = 0;
+    $maxValue = 0;
+
+    foreach ($rows as $row) {
+        $maxLabel = max(
+            $maxLabel,
+            rs_image_text_width((string)($row['label'] ?? ''), $fontPath, $fontSize, $bitmapFont, true)
+        );
+        $maxValue = max(
+            $maxValue,
+            rs_image_text_width((string)($row['value'] ?? ''), $fontPath, $fontSize, $bitmapFont, false)
+        );
+    }
+
+    return [
+        'label' => max(150, min(330, $maxLabel + 34)),
+        'value' => max(170, min(650, $maxValue + 34)),
+    ];
+}
+
 function rs_image_render_start(int $width, int $height): array
 {
     rs_image_require_gd();
@@ -595,18 +643,26 @@ function rs_image_draw_header(GdImage $image, array $c, ?string $fontPath, strin
  */
 function rs_image_render_table(string $title, string $subtitle, array $rows): string
 {
-    $width = 1400;
     $margin = 46;
-    $labelWidth = 350;
-    $gap = 26;
+    $gap = 18;
     $headerHeight = 132;
     $footerHeight = 42;
     $fontSize = 18.0;
     $bitmapFont = 5;
 
+    [$probe, $fontPath] = rs_image_render_start(100, 100);
+    imagedestroy($probe);
+
+    $compact = rs_image_compact_widths($rows, $fontPath, $fontSize, $bitmapFont);
+    $labelWidth = $compact['label'];
+    $valueWidth = $compact['value'];
+
+    // El lienzo se ajusta al contenido real, con limites razonables para correo.
+    $width = max(620, min(1180, ($margin * 2) + $labelWidth + $gap + $valueWidth));
+    $valueWidth = $width - ($margin * 2) - $labelWidth - $gap;
+
     [$image, $fontPath, $c] = rs_image_render_start($width, 100);
     $lineHeight = rs_image_line_height($fontPath, $fontSize, $bitmapFont);
-    $valueWidth = $width - ($margin * 2) - $labelWidth - $gap;
 
     $prepared = [];
     $bodyHeight = 0;
@@ -656,21 +712,48 @@ function rs_image_render_table(string $title, string $subtitle, array $rows): st
  */
 function rs_image_render_two_column_table(string $title, string $subtitle, array $leftRows, array $rightRows): string
 {
-    $width = 1600;
     $margin = 46;
     $headerHeight = 132;
     $footerHeight = 42;
-    $columnGap = 26;
+    $columnGap = 24;
+    $innerGap = 16;
     $fontSize = 17.0;
     $bitmapFont = 5;
 
+    [$probe, $fontPath] = rs_image_render_start(100, 100);
+    imagedestroy($probe);
+
+    $leftCompact = rs_image_compact_widths($leftRows, $fontPath, $fontSize, $bitmapFont);
+    $rightCompact = rs_image_compact_widths($rightRows, $fontPath, $fontSize, $bitmapFont);
+
+    $leftLabelWidth = $leftCompact['label'];
+    $leftValueWidth = $leftCompact['value'];
+    $rightLabelWidth = $rightCompact['label'];
+    $rightValueWidth = $rightCompact['value'];
+
+    $leftColumnWidth = $leftLabelWidth + $innerGap + $leftValueWidth;
+    $rightColumnWidth = $rightLabelWidth + $innerGap + $rightValueWidth;
+    $width = max(
+        940,
+        min(1500, ($margin * 2) + $leftColumnWidth + $columnGap + $rightColumnWidth)
+    );
+
+    // Si el contenido excede el limite, repartir el ajuste principalmente
+    // entre las columnas de valores, manteniendo etiquetas legibles.
+    $availableColumnsWidth = $width - ($margin * 2) - $columnGap;
+    $naturalColumnsWidth = $leftColumnWidth + $rightColumnWidth;
+    if ($naturalColumnsWidth > $availableColumnsWidth) {
+        $overflow = $naturalColumnsWidth - $availableColumnsWidth;
+        $leftReduction = (int)ceil($overflow / 2);
+        $rightReduction = $overflow - $leftReduction;
+        $leftValueWidth = max(190, $leftValueWidth - $leftReduction);
+        $rightValueWidth = max(190, $rightValueWidth - $rightReduction);
+        $leftColumnWidth = $leftLabelWidth + $innerGap + $leftValueWidth;
+        $rightColumnWidth = $rightLabelWidth + $innerGap + $rightValueWidth;
+    }
+
     [$image, $fontPath, $c] = rs_image_render_start($width, 100);
     $lineHeight = rs_image_line_height($fontPath, $fontSize, $bitmapFont);
-    $contentWidth = $width - ($margin * 2);
-    $columnWidth = (int) floor(($contentWidth - $columnGap) / 2);
-    $labelWidth = 228;
-    $innerGap = 16;
-    $valueWidth = $columnWidth - $labelWidth - $innerGap;
 
     $maxRows = max(count($leftRows), count($rightRows));
     $prepared = [];
@@ -680,10 +763,10 @@ function rs_image_render_two_column_table(string $title, string $subtitle, array
         $left = $leftRows[$i] ?? ['label' => '', 'value' => ''];
         $right = $rightRows[$i] ?? ['label' => '', 'value' => ''];
 
-        $leftLabelLines = rs_image_wrap_lines(rs_image_clean_text($left['label'] ?? ''), $labelWidth - 22, $fontPath, $fontSize, $bitmapFont);
-        $leftValueLines = rs_image_wrap_lines(rs_image_clean_text($left['value'] ?? ''), $valueWidth - 10, $fontPath, $fontSize, $bitmapFont);
-        $rightLabelLines = rs_image_wrap_lines(rs_image_clean_text($right['label'] ?? ''), $labelWidth - 22, $fontPath, $fontSize, $bitmapFont);
-        $rightValueLines = rs_image_wrap_lines(rs_image_clean_text($right['value'] ?? ''), $valueWidth - 10, $fontPath, $fontSize, $bitmapFont);
+        $leftLabelLines = rs_image_wrap_lines(rs_image_clean_text($left['label'] ?? ''), $leftLabelWidth - 22, $fontPath, $fontSize, $bitmapFont);
+        $leftValueLines = rs_image_wrap_lines(rs_image_clean_text($left['value'] ?? ''), $leftValueWidth - 10, $fontPath, $fontSize, $bitmapFont);
+        $rightLabelLines = rs_image_wrap_lines(rs_image_clean_text($right['label'] ?? ''), $rightLabelWidth - 22, $fontPath, $fontSize, $bitmapFont);
+        $rightValueLines = rs_image_wrap_lines(rs_image_clean_text($right['value'] ?? ''), $rightValueWidth - 10, $fontPath, $fontSize, $bitmapFont);
 
         $lines = max(count($leftLabelLines), count($leftValueLines), count($rightLabelLines), count($rightValueLines));
         $rowHeight = max(48, ($lines * $lineHeight) + 16);
@@ -701,14 +784,14 @@ function rs_image_render_two_column_table(string $title, string $subtitle, array
     rs_image_draw_header($image, $c, $fontPath, $title, $subtitle, $width, $margin, $headerHeight);
 
     $leftX = $margin;
-    $rightX = $margin + $columnWidth + $columnGap;
+    $rightX = $margin + $leftColumnWidth + $columnGap;
     $y = $headerHeight;
 
     foreach ($prepared as [$leftLabelLines, $leftValueLines, $rightLabelLines, $rightValueLines, $rowHeight]) {
         imageline($image, $margin, $y, $width - $margin, $y, $c['line']);
 
-        imagefilledrectangle($image, $leftX, $y, $leftX + $labelWidth, $y + $rowHeight, $c['labelBg']);
-        imagefilledrectangle($image, $rightX, $y, $rightX + $labelWidth, $y + $rowHeight, $c['labelBg']);
+        imagefilledrectangle($image, $leftX, $y, $leftX + $leftLabelWidth, $y + $rowHeight, $c['labelBg']);
+        imagefilledrectangle($image, $rightX, $y, $rightX + $rightLabelWidth, $y + $rowHeight, $c['labelBg']);
 
         $textY = $y + 28;
         foreach ($leftLabelLines as $lineText) {
@@ -717,7 +800,7 @@ function rs_image_render_two_column_table(string $title, string $subtitle, array
         }
         $textY = $y + 28;
         foreach ($leftValueLines as $lineText) {
-            rs_image_draw_text($image, $leftX + $labelWidth + $innerGap, $textY, $lineText, $c['ink'], $fontPath, $fontSize, $bitmapFont);
+            rs_image_draw_text($image, $leftX + $leftLabelWidth + $innerGap, $textY, $lineText, $c['ink'], $fontPath, $fontSize, $bitmapFont);
             $textY += $lineHeight;
         }
 
@@ -728,7 +811,7 @@ function rs_image_render_two_column_table(string $title, string $subtitle, array
         }
         $textY = $y + 28;
         foreach ($rightValueLines as $lineText) {
-            rs_image_draw_text($image, $rightX + $labelWidth + $innerGap, $textY, $lineText, $c['ink'], $fontPath, $fontSize, $bitmapFont);
+            rs_image_draw_text($image, $rightX + $rightLabelWidth + $innerGap, $textY, $lineText, $c['ink'], $fontPath, $fontSize, $bitmapFont);
             $textY += $lineHeight;
         }
 
