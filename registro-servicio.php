@@ -501,7 +501,8 @@ try {
     $registroPlaca = __DIR__ . '/registro-placa.php';
     $registroCarta = __DIR__ . '/registro-carta.php';
     $registroImagenes = __DIR__ . '/registro-imagenes.php';
-    if (!is_file($bootstrap) || !is_file($registroSharePoint) || !is_file($registroCalendario) || !is_file($registroPlaca) || !is_file($registroCarta) || !is_file($registroImagenes)) {
+    $registroTellmebye = __DIR__ . '/registro-tellmebye.php';
+    if (!is_file($bootstrap) || !is_file($registroSharePoint) || !is_file($registroCalendario) || !is_file($registroPlaca) || !is_file($registroCarta) || !is_file($registroImagenes) || !is_file($registroTellmebye)) {
         throw new RuntimeException('No se encontraron los componentes necesarios de Registro de Servicios.');
     }
     require_once $bootstrap;
@@ -510,6 +511,7 @@ try {
     require_once $registroPlaca;
     require_once $registroCarta;
     require_once $registroImagenes;
+    require_once $registroTellmebye;
     portal_require_authentication();
     $storageCtx = rs_storage_bootstrap();
     $draftIdRaw = trim((string) ($_POST['draftId'] ?? ''));
@@ -1146,6 +1148,25 @@ try {
         }
     }
 
+    // TellMeBye se dispara de forma independiente. Un fallo del bot no revierte
+    // el registro, el correo principal ni el correo de placa.
+    $tellmebyeResult = [
+        'enabled' => false,
+        'triggered' => false,
+        'mode' => null,
+        'error' => null,
+    ];
+    try {
+        $tellmebyeResult = array_merge(
+            $tellmebyeResult,
+            rs_trigger_tellmebye($itemId, rs_is_preview_mode())
+        );
+    } catch (Throwable $tellmebyeError) {
+        $tellmebyeResult['enabled'] = true;
+        $tellmebyeResult['error'] = $tellmebyeError->getMessage();
+        error_log('Registro Servicios TellMeBye item ' . $itemId . ': ' . $tellmebyeError->getMessage());
+    }
+
     rs_add_publication($storageCtx, [
         'itemId'=>(string)$itemId,
         'status'=>'PUBLICADO',
@@ -1171,6 +1192,7 @@ try {
         'letter' => $letterResult,
         'email' => $emailResult ?? ['enabled' => false, 'sent' => false],
         'plateEmail' => $plateEmailResult ?? ['enabled' => false, 'sent' => false],
+        'tellmebye' => $tellmebyeResult ?? ['enabled' => false, 'triggered' => false],
     ]);
 } catch (Throwable $error) {
     error_log('Registro Servicios SharePoint: ' . $error->getMessage());
