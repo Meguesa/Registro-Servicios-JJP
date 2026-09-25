@@ -368,6 +368,9 @@ function rs_send_plate_email(array $payload, array $plateAttachment): array
     $fechaNacimiento = trim((string)($payload['fechaNacimiento'] ?? ''));
     $fechaDefuncion = trim((string)($payload['fechaDefuncion'] ?? ''));
     $termino = trim((string)($payload['termino'] ?? ''));
+    if ($termino === '') {
+        $termino = trim((string)($payload['inicioCrematorio'] ?? ''));
+    }
 
     $fmtDate = static function (string $value): string {
         $value = trim($value);
