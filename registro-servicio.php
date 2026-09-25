@@ -197,41 +197,48 @@ function rs_send_controlled_test_email(array $payload, array $attachments): arra
         . ($sala !== '' ? ', ' . $sala : '')
         . ($referencia !== '' ? ', ' . $referencia : '');
 
-    $line = static function (string $label, string $value): string {
-        return '<div style="margin:0 0 3px 0;"><strong>'
+    // Formato tabular compacto, similar al correo controlado anterior:
+    // etiquetas alineadas a la izquierda y valores en una segunda columna.
+    $row = static function (string $label, string $value): string {
+        return '<tr>'
+            . '<td style="padding:3px 18px 3px 0;white-space:nowrap;vertical-align:top;"><strong>'
             . rs_email_escape($label)
-            . ':</strong> '
+            . ':</strong></td>'
+            . '<td style="padding:3px 0;vertical-align:top;">'
             . rs_email_escape($value !== '' ? $value : 'NO CAPTURADO')
-            . '</div>';
+            . '</td>'
+            . '</tr>';
     };
 
     $bodyHtml = ''
-        . '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.35;color:#111;">'
+        . '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.3;color:#111;">'
         . '<div style="margin:0 0 14px 0;padding:10px 12px;border:1px solid #d8b45a;background:#fff8e6;">'
         . '<strong>PRUEBA CONTROLADA - REGISTRO DE SERVICIOS</strong><br>'
         . 'Este correo fue generado desde el módulo Preview. '
         . '<strong>No se agregó ningún evento al calendario.</strong>'
         . '</div>'
-        . $line('EVENTO', $evento)
-        . $line('EXEQUIA', $exequia)
-        . '<br>'
-        . $line('UBICACIÓN', $ubicacion)
-        . $line('SALA', $sala)
-        . $line('PREVISIÓN/USO INMEDIATO', $prevision)
-        . $line('UBICACIÓN DE RESCATE', $ubicacionRescate)
-        . $line('MOTIVO DE FALLECIMIENTO', $motivo)
-        . $line('SERVICIO', $servicio)
-        . $line('PERSONAL DE RESCATE', $personalRescate)
-        . '<br>'
-        . $line('TITULAR', $titular)
-        . $line('FALLECIDO(A)', $fallecido)
-        . $line('FECHA DE NACIMIENTO', $fechaNacimiento)
-        . $line('FECHA DE DEFUNCIÓN', $fechaDefuncion)
-        . $line('EDAD', $edad)
-        . '<br>'
-        . $line('REFERENCIA', $referencia)
-        . $line('NÚMERO DE SERVICIO', $numeroServicio)
-        . $line('VENDEDOR', $vendedor)
+        . '<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:auto;">'
+        . $row('EVENTO', $evento)
+        . $row('EXEQUIA', $exequia)
+        . '<tr><td colspan="2" style="height:10px;"></td></tr>'
+        . $row('UBICACIÓN', $ubicacion)
+        . $row('SALA', $sala)
+        . $row('PREVISIÓN/USO INMEDIATO', $prevision)
+        . $row('UBICACIÓN DE RESCATE', $ubicacionRescate)
+        . $row('MOTIVO DE FALLECIMIENTO', $motivo)
+        . $row('SERVICIO', $servicio)
+        . $row('PERSONAL DE RESCATE', $personalRescate)
+        . '<tr><td colspan="2" style="height:10px;"></td></tr>'
+        . $row('TITULAR', $titular)
+        . $row('FALLECIDO(A)', $fallecido)
+        . $row('FECHA DE NACIMIENTO', $fechaNacimiento)
+        . $row('FECHA DE DEFUNCIÓN', $fechaDefuncion)
+        . $row('EDAD', $edad)
+        . '<tr><td colspan="2" style="height:10px;"></td></tr>'
+        . $row('REFERENCIA', $referencia)
+        . $row('NÚMERO DE SERVICIO', $numeroServicio)
+        . $row('VENDEDOR', $vendedor)
+        . '</table>'
         . '</div>';
 
     $toRecipients = array_map(
