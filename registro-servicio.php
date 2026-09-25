@@ -14,6 +14,176 @@ function rs_json(int $status, array $payload): never
     exit;
 }
 
+
+function rs_is_preview_mode(): bool
+{
+    return str_contains(
+        (string)($_SERVER['REQUEST_URI'] ?? ''),
+        '/registro-servicios-preview/'
+    );
+}
+
+function rs_email_escape(string $value): string
+{
+    return htmlspecialchars(trim($value), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+/**
+ * Envio controlado del PREVIEW. Nunca se ejecuta fuera de
+ * /registro-servicios-preview/.
+ *
+ * @param array<int,array{name:string,contentType:string,bytes:string}> $attachments
+ */
+function rs_send_controlled_test_email(array $payload, array $attachments): array
+{
+    if (!rs_is_preview_mode()) {
+        return [
+            'enabled' => false,
+            'sent' => false,
+            'recipients' => [],
+            'attachmentNames' => [],
+        ];
+    }
+
+    $sender = 'sistemas@juanpablo.com.mx';
+    $recipients = [
+        'sistemas@juanpablo.com.mx',
+        'gabriel.guerra@juanpablo.com.mx',
+        'it@juanpablo.com.mx',
+    ];
+
+    $graphAttachments = [];
+    $attachmentNames = [];
+    $seen = [];
+
+    foreach ($attachments as $attachment) {
+        $name = trim((string)($attachment['name'] ?? ''));
+        $bytes = (string)($attachment['bytes'] ?? '');
+        $contentType = trim((string)($attachment['contentType'] ?? 'application/octet-stream'));
+
+        if ($name === '' || $bytes === '') continue;
+
+        $key = mb_strtolower($name, 'UTF-8');
+        if (isset($seen[$key])) continue;
+        $seen[$key] = true;
+
+        $graphAttachments[] = [
+            '@odata.type' => '#microsoft.graph.fileAttachment',
+            'name' => $name,
+            'contentType' => $contentType !== '' ? $contentType : 'application/octet-stream',
+            'contentBytes' => base64_encode($bytes),
+        ];
+        $attachmentNames[] = $name;
+    }
+
+    $numero = trim((string)($payload['numeroReferencia'] ?? ''));
+    $fallecido = trim((string)($payload['fallecido'] ?? ''));
+    $servicio = trim((string)($payload['servicio'] ?? ''));
+    $referencia = trim((string)($payload['referencia'] ?? ''));
+    $ubicacion = trim((string)($payload['ubicacion'] ?? ''));
+    $sala = trim((string)($payload['sala'] ?? ''));
+
+    $subject = '[PRUEBA CONTROLADA] Registro de Servicio'
+        . ($numero !== '' ? ' ' . $numero : '')
+        . ($fallecido !== '' ? ' - ' . $fallecido : '');
+
+    $bodyHtml = ''
+        . '<p><strong>PRUEBA CONTROLADA - REGISTRO DE SERVICIOS</strong></p>'
+        . '<p>Este correo fue generado desde el módulo Preview. '
+        . '<strong>No se agregó ningún evento al calendario.</strong></p>'
+        . '<table cellpadding="5" cellspacing="0" style="border-collapse:collapse;">'
+        . '<tr><td><strong>Número de servicio:</strong></td><td>' . rs_email_escape($numero) . '</td></tr>'
+        . '<tr><td><strong>Fallecido(a):</strong></td><td>' . rs_email_escape($fallecido) . '</td></tr>'
+        . '<tr><td><strong>Servicio:</strong></td><td>' . rs_email_escape($servicio) . '</td></tr>'
+        . '<tr><td><strong>Referencia:</strong></td><td>' . rs_email_escape($referencia) . '</td></tr>'
+        . '<tr><td><strong>Ubicación:</strong></td><td>' . rs_email_escape($ubicacion) . '</td></tr>'
+        . '<tr><td><strong>Sala:</strong></td><td>' . rs_email_escape($sala) . '</td></tr>'
+        . '</table>'
+        . '<p>Se adjuntan los documentos generados y cargados durante esta prueba.</p>';
+
+    $toRecipients = array_map(
+        static fn(string $address): array => [
+            'emailAddress' => ['address' => $address],
+        ],
+        $recipients
+    );
+
+    $request = [
+        'message' => [
+            'subject' => $subject,
+            'body' => [
+                'contentType' => 'HTML',
+                'content' => $bodyHtml,
+            ],
+            'toRecipients' => $toRecipients,
+            'attachments' => $graphAttachments,
+        ],
+        'saveToSentItems' => true,
+    ];
+
+    $token = rs_graph_token();
+    $url = 'https://graph.microsoft.com/v1.0/users/'
+        . rawurlencode($sender)
+        . '/sendMail';
+
+    $curl = curl_init($url);
+    if ($curl === false) {
+        throw new RuntimeException('No fue posible inicializar el correo de Microsoft Graph.');
+    }
+
+    $json = json_encode($request, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($json)) {
+        throw new RuntimeException('No fue posible preparar el correo controlado.');
+    }
+
+    curl_setopt_array($curl, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 60,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $json,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . $token,
+            'Accept: application/json',
+            'Content-Type: application/json',
+        ],
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+    ]);
+
+    $response = curl_exec($curl);
+    $status = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $error = curl_error($curl);
+    curl_close($curl);
+
+    if ($response === false) {
+        throw new RuntimeException('El envio de correo fallo: ' . $error);
+    }
+
+    $decoded = json_decode((string)$response, true);
+    if ($status < 200 || $status >= 300) {
+        $detail = is_array($decoded)
+            ? trim((string)($decoded['error']['message'] ?? ''))
+            : '';
+        if ($detail === '') {
+            $detail = mb_substr(trim((string)$response), 0, 1600);
+        }
+        throw new RuntimeException(
+            'Microsoft Graph correo respondio HTTP ' . $status
+            . ($detail !== '' ? ': ' . $detail : '.')
+        );
+    }
+
+    return [
+        'enabled' => true,
+        'sent' => true,
+        'sender' => $sender,
+        'recipients' => $recipients,
+        'attachmentNames' => $attachmentNames,
+    ];
+}
+
 try {
     $root = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
     $bootstrap = $root . '/includes/bootstrap.php';
@@ -21,7 +191,8 @@ try {
     $registroCalendario = __DIR__ . '/registro-calendario.php';
     $registroPlaca = __DIR__ . '/registro-placa.php';
     $registroCarta = __DIR__ . '/registro-carta.php';
-    if (!is_file($bootstrap) || !is_file($registroSharePoint) || !is_file($registroCalendario) || !is_file($registroPlaca) || !is_file($registroCarta)) {
+    $registroImagenes = __DIR__ . '/registro-imagenes.php';
+    if (!is_file($bootstrap) || !is_file($registroSharePoint) || !is_file($registroCalendario) || !is_file($registroPlaca) || !is_file($registroCarta) || !is_file($registroImagenes)) {
         throw new RuntimeException('No se encontraron los componentes necesarios de Registro de Servicios.');
     }
     require_once $bootstrap;
@@ -29,6 +200,7 @@ try {
     require_once $registroCalendario;
     require_once $registroPlaca;
     require_once $registroCarta;
+    require_once $registroImagenes;
     portal_require_authentication();
     $storageCtx = rs_storage_bootstrap();
     $draftIdRaw = trim((string) ($_POST['draftId'] ?? ''));
@@ -395,6 +567,9 @@ try {
     $itemId = (int) ($created['Id'] ?? $created['ID'] ?? 0);
     if ($itemId <= 0) throw new RuntimeException('SharePoint creo el registro, pero no devolvio un ID utilizable.');
 
+    // Archivos que formaran parte del correo controlado de Preview.
+    $emailAttachments = [];
+
     // FASE 3: placa de urna generada internamente.
     // Resultado final: SOLO PNG, con nombre historico Placa-<ID>.png.
     // Se guarda en la misma carpeta utilizada actualmente:
@@ -428,6 +603,11 @@ try {
 
             $plateResult['created'] = true;
             $plateResult['fileName'] = $plateFileName;
+            $emailAttachments[] = [
+                'name' => $plateFileName,
+                'contentType' => 'image/png',
+                'bytes' => $plateBytes,
+            ];
 
             $platesFolder = '/sites/Operaciones/Documentos compartidos/Automaticaciones/Eventos Capillas/Placas';
             $folderArg = rawurlencode("'" . $platesFolder . "'");
@@ -478,6 +658,11 @@ try {
 
         $letterResult['created'] = true;
         $letterResult['fileName'] = $letterFileName;
+        $emailAttachments[] = [
+            'name' => $letterFileName,
+            'contentType' => 'application/pdf',
+            'bytes' => $letterBytes,
+        ];
 
         $safeLetterName = preg_replace('/[^A-Za-z0-9._() -]+/u', '_', $letterFileName) ?: ('Carta_Servicio_Otorgado_' . $itemId . '.pdf');
         $safeLetterName = str_replace("'", "''", $safeLetterName);
@@ -497,6 +682,29 @@ try {
         // la carta no debe provocar que el usuario duplique el registro.
         $letterResult['error'] = $letterError->getMessage();
         error_log('Registro Servicios Carta item ' . $itemId . ': ' . $letterError->getMessage());
+    }
+
+    // FASE 2: las tres imagenes informativas se generan con los datos reales
+    // para adjuntarlas al correo controlado.
+    try {
+        $infoImages = rs_generate_service_information_images($payload);
+        foreach ([
+            ['nameKey' => 'serviceName', 'bytesKey' => 'servicePng'],
+            ['nameKey' => 'obitName', 'bytesKey' => 'obitPng'],
+            ['nameKey' => 'saleName', 'bytesKey' => 'salePng'],
+        ] as $imagePart) {
+            $imageName = trim((string)($infoImages[$imagePart['nameKey']] ?? ''));
+            $imageBytes = (string)($infoImages[$imagePart['bytesKey']] ?? '');
+            if ($imageName !== '' && $imageBytes !== '') {
+                $emailAttachments[] = [
+                    'name' => $imageName,
+                    'contentType' => 'image/png',
+                    'bytes' => $imageBytes,
+                ];
+            }
+        }
+    } catch (Throwable $imageError) {
+        error_log('Registro Servicios Imagenes item ' . $itemId . ': ' . $imageError->getMessage());
     }
 
     /** @return array<int,array{key:string,name:string,tmp:string,size:int,type:string}> */
@@ -547,6 +755,11 @@ try {
     foreach ($filesToAttach as $file) {
         $bytes = file_get_contents($file['tmp']);
         if ($bytes === false) throw new RuntimeException('No fue posible leer el archivo ' . $file['name'] . '.');
+        $emailAttachments[] = [
+            'name' => (string)$file['name'],
+            'contentType' => (string)($file['type'] ?? 'application/octet-stream'),
+            'bytes' => $bytes,
+        ];
         $safeName = preg_replace('/[^A-Za-z0-9._() -]+/u', '_', $file['name']) ?: 'archivo';
         $safeName = str_replace("'", "''", $safeName);
         $attachmentUrl = $siteUrl . "/_api/web/lists/getbytitle('" . $listEsc . "')/items(" . $itemId . ")/AttachmentFiles/add(FileName='" . rawurlencode($safeName) . "')";
@@ -561,17 +774,46 @@ try {
         $uploadedNames[] = $safeName;
     }
 
-    // FASE 1: crear evento de calendario de forma interna y aislada.
-    // El modulo queda gobernado por registro_servicios_calendar_enabled.
-    // Mientras este en false, no cambia el comportamiento productivo actual.
-    try {
-        $calendarResult = rs_calendar_create_event($payload, $config);
-    } catch (Throwable $calendarError) {
-        throw new RuntimeException(
-            'Etapa CREAR EVENTO CALENDARIO: ' . $calendarError->getMessage(),
-            0,
-            $calendarError
-        );
+    // PRUEBA CONTROLADA: en Preview NO crear eventos de calendario,
+    // aunque la bandera privada del calendario se encuentre habilitada.
+    if (rs_is_preview_mode()) {
+        $calendarResult = [
+            'enabled' => false,
+            'created' => false,
+            'skipped' => true,
+            'reason' => 'Preview controlado: calendario deshabilitado para esta prueba.',
+        ];
+    } else {
+        try {
+            $calendarResult = rs_calendar_create_event($payload, $config);
+        } catch (Throwable $calendarError) {
+            throw new RuntimeException(
+                'Etapa CREAR EVENTO CALENDARIO: ' . $calendarError->getMessage(),
+                0,
+                $calendarError
+            );
+        }
+    }
+
+    // Correo CONTROLADO del Preview. Un fallo de correo no debe provocar
+    // duplicidad del servicio ya creado en SharePoint.
+    $emailResult = [
+        'enabled' => rs_is_preview_mode(),
+        'sent' => false,
+        'recipients' => [],
+        'attachmentNames' => [],
+        'error' => null,
+    ];
+    if (rs_is_preview_mode()) {
+        try {
+            $emailResult = array_merge(
+                $emailResult,
+                rs_send_controlled_test_email($payload, $emailAttachments)
+            );
+        } catch (Throwable $emailError) {
+            $emailResult['error'] = $emailError->getMessage();
+            error_log('Registro Servicios Correo item ' . $itemId . ': ' . $emailError->getMessage());
+        }
     }
 
     rs_add_publication($storageCtx, [
@@ -597,6 +839,7 @@ try {
         'calendar' => $calendarResult ?? ['enabled' => false, 'created' => false],
         'plate' => $plateResult,
         'letter' => $letterResult,
+        'email' => $emailResult ?? ['enabled' => false, 'sent' => false],
     ]);
 } catch (Throwable $error) {
     error_log('Registro Servicios SharePoint: ' . $error->getMessage());
