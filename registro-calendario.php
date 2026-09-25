@@ -207,9 +207,12 @@ function rs_calendar_create_event(array $payload, array $sharePointConfig): arra
     if ($subject === '') {
         $subject = 'Evento de Capillas';
     }
-    // Mientras Registro de Servicios opere en preview, todos los eventos
-    // creados internamente deben ser claramente identificables.
-    $subject = '(PRUEBA) ' . $subject;
+    // En Preview, identificar claramente todos los eventos de prueba.
+    // En produccion no se agrega el prefijo.
+    $isPreview = (bool)($payload['_previewMode'] ?? false);
+    if ($isPreview) {
+        $subject = '(PRUEBA) ' . $subject;
+    }
 
     $lines = [];
     $lines[] = '<strong>EVENTO:</strong> de ' . rs_calendar_escape(rs_calendar_date_display((string)($payload['inicio'] ?? '')))
@@ -301,8 +304,13 @@ function rs_calendar_create_event(array $payload, array $sharePointConfig): arra
             $sala,
         ], static fn(string $v): bool => $v !== ''));
 
+        $exequiaSubject = implode(' - ', $exequiaParts);
+        if ($isPreview) {
+            $exequiaSubject = '(PRUEBA) ' . $exequiaSubject;
+        }
+
         $exequiaEvent = [
-            'subject' => '(PRUEBA) ' . implode(' - ', $exequiaParts),
+            'subject' => $exequiaSubject,
             'body' => [
                 'contentType' => 'HTML',
                 'content' => $bodyHtml,
