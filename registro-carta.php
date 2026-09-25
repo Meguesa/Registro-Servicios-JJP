@@ -375,20 +375,20 @@ function rs_generate_service_letter(array $payload): array
         $nameY += 42;
     }
 
-    $infoY = max(575, $nameY + 20);
+    $infoY = max(545, $nameY + 5);
     rs_carta_text($image, 345, $infoY, 'DE ACUERDO A EL PLAN ADQUIRIDO:', $black, $font, 20.0, false);
     rs_carta_text($image, 750, $infoY, $reference, $black, $font, 20.0, true);
     rs_carta_text($image, 345, $infoY + 38, 'POR:', $black, $font, 20.0, false);
-    rs_carta_center($image, 760, $infoY + 38, $titular, $black, $font, 20.0, true);
+    rs_carta_center($image, $centerX, $infoY + 38, $titular, $black, $font, 20.0, true);
 
-    $destY = $infoY + 105;
+    $destY = $infoY + 88;
     rs_carta_center($image, $centerX, $destY, 'DESTINO:  ' . $destination, $black, $font, 18.5, true);
     rs_carta_center($image, $centerX, $destY + 36, 'DESCRIPCIÓN DE BENEFICIOS', $black, $font, 20.0, true);
     rs_carta_center($image, $centerX, $destY + 66, str_repeat('*', 82), $black, $font, 13.0, false);
 
     $listX = 350;
     $textX = 385;
-    $y = $destY + 125;
+    $y = $destY + 105;
     $availableBottom = 1265;
     $maxListHeight = $availableBottom - $y;
 
@@ -418,7 +418,7 @@ function rs_generate_service_letter(array $payload): array
     }
 
     // Firmas.
-    $sigY = 1460;
+    $sigY = 1415;
     imageline($image, 230, $sigY, 565, $sigY, $gray);
     imageline($image, 800, $sigY, 1145, $sigY, $gray);
     rs_carta_center($image, 398, $sigY + 37, 'JARDINES DE JUAN PABLO', $black, $font, 17.0, false);
@@ -431,7 +431,7 @@ function rs_generate_service_letter(array $payload): array
     }
 
     $serviceDate = rs_carta_service_date($payload);
-    rs_carta_center($image, $centerX, 1595, rs_carta_spanish_date($serviceDate), $black, $font, 16.0, false);
+    rs_carta_center($image, $centerX, 1558, rs_carta_spanish_date($serviceDate), $black, $font, 16.0, false);
 
     ob_start();
     imagepng($image, null, 6);
