@@ -109,6 +109,8 @@ function updateRules(){
   const sinVelacion=svc==="Cremación Directa (sin velación)";
   const renta=svc==="Renta de Capillas";
   const crem=["Cremación","Cremación Directa (con velación)","Cremación Directa (sin velación)"].includes(svc);
+  const requierePlaca=document.getElementById("requierePlaca");
+  if(crem && requierePlaca) requierePlaca.checked=true;
   const tieneExequia=exequia.checked&&!sinVelacion;
 
   ["wrapSala","wrapInicio","wrapTermino","wrapExequiaToggle","wrapTiempo"].forEach(id=>toggle(id,!sinVelacion));
@@ -612,6 +614,7 @@ function rsPayload(){
   const data=new FormData(form);
   const servicioActual=String(data.get("servicio")||"").trim();
   const sinVelacion=servicioActual==="Cremación Directa (sin velación)";
+  const servicioCremacion=["Cremación","Cremación Directa (con velación)","Cremación Directa (sin velación)"].includes(servicioActual);
   const extrasSeleccionados=selectedExtras();
   // SharePoint tiene "Servicios Extra" como obligatorio.
   // Si el usuario no selecciona adicionales, registrar explicitamente "No Aplica".
@@ -638,7 +641,7 @@ function rsPayload(){
     codigoServicio:String(document.getElementById("codigoServicio")?.textContent||"").replace("—","").trim(),
     codigoAtaud:String(document.getElementById("codigoAtaud")?.textContent||"").replace("—","").trim(),
     referencia:String(document.getElementById("referenciaPreview")?.textContent||"").replace("—","").trim(),
-    requierePlaca:document.getElementById("requierePlaca")?.checked===true,
+    requierePlaca:servicioCremacion || document.getElementById("requierePlaca")?.checked===true,
     titular:String(data.get("titular")||"").trim(),
     fallecido:String(data.get("fallecido")||"").trim(),
     fechaNacimiento:String(document.getElementById("fechaNacimiento")?.value||""),
