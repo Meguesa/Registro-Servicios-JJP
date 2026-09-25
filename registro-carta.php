@@ -63,6 +63,9 @@ function rs_carta_benefits(array $payload): array
     $isCremation = str_contains($servicio, 'cremacion');
     $isDirect = str_contains($servicio, 'cremacion directa');
     $directWithWake = str_contains($servicio, 'con velacion');
+    $tiempoCapillas = trim((string)($payload['tiempoCapillas'] ?? ''));
+    $salaVelacion = 'Sala de velación con oratorio'
+        . ($tiempoCapillas !== '' ? ' (' . $tiempoCapillas . ')' : '');
 
     if ($isDirect || $package === 'CDURNABAS') {
         $items = [
@@ -79,14 +82,13 @@ function rs_carta_benefits(array $payload): array
         return array_merge($items, [
             'Espacio especial para fotografía y Rosario de mármol',
             'Arreglo floral especial para urna',
-            'Asesoría profesional en trámites oficiales',
             'Esquela digital en página web',
         ]);
     }
 
     $definitions = [
         'ATMETBA' => [
-            'Sala de velación con oratorio',
+            $salaVelacion,
             'Ataúd metal básico',
             'Embalsamamiento',
             'Preparación estética',
@@ -97,11 +99,10 @@ function rs_carta_benefits(array $payload): array
             'Arreglo floral especial',
             'Servicio cafetería',
             'Área infantil',
-            'Asesoría profesional en trámites oficiales',
             'Esquela digital en página web y para redes sociales',
         ],
         'ATMADBA' => [
-            'Sala de velación con oratorio',
+            $salaVelacion,
             'Ataúd madera básico',
             'Embalsamamiento',
             'Preparación estética',
@@ -112,11 +113,10 @@ function rs_carta_benefits(array $payload): array
             'Arreglo floral especial',
             'Servicio cafetería',
             'Área infantil',
-            'Asesoría profesional en trámites oficiales',
             'Esquela digital en página web y para redes sociales',
         ],
         'ATMADEX' => [
-            'Sala de velación con oratorio',
+            $salaVelacion,
             'Ataúd madera exclusiva',
             'Embalsamamiento',
             'Preparación estética',
@@ -127,11 +127,10 @@ function rs_carta_benefits(array $payload): array
             'Arreglo floral especial',
             'Servicio cafetería especial',
             'Área infantil',
-            'Asesoría profesional en trámites oficiales',
             'Esquela digital en página web y para redes sociales',
         ],
         'ATMADLX' => [
-            'Sala de velación con oratorio',
+            $salaVelacion,
             'Ataúd madera de lujo',
             'Embalsamamiento',
             'Preparación estética',
@@ -142,7 +141,6 @@ function rs_carta_benefits(array $payload): array
             'Ceremonia de pétalos de flores con violinista',
             'Servicio cafetería especial catering',
             'Área infantil',
-            'Asesoría profesional en trámites oficiales',
             'Esquela digital en página web',
         ],
     ];
@@ -150,15 +148,7 @@ function rs_carta_benefits(array $payload): array
     $items = $definitions[$package] ?? $definitions['ATMETBA'];
 
     if ($isCremation) {
-        $rental = match ($package) {
-            'ATMADBA' => 'Ataúd madera básico (uso renta para velación)',
-            'ATMADEX' => 'Ataúd madera exclusivo (uso renta para velación)',
-            'ATMADLX' => 'Ataúd madera de lujo (uso renta para velación)',
-            default => 'Ataúd metal básico (uso renta para velación)',
-        };
-
         $items[] = 'Cremación';
-        $items[] = $rental;
         $items[] = 'Urna especial en mármol';
         $items[] = 'Placa personalizada';
     }
@@ -281,6 +271,47 @@ function rs_carta_check(GdImage $image, int $x, int $y, int $color): void
     imagesetthickness($image, 1);
 }
 
+function rs_carta_service_date(array $payload): DateTimeImmutable
+{
+    $timezone = new DateTimeZone('America/Monterrey');
+    $candidates = [
+        (string)($payload['inicio'] ?? ''),
+        (string)($payload['fechaServicio'] ?? ''),
+        (string)($payload['inicioCrematorio'] ?? ''),
+        (string)($payload['fechaHoraInhumacion'] ?? ''),
+        (string)($payload['fechaCompra'] ?? ''),
+    ];
+
+    $formats = [
+        'Y-m-d\\TH:i',
+        'Y-m-d\\TH:i:s',
+        'Y-m-d H:i',
+        'Y-m-d H:i:s',
+        'd/m/Y H:i',
+        'd/m/Y H:i:s',
+        'd/m/Y',
+        'Y-m-d',
+    ];
+
+    foreach ($candidates as $raw) {
+        $raw = trim($raw);
+        if ($raw === '') continue;
+
+        foreach ($formats as $format) {
+            $parsed = DateTimeImmutable::createFromFormat('!' . $format, $raw, $timezone);
+            if ($parsed instanceof DateTimeImmutable) return $parsed;
+        }
+
+        try {
+            return new DateTimeImmutable($raw, $timezone);
+        } catch (Throwable) {
+            // Probar el siguiente candidato.
+        }
+    }
+
+    return new DateTimeImmutable('now', $timezone);
+}
+
 function rs_carta_spanish_date(?DateTimeImmutable $date = null): string
 {
     $date ??= new DateTimeImmutable('now', new DateTimeZone('America/Monterrey'));
@@ -348,7 +379,7 @@ function rs_generate_service_letter(array $payload): array
     rs_carta_text($image, 345, $infoY, 'DE ACUERDO A EL PLAN ADQUIRIDO:', $black, $font, 20.0, false);
     rs_carta_text($image, 750, $infoY, $reference, $black, $font, 20.0, true);
     rs_carta_text($image, 345, $infoY + 38, 'POR:', $black, $font, 20.0, false);
-    rs_carta_text($image, 560, $infoY + 38, $titular, $black, $font, 20.0, true);
+    rs_carta_center($image, 760, $infoY + 38, $titular, $black, $font, 20.0, true);
 
     $destY = $infoY + 105;
     rs_carta_center($image, $centerX, $destY, 'DESTINO:  ' . $destination, $black, $font, 18.5, true);
@@ -387,7 +418,7 @@ function rs_generate_service_letter(array $payload): array
     }
 
     // Firmas.
-    $sigY = 1400;
+    $sigY = 1460;
     imageline($image, 230, $sigY, 565, $sigY, $gray);
     imageline($image, 800, $sigY, 1145, $sigY, $gray);
     rs_carta_center($image, 398, $sigY + 37, 'JARDINES DE JUAN PABLO', $black, $font, 17.0, false);
@@ -399,7 +430,8 @@ function rs_generate_service_letter(array $payload): array
         $sigTextY += 22;
     }
 
-    rs_carta_center($image, $centerX, 1578, rs_carta_spanish_date(), $black, $font, 16.0, false);
+    $serviceDate = rs_carta_service_date($payload);
+    rs_carta_center($image, $centerX, 1595, rs_carta_spanish_date($serviceDate), $black, $font, 16.0, false);
 
     ob_start();
     imagepng($image, null, 6);
