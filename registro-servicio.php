@@ -1090,25 +1090,21 @@ try {
         $uploadedNames[] = $safeName;
     }
 
-    // PRUEBA CONTROLADA: en Preview NO crear eventos de calendario,
-    // aunque la bandera privada del calendario se encuentre habilitada.
-    if (rs_is_preview_mode()) {
+    // Crear evento de calendario tambien en Preview para validar el flujo completo.
+    // El modulo de calendario agrega "(PRUEBA)" al titulo cuando _previewMode=true.
+    try {
+        $calendarPayload = $payload;
+        $calendarPayload['_previewMode'] = rs_is_preview_mode();
+        $calendarResult = rs_calendar_create_event($calendarPayload, $config);
+    } catch (Throwable $calendarError) {
+        // El registro ya existe en SharePoint. Informar el error de calendario
+        // sin provocar que el usuario duplique el servicio.
         $calendarResult = [
-            'enabled' => false,
+            'enabled' => true,
             'created' => false,
-            'skipped' => true,
-            'reason' => 'Preview controlado: calendario deshabilitado para esta prueba.',
+            'error' => $calendarError->getMessage(),
         ];
-    } else {
-        try {
-            $calendarResult = rs_calendar_create_event($payload, $config);
-        } catch (Throwable $calendarError) {
-            throw new RuntimeException(
-                'Etapa CREAR EVENTO CALENDARIO: ' . $calendarError->getMessage(),
-                0,
-                $calendarError
-            );
-        }
+        error_log('Registro Servicios Calendario item ' . $itemId . ': ' . $calendarError->getMessage());
     }
 
     // Correo CONTROLADO del Preview. Un fallo de correo no debe provocar
