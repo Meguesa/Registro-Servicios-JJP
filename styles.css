@@ -705,3 +705,34 @@ select:invalid{
     align-self:flex-start;
   }
 }
+
+
+/* Selector Registro de Servicios */
+.selector-home{display:grid;gap:18px}
+.selector-banner{margin-bottom:0}
+.selector-banner-meta{display:flex;align-items:center}
+.selector-notice{padding:16px 18px;background:#fff8e6;border:1px solid #f0d78c;border-left:4px solid #c89a24;border-radius:10px;color:#6f5720}
+.selector-notice strong,.selector-notice span{display:block}
+.selector-notice strong{margin-bottom:5px;color:var(--jp-brown)}
+.selector-notice span{font-size:13px;line-height:1.45}
+.selector-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.selector-card{min-height:300px;padding:26px 28px;display:flex;flex-direction:column;align-items:flex-start;background:#fff;border:1px solid var(--jp-border);border-radius:14px;box-shadow:var(--jp-shadow)}
+.selector-card-disabled{background:#fbfaf8}
+.selector-card-top{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px}
+.selector-card-kicker{color:#6c6964;font-size:11px;font-weight:800;letter-spacing:.12em}
+.selector-card-status{padding:6px 10px;border-radius:999px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.selector-card-status.available{color:#176241;background:#e9f6ef;border:1px solid #b9dfca}
+.selector-card-status.development{color:#805b00;background:#fff4cd;border:1px solid #ecd47c}
+.selector-card-icon{width:48px;height:48px;margin-bottom:16px;display:grid;place-items:center;color:#fff;background:var(--jp-blue);border-radius:12px;font-size:22px;font-weight:800}
+.selector-card-disabled .selector-card-icon{color:#796b5f;background:#eee8df}
+.selector-card h2{margin:0 0 10px;color:var(--jp-brown);font-size:25px}
+.selector-card p{margin:0 0 24px;color:var(--jp-muted);font-size:14px;line-height:1.5}
+.selector-action{margin-top:auto;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.disabled-action{cursor:not-allowed;color:#887f78;background:#f4f1ed;border-color:#e2dbd3}
+.selector-account-note{margin:4px 2px 0;color:var(--jp-muted);font-size:11px}
+@media(max-width:760px){
+  .selector-grid{grid-template-columns:1fr}
+  .selector-card{min-height:260px;padding:22px 20px}
+  .selector-banner-meta{width:100%}
+  .selector-banner-meta .preview-pill{width:100%;justify-content:center}
+}
