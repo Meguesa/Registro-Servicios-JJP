@@ -5,6 +5,13 @@ $root = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
 require_once $root . '/includes/bootstrap.php';
 portal_require_authentication();
 
+$user = portal_user();
+$userEmail = mb_strtolower(trim((string)($user['email'] ?? '')), 'UTF-8');
+$canUseTestMode = in_array($userEmail, [
+    'sistemas@juanpablo.com.mx',
+    'gabriel.guerra@juanpablo.com.mx',
+], true);
+
 $isPreview = str_contains(
     (string)($_SERVER['REQUEST_URI'] ?? ''),
     '/registro-servicios-preview/'
@@ -51,10 +58,12 @@ $isPreview = str_contains(
       <p>Captura la información por etapas. Los cálculos y campos condicionales conservan la lógica actual.</p>
     </div>
     <div class="form-banner-meta">
-      <?php if ($isPreview): ?>
-      <span class="preview-pill">Prueba · conectado a SharePoint</span>
-      <?php else: ?>
-      <span class="preview-pill">Producción · conectado a SharePoint</span>
+      <span class="preview-pill" id="modePill"><?= $isPreview ? 'Prueba · conectado a SharePoint' : 'Producción · conectado a SharePoint' ?></span>
+      <?php if ($canUseTestMode): ?>
+      <label class="test-mode-toggle" for="modoPrueba">
+        <span><strong>Modo prueba</strong><small>Solo Sistemas</small></span>
+        <input type="checkbox" id="modoPrueba" name="modoPrueba" <?= $isPreview ? 'checked' : '' ?>>
+      </label>
       <?php endif; ?>
       <div class="step-counter">
         <span>Paso</span>
@@ -208,8 +217,11 @@ $isPreview = str_contains(
         </div>
       </div>
 
-      <?php if ($isPreview): ?>
-      <div class="preview-warning"><strong>Modo piloto</strong><span>La prueba se guardará en Eventos Capillas con ModoPrueba = Sí.</span></div>
+      <?php if ($canUseTestMode): ?>
+      <div class="preview-warning test-mode-help" id="testModeHelp" <?= $isPreview ? '' : 'hidden' ?>>
+        <strong>Modo prueba activo</strong>
+        <span>El registro se guardará con ModoPrueba = Sí y los avisos se identificarán como prueba.</span>
+      </div>
       <?php endif; ?>
     </section>
 
