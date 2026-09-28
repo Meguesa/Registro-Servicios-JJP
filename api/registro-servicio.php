@@ -5,7 +5,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
-require_once __DIR__ . '/registro-storage.php';
+require_once dirname(__DIR__) . '/includes/registro-storage.php';
 
 function rs_json(int $status, array $payload): never
 {
@@ -597,13 +597,13 @@ function rs_send_plate_email(array $payload, array $plateAttachment, bool $isTes
 try {
     $root = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
     $bootstrap = $root . '/includes/bootstrap.php';
-    $registroSharePoint = __DIR__ . '/registro-sharepoint.php';
-    $registroCalendario = __DIR__ . '/registro-calendario.php';
-    $registroPlaca = __DIR__ . '/registro-placa.php';
-    $registroCarta = __DIR__ . '/registro-carta.php';
-    $registroImagenes = __DIR__ . '/registro-imagenes.php';
-    $registroEsquela = __DIR__ . '/registro-esquela.php';
-    $registroTellmebye = __DIR__ . '/registro-tellmebye.php';
+    $registroSharePoint = dirname(__DIR__) . '/includes/registro-sharepoint.php';
+    $registroCalendario = dirname(__DIR__) . '/includes/registro-calendario.php';
+    $registroPlaca = dirname(__DIR__) . '/includes/registro-placa.php';
+    $registroCarta = dirname(__DIR__) . '/includes/registro-carta.php';
+    $registroImagenes = dirname(__DIR__) . '/includes/registro-imagenes.php';
+    $registroEsquela = dirname(__DIR__) . '/includes/registro-esquela.php';
+    $registroTellmebye = dirname(__DIR__) . '/includes/registro-tellmebye.php';
     if (!is_file($bootstrap) || !is_file($registroSharePoint) || !is_file($registroCalendario) || !is_file($registroPlaca) || !is_file($registroCarta) || !is_file($registroImagenes) || !is_file($registroEsquela) || !is_file($registroTellmebye)) {
         throw new RuntimeException('No se encontraron los componentes necesarios de Registro de Servicios.');
     }
