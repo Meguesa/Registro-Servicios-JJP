@@ -80,9 +80,30 @@ function rs_email_recipients(bool $isTestMode, bool $plate = false): array
     return rs_normalize_email_list(
         $config[$key] ?? null,
         [
-            'sistemas@juanpablo.com.mx',
             'gabriel.guerra@juanpablo.com.mx',
+            'sistemas@juanpablo.com.mx',
+            'cobranza@juanpablo.com.mx',
+            'cobranza1@juanpablo.com.mx',
+            'cobranza2@juanpablo.com.mx',
+            'cobranza3@juanpablo.com.mx',
+            'cobranza4@juanpablo.com.mx',
+            'administracion@juanpablo.com.mx',
+            'administracion2@juanpablo.com.mx',
+            'ventas.us@juanpablo.com.mx',
+            'rh.comercial@juanpablo.com.mx',
+            'direccion@juanpablo.com.mx',
+            'capillas@juanpablo.com.mx',
+            'gustavorv@juanpablo.com.mx',
+            'rene.perez@juanpablo.com.mx',
+            'elizabeth.lopez@juanpablo.com.mx',
+            'marketing@juanpablo.com.mx',
+            'gerencia.comercial@juanpablo.com.mx',
+            'jose.santana@juanpablo.com.mx',
             'it@juanpablo.com.mx',
+            'gerencia.operacion@juanpablo.com.mx',
+            'diseno@juanpablo.com.mx',
+            'angel.delacruz@juanapablo.com.mx',
+            'jhonatan.montalvo@juanpablo.com.mx',
         ]
     );
 }
