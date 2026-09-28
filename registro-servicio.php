@@ -23,6 +23,79 @@ function rs_is_preview_mode(): bool
     );
 }
 
+
+function rs_normalize_email_list(mixed $value, array $fallback): array
+{
+    $items = [];
+    if (is_array($value)) {
+        $items = $value;
+    } elseif (is_string($value)) {
+        $items = preg_split('/[;,\\s]+/', $value) ?: [];
+    }
+
+    $emails = [];
+    foreach ($items as $item) {
+        $email = mb_strtolower(trim((string)$item), 'UTF-8');
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $emails[$email] = true;
+        }
+    }
+
+    if ($emails === []) {
+        foreach ($fallback as $email) {
+            $normalized = mb_strtolower(trim((string)$email), 'UTF-8');
+            if ($normalized !== '') $emails[$normalized] = true;
+        }
+    }
+
+    return array_keys($emails);
+}
+
+function rs_private_portal_config(): array
+{
+    $path = '/home/juanpab1/portal-config/config.php';
+    if (!is_file($path)) return [];
+    $raw = require $path;
+    return is_array($raw) ? $raw : [];
+}
+
+function rs_email_recipients(bool $isTestMode, bool $plate = false): array
+{
+    $config = rs_private_portal_config();
+
+    if ($isTestMode) {
+        return rs_normalize_email_list(
+            $config['registro_servicios_test_email_recipients'] ?? null,
+            [
+                'sistemas@juanpablo.com.mx',
+                'gabriel.guerra@juanpablo.com.mx',
+            ]
+        );
+    }
+
+    $key = $plate
+        ? 'registro_servicios_plate_email_recipients'
+        : 'registro_servicios_email_recipients';
+
+    return rs_normalize_email_list(
+        $config[$key] ?? null,
+        [
+            'sistemas@juanpablo.com.mx',
+            'gabriel.guerra@juanpablo.com.mx',
+            'it@juanpablo.com.mx',
+        ]
+    );
+}
+
+function rs_user_can_test_mode(string $email): bool
+{
+    $email = mb_strtolower(trim($email), 'UTF-8');
+    return in_array($email, [
+        'sistemas@juanpablo.com.mx',
+        'gabriel.guerra@juanpablo.com.mx',
+    ], true);
+}
+
 function rs_email_escape(string $value): string
 {
     return htmlspecialchars(
@@ -60,14 +133,10 @@ function rs_uppercase_export(mixed $value): mixed
  *
  * @param array<int,array{name:string,contentType:string,bytes:string}> $attachments
  */
-function rs_send_controlled_test_email(array $payload, array $attachments): array
+function rs_send_controlled_test_email(array $payload, array $attachments, bool $isTestMode): array
 {
     $sender = 'sistemas@juanpablo.com.mx';
-    $recipients = [
-        'sistemas@juanpablo.com.mx',
-        'gabriel.guerra@juanpablo.com.mx',
-        'it@juanpablo.com.mx',
-    ];
+    $recipients = rs_email_recipients($isTestMode, false);
 
     // Orden operativo solicitado para el correo:
     // 1) Informacion_Servicio, 2) Obituario, 3) Informacion_Venta,
@@ -209,7 +278,7 @@ function rs_send_controlled_test_email(array $payload, array $attachments): arra
         ? ($horaExequia !== '' ? $horaExequia : 'PENDIENTE')
         : 'NO APLICA';
 
-    $subject = (rs_is_preview_mode() ? '[PRUEBA CONTROLADA] ' : '')
+    $subject = ($isTestMode ? '[PRUEBA CONTROLADA] ' : '')
         . 'Nuevo evento de Capillas: '
         . ($ubicacion !== '' ? $ubicacion : 'Sin ubicación')
         . ($sala !== '' ? ', ' . $sala : '')
@@ -228,7 +297,7 @@ function rs_send_controlled_test_email(array $payload, array $attachments): arra
             . '</tr>';
     };
 
-    $previewBanner = rs_is_preview_mode()
+    $previewBanner = $isTestMode
         ? '<div style="margin:0 0 14px 0;padding:10px 12px;border:1px solid #d8b45a;background:#fff8e6;">'
             . '<strong>PRUEBA CONTROLADA - REGISTRO DE SERVICIOS</strong><br>'
             . 'Este correo fue generado desde el módulo Preview.'
@@ -352,7 +421,7 @@ function rs_send_controlled_test_email(array $payload, array $attachments): arra
  *
  * @param array{name:string,contentType:string,bytes:string} $plateAttachment
  */
-function rs_send_plate_email(array $payload, array $plateAttachment): array
+function rs_send_plate_email(array $payload, array $plateAttachment, bool $isTestMode): array
 {
     $name = trim((string)($plateAttachment['name'] ?? ''));
     $bytes = (string)($plateAttachment['bytes'] ?? '');
@@ -369,11 +438,7 @@ function rs_send_plate_email(array $payload, array $plateAttachment): array
     }
 
     $sender = 'sistemas@juanpablo.com.mx';
-    $recipients = [
-        'sistemas@juanpablo.com.mx',
-        'gabriel.guerra@juanpablo.com.mx',
-        'it@juanpablo.com.mx',
-    ];
+    $recipients = rs_email_recipients($isTestMode, true);
 
     $numeroServicio = (string)rs_uppercase_export($payload['numeroServicio'] ?? '');
     $fallecido = (string)rs_uppercase_export($payload['fallecido'] ?? '');
@@ -530,6 +595,8 @@ try {
     require_once $registroEsquela;
     require_once $registroTellmebye;
     portal_require_authentication();
+    $currentUser = portal_user();
+    $currentUserEmail = mb_strtolower(trim((string)($currentUser['email'] ?? '')), 'UTF-8');
     $storageCtx = rs_storage_bootstrap();
     $draftIdRaw = trim((string) ($_POST['draftId'] ?? ''));
     $draftId = $draftIdRaw !== '' ? rs_safe_id($draftIdRaw) : '';
@@ -543,6 +610,13 @@ try {
     if (!is_array($payload)) {
         rs_json(400, ['ok' => false, 'message' => 'La informacion del formulario no es valida.']);
     }
+
+    $requestedTestMode = rs_is_preview_mode() || (bool)($payload['modoPrueba'] ?? false);
+    if ($requestedTestMode && !rs_user_can_test_mode($currentUserEmail)) {
+        rs_json(403, ['ok' => false, 'message' => 'Tu usuario no tiene permiso para activar Modo prueba.']);
+    }
+    $isTestMode = $requestedTestMode && rs_user_can_test_mode($currentUserEmail);
+    $payload['modoPrueba'] = $isTestMode;
 
     $required = ['numeroReferencia', 'servicio', 'ubicacion', 'prevision', 'numeroServicio', 'titular', 'fallecido'];
     foreach ($required as $key) {
@@ -763,7 +837,7 @@ try {
     $fieldIndex = rs_fields_by_norm(is_array($fieldRows) ? $fieldRows : []);
 
     $sp = [];
-    rs_add_value($sp, $fieldIndex, ['ModoPrueba', 'Modo Prueba'], rs_is_preview_mode(), false);
+    rs_add_value($sp, $fieldIndex, ['ModoPrueba', 'Modo Prueba'], $isTestMode, false);
     rs_add_value($sp, $fieldIndex, ['field_1', 'Numero de Referencia', 'Número de Referencia'], trim((string) ($payload['numeroReferencia'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['field_32', 'Servicio', 'Tipo de Servicio'], trim((string) ($payload['servicio'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['field_39', 'Ubicación Servicio Capillas', 'Ubicacion Servicio Capillas'], trim((string) ($payload['ubicacion'] ?? '')));
@@ -1193,7 +1267,7 @@ try {
     // El modulo de calendario agrega "(PRUEBA)" al titulo cuando _previewMode=true.
     try {
         $calendarPayload = rs_uppercase_export($payload);
-        $calendarPayload['_previewMode'] = rs_is_preview_mode();
+        $calendarPayload['_previewMode'] = $isTestMode;
         $calendarResult = rs_calendar_create_event($calendarPayload, $config);
     } catch (Throwable $calendarError) {
         // El registro ya existe en SharePoint. Informar el error de calendario
@@ -1218,7 +1292,7 @@ try {
     try {
         $emailResult = array_merge(
             $emailResult,
-            rs_send_controlled_test_email(rs_uppercase_export($payload), $emailAttachments)
+            rs_send_controlled_test_email(rs_uppercase_export($payload), $emailAttachments, $isTestMode)
         );
     } catch (Throwable $emailError) {
         $emailResult['error'] = $emailError->getMessage();
@@ -1236,7 +1310,7 @@ try {
         try {
             $plateEmailResult = array_merge(
                 $plateEmailResult,
-                rs_send_plate_email(rs_uppercase_export($payload), $plateEmailAttachment)
+                rs_send_plate_email(rs_uppercase_export($payload), $plateEmailAttachment, $isTestMode)
             );
         } catch (Throwable $plateEmailError) {
             $plateEmailResult['error'] = $plateEmailError->getMessage();
@@ -1255,7 +1329,7 @@ try {
     try {
         $tellmebyeResult = array_merge(
             $tellmebyeResult,
-            rs_trigger_tellmebye($itemId, rs_is_preview_mode())
+            rs_trigger_tellmebye($itemId, $isTestMode)
         );
     } catch (Throwable $tellmebyeError) {
         $tellmebyeResult['enabled'] = true;
@@ -1290,6 +1364,7 @@ try {
         'email' => $emailResult ?? ['enabled' => false, 'sent' => false],
         'plateEmail' => $plateEmailResult ?? ['enabled' => false, 'sent' => false],
         'tellmebye' => $tellmebyeResult ?? ['enabled' => false, 'triggered' => false],
+        'testMode' => $isTestMode,
     ]);
 } catch (Throwable $error) {
     error_log('Registro Servicios SharePoint: ' . $error->getMessage());
