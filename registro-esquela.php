@@ -107,6 +107,8 @@ function rs_esquela_load_asset(string $baseName): ?GdImage
 
 function rs_esquela_asset_image(array $assets, string $key): ?GdImage
 {
+    // Las plantillas oficiales de esquela se cargan desde SharePoint.
+    // No reutilizar fondos locales antiguos si la descarga falla.
     $bytes = $assets[$key] ?? null;
     if (is_string($bytes) && $bytes !== '') {
         $image = rs_esquela_image_from_bytes($bytes);
@@ -114,7 +116,7 @@ function rs_esquela_asset_image(array $assets, string $key): ?GdImage
             return $image;
         }
     }
-    return rs_esquela_load_asset($key);
+    return null;
 }
 
 function rs_esquela_background_key(array $payload): string
@@ -432,9 +434,6 @@ function rs_esquela_draw_circular_photo(GdImage $canvas, ?GdImage $photo, int $c
 function rs_esquela_draw_ribbon(GdImage $image, int $cx, int $cy, int $size = 78, ?string $assetBytes = null): void
 {
     $asset = rs_esquela_image_from_bytes((string)$assetBytes);
-    if (!$asset instanceof GdImage) {
-        $asset = rs_esquela_load_asset('crespon');
-    }
     if ($asset instanceof GdImage) {
         $x = (int)round($cx - ($size / 2));
         $y = (int)round($cy - ($size / 2));
