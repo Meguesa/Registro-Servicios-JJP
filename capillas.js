@@ -717,6 +717,7 @@ async function rsSubmitToSharePoint(){
     const plateEmail=result?.plateEmail||null;
     const letter=result?.letter||null;
     const email=result?.email||null;
+    const esquela=result?.esquela||null;
     const tellmebye=result?.tellmebye||null;
     const calendar=result?.calendar||null;
 
@@ -772,13 +773,19 @@ async function rsSubmitToSharePoint(){
       lines.push("Correo: no habilitado");
     }
 
+    if(esquela?.created===true){
+      lines.push("Esquela local: OK - "+(esquela.fileName||"JPG"));
+      lines.push("Fondo: "+(esquela.background||"automático")+" | Tratamiento: "+(esquela.prefix||"automático"));
+      if(esquela?.qrGenerated!==true){
+        lines.push("QR: no se pudo descargar; se dejó marcador para revisión");
+      }
+    }else{
+      lines.push("Esquela local: ERROR"+(esquela?.error?(" - "+esquela.error):""));
+    }
+
     if(tellmebye?.triggered===true){
       lines.push("TellMeBye: DISPARADO ("+(tellmebye.mode||"modo no indicado")+")");
-      if(tellmebye.mode==="publicar"){
-        lines.push("Esquela: se enviará en correo independiente al terminar TellMeBye");
-      }else{
-        lines.push("Esquela: modo preview, no se publica ni envía cartulina final");
-      }
+      lines.push("TellMeBye continuará actualizando el portal externo de forma independiente.");
     }else if(tellmebye?.enabled===true){
       lines.push("TellMeBye: NO DISPARADO"+(tellmebye?.error?(" - "+tellmebye.error):""));
     }else{
