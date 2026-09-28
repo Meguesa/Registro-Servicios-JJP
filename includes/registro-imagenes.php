@@ -15,7 +15,7 @@ declare(strict_types=1);
 function rs_image_font_cache_dir(): string
 {
     $candidates = [
-        __DIR__ . '/.registro-servicios-data/fonts',
+        dirname(__DIR__) . '/.registro-servicios-data/fonts',
         rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'registro-servicios-fonts',
     ];
 
@@ -112,8 +112,8 @@ function rs_image_carlito_font_path(bool $bold = false): ?string
     $filename = $bold ? 'Carlito-Bold.ttf' : 'Carlito-Regular.ttf';
 
     $localCandidates = [
-        __DIR__ . '/assets/fonts/' . $filename,
-        __DIR__ . '/fonts/' . $filename,
+        dirname(__DIR__) . '/assets/fonts/' . $filename,
+        dirname(__DIR__) . '/fonts/' . $filename,
     ];
 
     foreach ($localCandidates as $candidate) {
