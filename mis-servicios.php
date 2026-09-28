@@ -35,7 +35,7 @@ $email = htmlspecialchars((string)($user['email'] ?? ''), ENT_QUOTES, 'UTF-8');
 <main class="page-shell services-home">
   <section class="form-banner">
     <div><span class="status-pill">CAPILLAS</span><h1>Mis servicios</h1><p>Continúa borradores y consulta los servicios publicados desde este módulo.</p></div>
-    <a class="primary-button button-link" href="./?nuevo=1">＋ Nuevo servicio</a>
+    <a class="primary-button button-link" href="capillas.php?nuevo=1">＋ Nuevo servicio</a>
   </section>
 
   <section class="service-menu-grid">
