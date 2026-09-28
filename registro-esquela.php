@@ -426,8 +426,12 @@ function rs_esquela_draw_circular_photo(GdImage $canvas, ?GdImage $photo, int $c
         }
     }
 
-    $border = imagecolorallocate($canvas, 190, 143, 54);
-    imageellipse($canvas, $cx, $cy, $diameter + 4, $diameter + 4, $border);
+    // Borde amarillo/dorado visible alrededor de la fotografia.
+    $border = imagecolorallocate($canvas, 229, 184, 55);
+    $borderWidth = max(3, (int)round($diameter * 0.022));
+    imagesetthickness($canvas, $borderWidth);
+    imageellipse($canvas, $cx, $cy, $diameter + $borderWidth, $diameter + $borderWidth, $border);
+    imagesetthickness($canvas, 1);
     imagedestroy($tmp);
 }
 
@@ -469,72 +473,31 @@ function rs_esquela_draw_ribbon(GdImage $image, int $cx, int $cy, int $size = 78
     imagearc($image, $cx, $cy - (int)($size * 0.18), (int)($size * 0.50), (int)($size * 0.48), 180, 360, $dark);
     imagesetthickness($image, 1);
 }
-function rs_esquela_logo_path(): ?string
+function rs_esquela_draw_logo(GdImage $canvas, int $x, int $y, int $size): bool
 {
-    $root = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
-    foreach ([
-        $root . '/mapa/assets/logo.jpg',
-        $root . '/mapa/assets/logo.png',
-        __DIR__ . '/assets/logo.jpg',
-        __DIR__ . '/assets/logo.png',
-    ] as $candidate) {
-        if ($candidate !== '' && is_file($candidate) && is_readable($candidate)) {
-            return $candidate;
-        }
-    }
-    return null;
-}
-
-
-function rs_esquela_draw_logo(GdImage $canvas, int $cx, int $cy, int $diameter): void
-{
-    $path = rs_esquela_logo_path();
-    if ($path === null) {
-        return;
-    }
-    $raw = @file_get_contents($path);
-    if (!is_string($raw) || $raw === '') {
-        return;
-    }
-    $logo = rs_esquela_image_from_bytes($raw);
+    // Logo oficial suministrado para la esquela. Se carga como asset local
+    // y se conserva completo dentro de un cuadro del mismo tamano que el QR.
+    $logo = rs_esquela_load_asset('logo_jjp');
     if (!$logo instanceof GdImage) {
-        return;
+        return false;
     }
 
-    $tmp = imagecreatetruecolor($diameter, $diameter);
-    imagealphablending($tmp, false);
-    imagesavealpha($tmp, true);
-    $transparent = imagecolorallocatealpha($tmp, 255, 255, 255, 127);
-    imagefill($tmp, 0, 0, $transparent);
+    $white = imagecolorallocate($canvas, 255, 255, 255);
+    imagefilledrectangle($canvas, $x, $y, $x + $size, $y + $size, $white);
 
-    $white = imagecolorallocate($tmp, 255, 255, 255);
-    imagefilledellipse($tmp, (int)($diameter / 2), (int)($diameter / 2), $diameter - 2, $diameter - 2, $white);
-
-    // Ajustar el logo completo dentro del circulo, sin recortarlo.
     $sw = imagesx($logo);
     $sh = imagesy($logo);
-    $inner = (int)round($diameter * 0.82);
+    $inner = max(1, (int)round($size * 0.94));
     $scale = min($inner / max(1, $sw), $inner / max(1, $sh));
     $dw = max(1, (int)round($sw * $scale));
     $dh = max(1, (int)round($sh * $scale));
-    $dx = (int)round(($diameter - $dw) / 2);
-    $dy = (int)round(($diameter - $dh) / 2);
+    $dx = $x + (int)round(($size - $dw) / 2);
+    $dy = $y + (int)round(($size - $dh) / 2);
 
-    imagealphablending($tmp, true);
-    imagecopyresampled($tmp, $logo, $dx, $dy, 0, 0, $dw, $dh, $sw, $sh);
-
-    $x0 = $cx - (int)round($diameter / 2);
-    $y0 = $cy - (int)round($diameter / 2);
     imagealphablending($canvas, true);
-    imagecopy($canvas, $tmp, $x0, $y0, 0, 0, $diameter, $diameter);
-
-    $border = imagecolorallocate($canvas, 235, 224, 196);
-    imagesetthickness($canvas, max(1, (int)round($diameter * 0.015)));
-    imageellipse($canvas, $cx, $cy, $diameter - 2, $diameter - 2, $border);
-    imagesetthickness($canvas, 1);
-
+    imagecopyresampled($canvas, $logo, $dx, $dy, 0, 0, $dw, $dh, $sw, $sh);
     imagedestroy($logo);
-    imagedestroy($tmp);
+    return true;
 }
 
 
@@ -579,10 +542,24 @@ function rs_esquela_draw_qr(
         return false;
     }
 
-    $pad = max(8, (int)round($size * 0.07));
+    // "$size" representa el cuadro exterior completo para que QR y logo
+    // ocupen exactamente la misma caja visual.
     $white = imagecolorallocate($canvas, 255, 255, 255);
-    imagefilledrectangle($canvas, $x - $pad, $y - $pad, $x + $size + $pad, $y + $size + $pad, $white);
-    imagecopyresampled($canvas, $qr, $x, $y, 0, 0, $size, $size, imagesx($qr), imagesy($qr));
+    imagefilledrectangle($canvas, $x, $y, $x + $size, $y + $size, $white);
+    $pad = max(6, (int)round($size * 0.065));
+    $inner = max(1, $size - (2 * $pad));
+    imagecopyresampled(
+        $canvas,
+        $qr,
+        $x + $pad,
+        $y + $pad,
+        0,
+        0,
+        $inner,
+        $inner,
+        imagesx($qr),
+        imagesy($qr)
+    );
     imagedestroy($qr);
     return true;
 }
@@ -660,11 +637,21 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?
 
     $serviceText = 'El homenaje de vida se llevará a cabo en ' . $ubicacion
         . ($sala !== '' ? ' ' . $sala : '')
-        . ($inicio !== '' ? ', el ' . $inicio : '')
-        . ($termino !== '' ? ', para concluir el ' . $termino : '') . '.';
+        . ($inicio !== '' ? ', el ' . $inicio : '');
 
+    // Si hay exequia, debe aparecer cronologicamente entre el inicio
+    // y el termino del servicio.
     if ((bool)($payload['llevaExequia'] ?? false) && $exequia !== '') {
-        $serviceText .= ' Se llevará a cabo una ceremonia de cuerpo presente el ' . $exequia . '.';
+        $serviceText .= '. Se llevará a cabo una ceremonia de cuerpo presente el ' . $exequia;
+        if ($termino !== '') {
+            $serviceText .= ', para concluir el ' . $termino;
+        }
+        $serviceText .= '.';
+    } else {
+        if ($termino !== '') {
+            $serviceText .= ', para concluir el ' . $termino;
+        }
+        $serviceText .= '.';
     }
 
     $y = rs_esquela_center_text($canvas, $serviceText, $y, $S(635), $black, $font, $FS(20), $S(27));
@@ -693,24 +680,27 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?
         $S(27)
     );
 
-    // Pie alineado en una misma franja: logo circular, direccion y QR.
-    $footerCenterY = $S(890);
-    rs_esquela_draw_logo($canvas, $S(105), $footerCenterY, $S(135));
+    // Pie simetrico: logo y QR con el mismo tamano, misma altura y
+    // exactamente el mismo margen respecto a los bordes laterales.
+    $footerBoxSize = $S(124);
+    $footerSideMargin = $S(42);
+    $footerY = $S(832);
+    $logoX = $footerSideMargin;
+    $qrX = $width - $footerSideMargin - $footerBoxSize;
+
+    rs_esquela_draw_logo($canvas, $logoX, $footerY, $footerBoxSize);
 
     $brandY = $S(858);
-    rs_esquela_center_text($canvas, 'Jardines de Juan Pablo', $brandY, $S(360), $brown, $font, $FS(20), $S(26));
+    rs_esquela_center_text($canvas, 'Jardines de Juan Pablo', $brandY, $S(350), $brown, $font, $FS(20), $S(26));
     imagesetthickness($canvas, max(1, $S(1)));
     imageline($canvas, $S(252), $S(884), $S(468), $S(884), $brown);
     imagesetthickness($canvas, 1);
     if ($address !== '') {
-        rs_esquela_center_text($canvas, $address, $S(914), $S(430), $brown, $font, $FS(18), $S(23));
+        rs_esquela_center_text($canvas, $address, $S(914), $S(400), $brown, $font, $FS(18), $S(23));
     }
 
     $qrUrl = rs_esquela_qr_url($name);
-    $qrSize = $S(112);
-    $qrX = $S(592);
-    $qrY = $footerCenterY - (int)round($qrSize / 2);
-    $qrOk = rs_esquela_draw_qr($canvas, $qrUrl, $qrX, $qrY, $qrSize, $qrBytes);
+    $qrOk = rs_esquela_draw_qr($canvas, $qrUrl, $qrX, $footerY, $footerBoxSize, $qrBytes);
     if (!$qrOk) {
         imagedestroy($canvas);
         throw new RuntimeException('No fue posible generar el codigo QR de la esquela.');
