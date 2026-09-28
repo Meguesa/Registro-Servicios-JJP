@@ -12,8 +12,8 @@ $email = htmlspecialchars((string)($user['email'] ?? ''), ENT_QUOTES, 'UTF-8');
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mis Servicios | Jardines de Juan Pablo</title>
-<link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="mis-servicios.css">
+<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="assets/css/mis-servicios.css">
 </head>
 <body>
 <header class="solicitud-topbar">
@@ -50,6 +50,6 @@ $email = htmlspecialchars((string)($user['email'] ?? ''), ENT_QUOTES, 'UTF-8');
     <div id="servicesEmpty" class="empty-state" hidden>No hay registros en esta sección.</div>
   </section>
 </main>
-<script src="mis-servicios.js"></script>
+<script src="assets/js/mis-servicios.js"></script>
 </body>
 </html>
