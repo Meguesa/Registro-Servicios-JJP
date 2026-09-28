@@ -43,3 +43,16 @@ Parque permanece visible como **En desarrollo**.
 La publicación se controla desde `Portal-Interno-JJP` mediante GitHub Actions y FTPS.
 
 Se conserva un workflow de preview para validaciones controladas, pero los endpoints PHP de diagnóstico temporal ya no forman parte del despliegue.
+
+
+## Organización del repositorio
+
+- Raíz: páginas navegables del módulo.
+- `api/`: endpoints HTTP llamados por JavaScript.
+- `includes/`: lógica PHP interna que no debe navegarse directamente desde la interfaz.
+- `assets/css/`: hojas de estilo.
+- `assets/js/`: JavaScript del frontend.
+- `assets/esquelas/`: fondos y recursos visuales de esquela.
+- `docs/`: documentación técnica.
+
+Esta separación evita archivos monolíticos y mantiene cada responsabilidad aislada sin dejar decenas de archivos funcionales mezclados en la raíz.
