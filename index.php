@@ -42,7 +42,11 @@ declare(strict_types=1);
       <p>Captura la información por etapas. Los cálculos y campos condicionales conservan la lógica actual.</p>
     </div>
     <div class="form-banner-meta">
+      <?php if ($isPreview): ?>
       <span class="preview-pill">Prueba · conectado a SharePoint</span>
+      <?php else: ?>
+      <span class="preview-pill">Producción · conectado a SharePoint</span>
+      <?php endif; ?>
       <div class="step-counter">
         <span>Paso</span>
         <strong><span id="currentStepNumber">1</span> de 5</strong>
@@ -195,7 +199,9 @@ declare(strict_types=1);
         </div>
       </div>
 
+      <?php if ($isPreview): ?>
       <div class="preview-warning"><strong>Modo piloto</strong><span>La prueba se guardará en Eventos Capillas con ModoPrueba = Sí.</span></div>
+      <?php endif; ?>
     </section>
 
     <div class="wizard-actions">
