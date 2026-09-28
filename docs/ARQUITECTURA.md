@@ -1,51 +1,45 @@
-# Arquitectura inicial
+# Arquitectura actual
 
 ## Fuente de verdad
 
-Se conservarán como fuente de verdad las listas existentes:
+- Capillas: lista SharePoint `Eventos Capillas`.
+- Parque: lista SharePoint `Eventos Parque` cuando se habilite su módulo.
 
-- Capillas: `Eventos Capillas`
-- Parque: `Eventos Parque`
+## Capillas
 
-## Regla de integración
+Registro de Servicios ya ejecuta directamente el proceso operativo que anteriormente dependía del flujo de Power Automate.
 
-La nueva herramienta no ejecutará Power Automate directamente.
-
-Su responsabilidad será:
+Responsabilidades del módulo:
 
 1. Validar la captura.
-2. Crear UN nuevo elemento completo en la lista correspondiente.
-3. Confirmar al usuario si SharePoint aceptó el registro.
+2. Crear un único elemento en `Eventos Capillas`.
+3. Adjuntar documentos e imágenes.
+4. Crear calendario cuando corresponde.
+5. Generar placa, carta, tablas informativas y esquela.
+6. Enviar los correos operativos.
+7. Disparar TellMeBye de forma independiente.
+8. Registrar borradores y publicaciones en el almacenamiento del módulo.
 
-Power Automate continuará disparándose por el mecanismo que ya existe al crear un nuevo elemento en SharePoint.
+El flujo antiguo de Power Automate de Eventos Capillas debe estar desactivado para evitar duplicidades.
 
-## Patrón técnico
+## Modo prueba
 
-La herramienta seguirá el mismo enfoque ya utilizado en herramientas internas como Reportes:
+El modo normal es el predeterminado. Solo Sistemas y Gabriel Guerra pueden activar el modo prueba desde el formulario.
 
-- Autenticación mediante la sesión del Portal Interno.
-- PHP en backend.
-- Credenciales de Microsoft almacenadas fuera del repositorio.
-- Escritura server-side a SharePoint.
-- Protección CSRF para formularios POST.
-- Ningún secreto dentro de JavaScript o HTML.
+El backend valida nuevamente el permiso, por lo que no depende únicamente del control visual del navegador.
 
-## Primera implementación
+## Portal
 
-Se desarrollará primero Capillas.
+Rutas productivas:
 
-Antes de crear el formulario visual se levantará el esquema real de la lista `Eventos Capillas`:
+- `/registro-servicios/` -> selector de área.
+- `/registro-servicios/mis-servicios.php` -> servicios de Capillas.
+- `/registro-servicios/capillas.php` -> captura de Capillas.
 
-- Nombre visible.
-- Nombre interno.
-- Tipo de columna.
-- Campos requeridos.
-- Opciones de Choice.
-- Lookup / Persona.
-- Fecha y hora.
-- Sí/No.
-- Adjuntos.
-- Campos utilizados por Power Automate.
-- Campos utilizados por Tellmebye y otros bots.
+Parque permanece visible como **En desarrollo**.
 
-Parque permanecerá sin cambios hasta completar la validación de Capillas.
+## Despliegue
+
+La publicación se controla desde `Portal-Interno-JJP` mediante GitHub Actions y FTPS.
+
+Se conserva un workflow de preview para validaciones controladas, pero los endpoints PHP de diagnóstico temporal ya no forman parte del despliegue.
