@@ -353,9 +353,15 @@ function rs_esquela_copy_cover(GdImage $dest, GdImage $src): void
     $sw = imagesx($src);
     $sh = imagesy($src);
 
+    // Usar interpolacion bicubica evita el aspecto de mosaico al ampliar
+    // los fondos fotograficos del asset.
+    if (function_exists('imagesetinterpolation') && defined('IMG_BICUBIC_FIXED')) {
+        @imagesetinterpolation($src, IMG_BICUBIC_FIXED);
+    }
+
     $scale = max($dw / max(1, $sw), $dh / max(1, $sh));
-    $cropW = (int)round($dw / $scale);
-    $cropH = (int)round($dh / $scale);
+    $cropW = max(1, (int)round($dw / $scale));
+    $cropH = max(1, (int)round($dh / $scale));
     $sx = max(0, (int)round(($sw - $cropW) / 2));
     $sy = max(0, (int)round(($sh - $cropH) / 2));
 
@@ -438,46 +444,94 @@ function rs_esquela_draw_circular_photo(GdImage $canvas, ?GdImage $photo, int $c
 
 function rs_esquela_draw_ribbon(GdImage $image, int $cx, int $cy, int $size = 78, ?string $assetBytes = null): void
 {
-    $asset = rs_esquela_image_from_bytes((string)$assetBytes);
-    if (!$asset instanceof GdImage) {
-        $asset = rs_esquela_load_asset('crespon');
-    }
+    // El crespon se dibuja localmente para evitar recortes o assets incompletos.
+    // "$size" es el ancho aproximado total del simbolo.
+    $w = max(36, $size);
+    $h = (int)round($w * 1.18);
 
-    if ($asset instanceof GdImage) {
-        $x = (int)round($cx - ($size / 2));
-        $y = (int)round($cy - ($size / 2));
-        imagealphablending($image, true);
-        imagecopyresampled(
-            $image,
-            $asset,
-            $x,
-            $y,
-            0,
-            0,
-            $size,
-            $size,
-            imagesx($asset),
-            imagesy($asset)
-        );
-        imagedestroy($asset);
+    $tmp = imagecreatetruecolor($w, $h);
+    if (!$tmp instanceof GdImage) {
         return;
     }
 
-    // Respaldo vectorial si el asset local no pudiera leerse.
-    $dark = imagecolorallocate($image, 67, 67, 70);
-    $light = imagecolorallocate($image, 84, 84, 88);
-    $w = max(8, (int)round($size * 0.16));
-    imagesetthickness($image, $w);
-    imageline($image, $cx - (int)($size * 0.17), $cy - (int)($size * 0.25), $cx + (int)($size * 0.27), $cy + (int)($size * 0.34), $dark);
-    imageline($image, $cx + (int)($size * 0.17), $cy - (int)($size * 0.25), $cx - (int)($size * 0.27), $cy + (int)($size * 0.34), $light);
-    imagearc($image, $cx, $cy - (int)($size * 0.18), (int)($size * 0.50), (int)($size * 0.48), 180, 360, $dark);
-    imagesetthickness($image, 1);
+    imagealphablending($tmp, false);
+    imagesavealpha($tmp, true);
+    $transparent = imagecolorallocatealpha($tmp, 0, 0, 0, 127);
+    imagefill($tmp, 0, 0, $transparent);
+
+    $dark = imagecolorallocatealpha($tmp, 55, 55, 58, 0);
+    $shadow = imagecolorallocatealpha($tmp, 72, 72, 76, 0);
+
+    $px = static fn(float $v): int => (int)round($v * $w);
+    $py = static fn(float $v): int => (int)round($v * $h);
+
+    // Lazo superior completo.
+    imagefilledellipse($tmp, $px(0.50), $py(0.25), $px(0.52), $py(0.43), $dark);
+    imagefilledellipse($tmp, $px(0.50), $py(0.25), $px(0.25), $py(0.22), $transparent);
+
+    // Cola que cruza hacia la derecha.
+    imagefilledpolygon($tmp, [
+        $px(0.39), $py(0.34),
+        $px(0.51), $py(0.42),
+        $px(0.80), $py(0.91),
+        $px(0.64), $py(0.91),
+        $px(0.45), $py(0.60),
+        $px(0.33), $py(0.47),
+    ], 6, $dark);
+
+    // Cola que cruza hacia la izquierda.
+    imagefilledpolygon($tmp, [
+        $px(0.61), $py(0.34),
+        $px(0.49), $py(0.42),
+        $px(0.20), $py(0.91),
+        $px(0.36), $py(0.91),
+        $px(0.55), $py(0.60),
+        $px(0.67), $py(0.47),
+    ], 6, $shadow);
+
+    // Refuerzo del cruce central para que no aparezca "cortado".
+    imagefilledpolygon($tmp, [
+        $px(0.40), $py(0.38),
+        $px(0.60), $py(0.38),
+        $px(0.56), $py(0.55),
+        $px(0.44), $py(0.55),
+    ], 4, $dark);
+
+    imagealphablending($image, true);
+    $x = (int)round($cx - ($w / 2));
+    $y = (int)round($cy - ($h / 2));
+    imagecopy($image, $tmp, $x, $y, 0, 0, $w, $h);
+    imagedestroy($tmp);
 }
+
 function rs_esquela_draw_logo(GdImage $canvas, int $x, int $y, int $size): bool
 {
-    // Logo oficial suministrado para la esquela. Se carga como asset local
-    // y se conserva completo dentro de un cuadro del mismo tamano que el QR.
     $logo = rs_esquela_load_asset('logo_jjp');
+
+    // Respaldo: si el asset no estuviera publicado por alguna razon,
+    // usar el logo ya existente del Portal.
+    if (!$logo instanceof GdImage) {
+        $root = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+        foreach ([
+            $root . '/mapa/assets/logo.jpg',
+            $root . '/mapa/assets/logo.png',
+            $root . '/assets/logo.jpg',
+            $root . '/assets/logo.png',
+        ] as $candidate) {
+            if ($candidate === '' || !is_file($candidate) || !is_readable($candidate)) {
+                continue;
+            }
+            $raw = @file_get_contents($candidate);
+            if (!is_string($raw) || $raw === '') {
+                continue;
+            }
+            $logo = rs_esquela_image_from_bytes($raw);
+            if ($logo instanceof GdImage) {
+                break;
+            }
+        }
+    }
+
     if (!$logo instanceof GdImage) {
         return false;
     }
@@ -499,7 +553,6 @@ function rs_esquela_draw_logo(GdImage $canvas, int $x, int $y, int $size): bool
     imagedestroy($logo);
     return true;
 }
-
 
 function rs_esquela_fetch_qr(string $url): ?GdImage
 {
@@ -571,9 +624,10 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?
         throw new RuntimeException('El servidor no tiene GD disponible para generar la esquela.');
     }
 
-    // Formato vertical basado en la cartulina de referencia: 720 x 1024.
-    // Se renderiza 1.5x para conservar texto y elementos graficos nitidos.
-    $scale = 1.5;
+    // Formato vertical basado en la cartulina de referencia.
+    // 0.775 produce ~558 x 794 px: suficiente para correo y reduce
+    // drásticamente el reescalado de los fondos fotograficos actuales.
+    $scale = 0.775;
     $baseWidth = 720;
     $baseHeight = 1024;
     $width = (int)round($baseWidth * $scale);
@@ -680,15 +734,15 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?
         $S(27)
     );
 
-    // Pie simetrico: logo y QR con el mismo tamano, misma altura y
-    // exactamente el mismo margen respecto a los bordes laterales.
-    $footerBoxSize = $S(124);
+    // Pie: el logo conserva presencia visual y el QR se reduce.
+    $logoBoxSize = $S(126);
+    $qrBoxSize = $S(98);
     $footerSideMargin = $S(42);
     $footerY = $S(832);
     $logoX = $footerSideMargin;
-    $qrX = $width - $footerSideMargin - $footerBoxSize;
+    $qrX = $width - $footerSideMargin - $qrBoxSize;
 
-    rs_esquela_draw_logo($canvas, $logoX, $footerY, $footerBoxSize);
+    rs_esquela_draw_logo($canvas, $logoX, $footerY, $logoBoxSize);
 
     $brandY = $S(858);
     rs_esquela_center_text($canvas, 'Jardines de Juan Pablo', $brandY, $S(350), $brown, $font, $FS(20), $S(26));
@@ -700,7 +754,7 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?
     }
 
     $qrUrl = rs_esquela_qr_url($name);
-    $qrOk = rs_esquela_draw_qr($canvas, $qrUrl, $qrX, $footerY, $footerBoxSize, $qrBytes);
+    $qrOk = rs_esquela_draw_qr($canvas, $qrUrl, $qrX, $footerY, $qrBoxSize, $qrBytes);
     if (!$qrOk) {
         imagedestroy($canvas);
         throw new RuntimeException('No fue posible generar el codigo QR de la esquela.');
