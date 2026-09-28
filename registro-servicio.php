@@ -102,7 +102,7 @@ function rs_email_recipients(bool $isTestMode, bool $plate = false): array
             'it@juanpablo.com.mx',
             'gerencia.operacion@juanpablo.com.mx',
             'diseno@juanpablo.com.mx',
-            'angel.delacruz@juanapablo.com.mx',
+            'angel.delacruz@juanpablo.com.mx',
             'jhonatan.montalvo@juanpablo.com.mx',
         ]
     );
