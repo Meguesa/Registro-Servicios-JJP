@@ -832,43 +832,6 @@ try {
     rs_add_value($sp, $fieldIndex, ['field_11', 'Personal Venta'], trim((string) ($payload['personalVenta'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['field_12', 'Precio de Venta', 'Precio Venta'], ($payload['precioVenta'] ?? '') === '' ? null : (float) $payload['precioVenta']);
 
-    /** Descarga bytes desde SharePoint REST usando el token app-only actual. */
-    function rs_sharepoint_binary(string $url, string $token): string
-    {
-        $curl = curl_init($url);
-        if ($curl === false) {
-            throw new RuntimeException('No fue posible inicializar la descarga de plantilla de esquela.');
-        }
-
-        curl_setopt_array($curl, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_HTTPHEADER => [
-                'Authorization: Bearer ' . $token,
-                'Accept: application/octet-stream',
-            ],
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2,
-        ]);
-
-        $response = curl_exec($curl);
-        $status = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        $error = curl_error($curl);
-        curl_close($curl);
-
-        if ($response === false) {
-            throw new RuntimeException('La descarga de plantilla de esquela fallo: ' . $error);
-        }
-        if ($status < 200 || $status >= 300) {
-            throw new RuntimeException('SharePoint respondio HTTP ' . $status . ' al descargar plantilla de esquela.');
-        }
-
-        return (string)$response;
-    }
-
-
     // "Servicios Extra" es obligatorio en Eventos Capillas.
     // No obligar al usuario a elegir un concepto inexistente: si no hay extras,
     // guardar "No Aplica" de forma automatica.
@@ -1181,37 +1144,9 @@ try {
         $esquelaPayload = $payload;
         $esquelaPayload['itemId'] = (string)$itemId;
 
-        $esquelaAssets = [];
-        $backgroundKey = rs_esquela_background_key($esquelaPayload);
-        $assetFolder = '/sites/Operaciones/Documentos compartidos/Automaticaciones/Eventos Capillas/Plantillas Esquela';
-        $backgroundFiles = [
-            'fondo_masculino' => 'fondo_masculino.png',
-            'fondo_femenino' => 'fondo_femenino.jpg',
-            'fondo_menor' => 'fondo_menor.png',
-        ];
-        $assetFiles = [
-            $backgroundKey => $backgroundFiles[$backgroundKey] ?? ($backgroundKey . '.jpg'),
-            'crespon' => 'crespon.png',
-        ];
-        if ($portraitBytes === null || $portraitBytes === '') {
-            $assetFiles['foto_fallback'] = 'foto_fallback.jpg';
-        }
-
-        foreach ($assetFiles as $assetKey => $assetFileName) {
-            $serverRelative = $assetFolder . '/' . $assetFileName;
-            $assetArg = rawurlencode("'" . $serverRelative . "'");
-            $assetUrl = $siteUrl
-                . "/_api/web/GetFileByServerRelativePath(decodedurl=@f)/\$value"
-                . "?@f=" . $assetArg;
-            try {
-                $esquelaAssets[$assetKey] = rs_sharepoint_binary($assetUrl, $token);
-            } catch (Throwable $assetError) {
-                // El generador conserva respaldo local/gradiente para no bloquear el registro.
-                error_log('Registro Servicios Asset Esquela ' . $assetKey . ': ' . $assetError->getMessage());
-            }
-        }
-
-        $localEsquela = rs_generate_local_esquela($esquelaPayload, $portraitBytes, $qrBytes, $esquelaAssets);
+        // La esquela usa exclusivamente los assets locales publicados junto con
+        // Registro de Servicios. TellMeBye conserva su flujo independiente.
+        $localEsquela = rs_generate_local_esquela($esquelaPayload, $portraitBytes, $qrBytes);
         $esquelaBytes = (string)($localEsquela['jpeg'] ?? '');
         $esquelaFileName = trim((string)($localEsquela['fileName'] ?? ''));
 
