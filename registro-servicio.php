@@ -1121,10 +1121,29 @@ try {
         }
     }
 
+    $qrBytes = null;
+    if (isset($_FILES['qrEsquelaFile']) && is_array($_FILES['qrEsquelaFile'])) {
+        $qrFile = $_FILES['qrEsquelaFile'];
+        $qrError = (int)($qrFile['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($qrError !== UPLOAD_ERR_OK) {
+            throw new RuntimeException('No fue posible recibir el codigo QR de la esquela.');
+        }
+        $qrTmp = (string)($qrFile['tmp_name'] ?? '');
+        $qrSize = (int)($qrFile['size'] ?? 0);
+        if ($qrTmp === '' || !is_uploaded_file($qrTmp) || $qrSize <= 0 || $qrSize > 2 * 1024 * 1024) {
+            throw new RuntimeException('El codigo QR recibido no es valido.');
+        }
+        $candidateQr = @file_get_contents($qrTmp);
+        if (!is_string($candidateQr) || $candidateQr === '') {
+            throw new RuntimeException('No fue posible leer el codigo QR de la esquela.');
+        }
+        $qrBytes = $candidateQr;
+    }
+
     try {
         $esquelaPayload = $payload;
         $esquelaPayload['itemId'] = (string)$itemId;
-        $localEsquela = rs_generate_local_esquela($esquelaPayload, $portraitBytes);
+        $localEsquela = rs_generate_local_esquela($esquelaPayload, $portraitBytes, $qrBytes);
         $esquelaBytes = (string)($localEsquela['jpeg'] ?? '');
         $esquelaFileName = trim((string)($localEsquela['fileName'] ?? ''));
 
