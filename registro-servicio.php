@@ -1184,8 +1184,13 @@ try {
         $esquelaAssets = [];
         $backgroundKey = rs_esquela_background_key($esquelaPayload);
         $assetFolder = '/sites/Operaciones/Documentos compartidos/Automaticaciones/Eventos Capillas/Plantillas Esquela';
+        $backgroundFiles = [
+            'fondo_masculino' => 'fondo_masculino.png',
+            'fondo_femenino' => 'fondo_femenino.jpg',
+            'fondo_menor' => 'fondo_menor.png',
+        ];
         $assetFiles = [
-            $backgroundKey => $backgroundKey . '.jpg',
+            $backgroundKey => $backgroundFiles[$backgroundKey] ?? ($backgroundKey . '.jpg'),
             'crespon' => 'crespon.png',
         ];
         if ($portraitBytes === null || $portraitBytes === '') {
