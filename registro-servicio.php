@@ -530,8 +530,9 @@ try {
     $registroPlaca = __DIR__ . '/registro-placa.php';
     $registroCarta = __DIR__ . '/registro-carta.php';
     $registroImagenes = __DIR__ . '/registro-imagenes.php';
+    $registroEsquela = __DIR__ . '/registro-esquela.php';
     $registroTellmebye = __DIR__ . '/registro-tellmebye.php';
-    if (!is_file($bootstrap) || !is_file($registroSharePoint) || !is_file($registroCalendario) || !is_file($registroPlaca) || !is_file($registroCarta) || !is_file($registroImagenes) || !is_file($registroTellmebye)) {
+    if (!is_file($bootstrap) || !is_file($registroSharePoint) || !is_file($registroCalendario) || !is_file($registroPlaca) || !is_file($registroCarta) || !is_file($registroImagenes) || !is_file($registroEsquela) || !is_file($registroTellmebye)) {
         throw new RuntimeException('No se encontraron los componentes necesarios de Registro de Servicios.');
     }
     require_once $bootstrap;
@@ -540,6 +541,7 @@ try {
     require_once $registroPlaca;
     require_once $registroCarta;
     require_once $registroImagenes;
+    require_once $registroEsquela;
     require_once $registroTellmebye;
     portal_require_authentication();
     $storageCtx = rs_storage_bootstrap();
@@ -1096,15 +1098,75 @@ try {
         }
     }
 
+    // FASE 5: generar la esquela local antes del correo principal.
+    // La fotografia recortada sigue adjunta al elemento de SharePoint para que
+    // TellMeBye pueda continuar su flujo externo sin cambios.
+    $esquelaResult = [
+        'created' => false,
+        'fileName' => null,
+        'background' => null,
+        'prefix' => null,
+        'qrUrl' => null,
+        'qrGenerated' => false,
+        'error' => null,
+    ];
+
+    $portraitBytes = null;
+    foreach ($filesToAttach as $file) {
+        if ((string)($file['key'] ?? '') !== 'esquela') continue;
+        $candidateBytes = @file_get_contents((string)($file['tmp'] ?? ''));
+        if (is_string($candidateBytes) && $candidateBytes !== '') {
+            $portraitBytes = $candidateBytes;
+            break;
+        }
+    }
+
+    try {
+        $esquelaPayload = $payload;
+        $esquelaPayload['itemId'] = (string)$itemId;
+        $localEsquela = rs_generate_local_esquela($esquelaPayload, $portraitBytes);
+        $esquelaBytes = (string)($localEsquela['jpeg'] ?? '');
+        $esquelaFileName = trim((string)($localEsquela['fileName'] ?? ''));
+
+        if ($esquelaBytes === '' || $esquelaFileName === '') {
+            throw new RuntimeException('La generacion local de esquela no devolvio un JPG utilizable.');
+        }
+
+        $esquelaResult = [
+            'created' => true,
+            'fileName' => $esquelaFileName,
+            'background' => (string)($localEsquela['background'] ?? ''),
+            'prefix' => (string)($localEsquela['prefix'] ?? ''),
+            'qrUrl' => (string)($localEsquela['qrUrl'] ?? ''),
+            'qrGenerated' => (bool)($localEsquela['qrGenerated'] ?? false),
+            'error' => null,
+        ];
+
+        $emailAttachments[] = [
+            'name' => $esquelaFileName,
+            'contentType' => 'image/jpeg',
+            'bytes' => $esquelaBytes,
+        ];
+    } catch (Throwable $esquelaError) {
+        $esquelaResult['error'] = $esquelaError->getMessage();
+        error_log('Registro Servicios Esquela local item ' . $itemId . ': ' . $esquelaError->getMessage());
+    }
+
     $uploadedNames = [];
     foreach ($filesToAttach as $file) {
         $bytes = file_get_contents($file['tmp']);
         if ($bytes === false) throw new RuntimeException('No fue posible leer el archivo ' . $file['name'] . '.');
-        $emailAttachments[] = [
-            'name' => (string)$file['name'],
-            'contentType' => (string)($file['type'] ?? 'application/octet-stream'),
-            'bytes' => $bytes,
-        ];
+
+        // Imagen_Esquela.jpg es la fotografia fuente para TellMeBye y queda en
+        // SharePoint, pero ya no se adjunta al correo principal. En su lugar se
+        // envia la esquela compuesta generada arriba.
+        if ((string)($file['key'] ?? '') !== 'esquela') {
+            $emailAttachments[] = [
+                'name' => (string)$file['name'],
+                'contentType' => (string)($file['type'] ?? 'application/octet-stream'),
+                'bytes' => $bytes,
+            ];
+        }
         $safeName = preg_replace('/[^A-Za-z0-9._() -]+/u', '_', $file['name']) ?: 'archivo';
         $safeName = str_replace("'", "''", $safeName);
         $attachmentUrl = $siteUrl . "/_api/web/lists/getbytitle('" . $listEsc . "')/items(" . $itemId . ")/AttachmentFiles/add(FileName='" . rawurlencode($safeName) . "')";
@@ -1218,6 +1280,7 @@ try {
         'calendar' => $calendarResult ?? ['enabled' => false, 'created' => false],
         'plate' => $plateResult,
         'letter' => $letterResult,
+        'esquela' => $esquelaResult ?? ['created' => false],
         'email' => $emailResult ?? ['enabled' => false, 'sent' => false],
         'plateEmail' => $plateEmailResult ?? ['enabled' => false, 'sent' => false],
         'tellmebye' => $tellmebyeResult ?? ['enabled' => false, 'triggered' => false],

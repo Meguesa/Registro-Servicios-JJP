@@ -149,7 +149,7 @@ declare(strict_types=1);
     </section>
 
     <section class="form-section wizard-panel" data-step="4">
-      <div class="section-title"><span>5</span><div><h2>Imagen de esquela</h2><p>Último paso del registro. La información y los archivos se enviarán a SharePoint.</p></div></div>
+      <div class="section-title"><span>5</span><div><h2>Fotografía para esquela</h2><p>Último paso del registro. La información y los archivos se enviarán a SharePoint.</p></div></div>
       <div class="upload-card image-upload-card">
         <div class="upload-heading">
           <div><strong>Imagen Esquela</strong><p class="hint">Selecciona una fotografía y ajusta el encuadre antes de continuar.</p></div>
@@ -168,7 +168,7 @@ declare(strict_types=1);
         </div>
         <div id="imageResult" class="image-result hidden">
           <img id="croppedPreview" alt="Imagen ajustada">
-          <div><strong>Imagen lista</strong><span>El encuadre procesado será el que se envíe cuando habilitemos SharePoint.</span>
+          <div><strong>Imagen lista</strong><span>El encuadre procesado se usará en la esquela local y también quedará disponible para TellMeBye.</span>
           <button type="button" class="secondary-button" id="editCropBtn">Volver a ajustar</button></div>
         </div>
         <input type="hidden" name="esquelaProcesada" id="esquelaProcesada">
