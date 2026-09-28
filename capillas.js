@@ -678,22 +678,44 @@ function rsTellMeByeUrl(fullName){
 async function rsQrFileForEsquela(){
   const fallecido=String(form.elements.namedItem("fallecido")?.value||"").trim();
   if(!fallecido) throw new Error("Falta el nombre del fallecido para generar el QR.");
-  if(!window.QRCode || typeof window.QRCode.toDataURL!=="function"){
+  if(typeof window.QRCode!=="function"){
     throw new Error("No fue posible cargar el generador de QR. Recarga la pagina e intenta de nuevo.");
   }
+
   const url=rsTellMeByeUrl(fallecido);
-  const dataUrl=await window.QRCode.toDataURL(url,{
-    width:420,
-    margin:2,
-    errorCorrectionLevel:"M",
-    color:{dark:"#111111",light:"#FFFFFF"}
-  });
-  const response=await fetch(dataUrl);
-  const blob=await response.blob();
-  return {
-    url,
-    file:new File([blob],"QR_Esquela.png",{type:"image/png"})
-  };
+  const holder=document.createElement("div");
+  holder.style.position="fixed";
+  holder.style.left="-10000px";
+  holder.style.top="-10000px";
+  document.body.appendChild(holder);
+
+  try{
+    new window.QRCode(holder,{
+      text:url,
+      width:420,
+      height:420,
+      colorDark:"#111111",
+      colorLight:"#FFFFFF",
+      correctLevel:window.QRCode.CorrectLevel.M
+    });
+
+    // qrcodejs genera un canvas en el mismo ciclo, pero cedemos un frame
+    // para asegurar que el dibujo ya este listo antes de serializarlo.
+    await new Promise(resolve=>requestAnimationFrame(()=>resolve()));
+    const canvas=holder.querySelector("canvas");
+    if(!canvas) throw new Error("El generador QR no produjo una imagen.");
+
+    const blob=await new Promise((resolve,reject)=>{
+      canvas.toBlob(value=>value?resolve(value):reject(new Error("No fue posible convertir el QR a PNG.")),"image/png");
+    });
+
+    return {
+      url,
+      file:new File([blob],"QR_Esquela.png",{type:"image/png"})
+    };
+  }finally{
+    holder.remove();
+  }
 }
 
 async function rsCroppedFile(){
