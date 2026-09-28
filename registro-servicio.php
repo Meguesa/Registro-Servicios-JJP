@@ -25,7 +25,33 @@ function rs_is_preview_mode(): bool
 
 function rs_email_escape(string $value): string
 {
-    return htmlspecialchars(trim($value), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    return htmlspecialchars(
+        mb_strtoupper(trim($value), 'UTF-8'),
+        ENT_QUOTES | ENT_SUBSTITUTE,
+        'UTF-8'
+    );
+}
+
+/**
+ * Convierte a mayusculas todos los textos que salen del formulario.
+ * Numeros, booleanos y null se conservan. Los arreglos se procesan
+ * recursivamente para Servicios Extra y estructuras similares.
+ */
+function rs_uppercase_export(mixed $value): mixed
+{
+    if (is_string($value)) {
+        return mb_strtoupper(trim($value), 'UTF-8');
+    }
+
+    if (is_array($value)) {
+        $out = [];
+        foreach ($value as $key => $item) {
+            $out[$key] = rs_uppercase_export($item);
+        }
+        return $out;
+    }
+
+    return $value;
 }
 
 /**
@@ -152,26 +178,26 @@ function rs_send_controlled_test_email(array $payload, array $attachments): arra
         return $value;
     };
 
-    $numeroServicio = trim((string)($payload['numeroServicio'] ?? ''));
-    $fallecido = trim((string)($payload['fallecido'] ?? ''));
-    $servicio = trim((string)($payload['servicio'] ?? ''));
-    $referencia = trim((string)($payload['referencia'] ?? ''));
-    $ubicacion = trim((string)($payload['ubicacion'] ?? ''));
-    $sala = trim((string)($payload['sala'] ?? ''));
+    $numeroServicio = (string)rs_uppercase_export($payload['numeroServicio'] ?? '');
+    $fallecido = (string)rs_uppercase_export($payload['fallecido'] ?? '');
+    $servicio = (string)rs_uppercase_export($payload['servicio'] ?? '');
+    $referencia = (string)rs_uppercase_export($payload['referencia'] ?? '');
+    $ubicacion = (string)rs_uppercase_export($payload['ubicacion'] ?? '');
+    $sala = (string)rs_uppercase_export($payload['sala'] ?? '');
     $inicio = $formatDateTime((string)($payload['inicio'] ?? ''));
     $termino = $formatDateTime((string)($payload['termino'] ?? ''));
     $llevaExequia = (bool)($payload['llevaExequia'] ?? false);
     $horaExequia = $formatDateTime((string)($payload['horaExequia'] ?? ''));
-    $prevision = trim((string)($payload['prevision'] ?? ''));
-    $ubicacionRescate = trim((string)($payload['ubicacionRescate'] ?? ''));
-    $motivo = trim((string)($payload['motivo'] ?? ''));
-    $rescate1 = trim((string)($payload['rescate1'] ?? ''));
-    $rescate2 = trim((string)($payload['rescate2'] ?? ''));
-    $titular = trim((string)($payload['titular'] ?? ''));
+    $prevision = (string)rs_uppercase_export($payload['prevision'] ?? '');
+    $ubicacionRescate = (string)rs_uppercase_export($payload['ubicacionRescate'] ?? '');
+    $motivo = (string)rs_uppercase_export($payload['motivo'] ?? '');
+    $rescate1 = (string)rs_uppercase_export($payload['rescate1'] ?? '');
+    $rescate2 = (string)rs_uppercase_export($payload['rescate2'] ?? '');
+    $titular = (string)rs_uppercase_export($payload['titular'] ?? '');
     $fechaNacimiento = $formatDate((string)($payload['fechaNacimiento'] ?? ''));
     $fechaDefuncion = $formatDate((string)($payload['fechaDefuncion'] ?? ''));
     $edad = trim((string)($payload['edad'] ?? ''));
-    $vendedor = trim((string)($payload['personalVenta'] ?? ''));
+    $vendedor = (string)rs_uppercase_export($payload['personalVenta'] ?? '');
 
     $personalRescate = implode(
         ' Y ',
@@ -363,8 +389,8 @@ function rs_send_plate_email(array $payload, array $plateAttachment): array
         'it@juanpablo.com.mx',
     ];
 
-    $numeroServicio = trim((string)($payload['numeroServicio'] ?? ''));
-    $fallecido = trim((string)($payload['fallecido'] ?? ''));
+    $numeroServicio = (string)rs_uppercase_export($payload['numeroServicio'] ?? '');
+    $fallecido = (string)rs_uppercase_export($payload['fallecido'] ?? '');
     $fechaNacimiento = trim((string)($payload['fechaNacimiento'] ?? ''));
     $fechaDefuncion = trim((string)($payload['fechaDefuncion'] ?? ''));
     $termino = trim((string)($payload['termino'] ?? ''));
@@ -690,6 +716,9 @@ try {
         if ($field === null) return;
         if ($skipBlank && ($value === null || $value === '' || $value === [])) return;
 
+        // Todo texto exportado a SharePoint se guarda en MAYUSCULAS.
+        $value = rs_uppercase_export($value);
+
         $internal = (string) ($field['InternalName'] ?? '');
         if ($internal === '') return;
         $type = strtolower((string) ($field['TypeAsString'] ?? ''));
@@ -906,7 +935,7 @@ try {
         $plateResult['required'] = true;
 
         try {
-            $platePayload = $payload;
+            $platePayload = rs_uppercase_export($payload);
             $platePayload['itemId'] = (string) $itemId;
             $plate = rs_generate_urna_plate($platePayload);
 
@@ -961,7 +990,7 @@ try {
     ];
 
     try {
-        $letterPayload = $payload;
+        $letterPayload = rs_uppercase_export($payload);
         $letterPayload['itemId'] = (string) $itemId;
 
         $letter = rs_generate_service_letter($letterPayload);
@@ -1003,7 +1032,7 @@ try {
     // FASE 2: las tres imagenes informativas se generan con los datos reales
     // para adjuntarlas al correo controlado.
     try {
-        $infoImages = rs_generate_service_information_images($payload);
+        $infoImages = rs_generate_service_information_images(rs_uppercase_export($payload));
         foreach ([
             ['nameKey' => 'serviceName', 'bytesKey' => 'servicePng'],
             ['nameKey' => 'obitName', 'bytesKey' => 'obitPng'],
@@ -1093,7 +1122,7 @@ try {
     // Crear evento de calendario tambien en Preview para validar el flujo completo.
     // El modulo de calendario agrega "(PRUEBA)" al titulo cuando _previewMode=true.
     try {
-        $calendarPayload = $payload;
+        $calendarPayload = rs_uppercase_export($payload);
         $calendarPayload['_previewMode'] = rs_is_preview_mode();
         $calendarResult = rs_calendar_create_event($calendarPayload, $config);
     } catch (Throwable $calendarError) {
@@ -1120,7 +1149,7 @@ try {
         try {
             $emailResult = array_merge(
                 $emailResult,
-                rs_send_controlled_test_email($payload, $emailAttachments)
+                rs_send_controlled_test_email(rs_uppercase_export($payload), $emailAttachments)
             );
         } catch (Throwable $emailError) {
             $emailResult['error'] = $emailError->getMessage();
@@ -1139,7 +1168,7 @@ try {
         try {
             $plateEmailResult = array_merge(
                 $plateEmailResult,
-                rs_send_plate_email($payload, $plateEmailAttachment)
+                rs_send_plate_email(rs_uppercase_export($payload), $plateEmailAttachment)
             );
         } catch (Throwable $plateEmailError) {
             $plateEmailResult['error'] = $plateEmailError->getMessage();
