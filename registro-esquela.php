@@ -107,8 +107,8 @@ function rs_esquela_load_asset(string $baseName): ?GdImage
 
 function rs_esquela_asset_image(array $assets, string $key): ?GdImage
 {
-    // Las plantillas oficiales de esquela se cargan desde SharePoint.
-    // No reutilizar fondos locales antiguos si la descarga falla.
+    // Permite bytes inyectados para pruebas, pero la fuente normal de las
+    // plantillas es el propio repositorio/deploy de Registro de Servicios.
     $bytes = $assets[$key] ?? null;
     if (is_string($bytes) && $bytes !== '') {
         $image = rs_esquela_image_from_bytes($bytes);
@@ -116,7 +116,8 @@ function rs_esquela_asset_image(array $assets, string $key): ?GdImage
             return $image;
         }
     }
-    return null;
+
+    return rs_esquela_load_asset($key);
 }
 
 function rs_esquela_background_key(array $payload): string
@@ -434,6 +435,10 @@ function rs_esquela_draw_circular_photo(GdImage $canvas, ?GdImage $photo, int $c
 function rs_esquela_draw_ribbon(GdImage $image, int $cx, int $cy, int $size = 78, ?string $assetBytes = null): void
 {
     $asset = rs_esquela_image_from_bytes((string)$assetBytes);
+    if (!$asset instanceof GdImage) {
+        $asset = rs_esquela_load_asset('crespon');
+    }
+
     if ($asset instanceof GdImage) {
         $x = (int)round($cx - ($size / 2));
         $y = (int)round($cy - ($size / 2));
@@ -454,7 +459,7 @@ function rs_esquela_draw_ribbon(GdImage $image, int $cx, int $cy, int $size = 78
         return;
     }
 
-    // Respaldo vectorial de mejor calidad que el dibujo anterior.
+    // Respaldo vectorial si el asset local no pudiera leerse.
     $dark = imagecolorallocate($image, 67, 67, 70);
     $light = imagecolorallocate($image, 84, 84, 88);
     $w = max(8, (int)round($size * 0.16));
@@ -464,7 +469,6 @@ function rs_esquela_draw_ribbon(GdImage $image, int $cx, int $cy, int $size = 78
     imagearc($image, $cx, $cy - (int)($size * 0.18), (int)($size * 0.50), (int)($size * 0.48), 180, 360, $dark);
     imagesetthickness($image, 1);
 }
-
 function rs_esquela_logo_path(): ?string
 {
     $root = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
