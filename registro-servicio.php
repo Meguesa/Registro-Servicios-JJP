@@ -1194,10 +1194,10 @@ try {
 
         foreach ($assetFiles as $assetKey => $assetFileName) {
             $serverRelative = $assetFolder . '/' . $assetFileName;
+            $assetArg = rawurlencode("'" . $serverRelative . "'");
             $assetUrl = $siteUrl
-                . "/_api/web/GetFileByServerRelativePath(decodedurl='"
-                . rawurlencode($serverRelative)
-                . "')/$value";
+                . "/_api/web/GetFileByServerRelativePath(decodedurl=@f)/\$value"
+                . "?@f=" . $assetArg;
             try {
                 $esquelaAssets[$assetKey] = rs_sharepoint_binary($assetUrl, $token);
             } catch (Throwable $assetError) {
