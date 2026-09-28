@@ -604,6 +604,19 @@ setRequired=function(id,on){
 updateRules();
 
 
+
+function rsSyncTestModeUi(){
+  const toggle=document.getElementById("modoPrueba");
+  const pill=document.getElementById("modePill");
+  const help=document.getElementById("testModeHelp");
+  if(!toggle)return;
+  const active=toggle.checked===true;
+  if(pill) pill.textContent=active?"Prueba · conectado a SharePoint":"Producción · conectado a SharePoint";
+  if(help) help.hidden=!active;
+}
+document.getElementById("modoPrueba")?.addEventListener("change",rsSyncTestModeUi);
+rsSyncTestModeUi();
+
 /* Integración SharePoint: Eventos Capillas */
 function rsMoneyNumber(text){
   const n=Number(String(text||"").replace(/[^0-9.-]/g,""));
@@ -663,7 +676,8 @@ function rsPayload(){
     precioVenta:data.get("precioVenta")===""?null:Number(data.get("precioVenta")),
     serviciosExtra:extras,
     extraAmounts,
-    ventaTotal:rsMoneyNumber(document.getElementById("ventaTotal")?.textContent||"0")
+    ventaTotal:rsMoneyNumber(document.getElementById("ventaTotal")?.textContent||"0"),
+    modoPrueba:document.getElementById("modoPrueba")?.checked===true
   };
 }
 
