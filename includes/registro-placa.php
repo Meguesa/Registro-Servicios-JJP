@@ -85,8 +85,8 @@ function rs_plate_logo_path(): ?string
     $candidates = [
         $root . '/mapa/assets/logo.jpg',
         $root . '/mapa/assets/logo.png',
-        __DIR__ . '/assets/logo.jpg',
-        __DIR__ . '/assets/logo.png',
+        dirname(__DIR__) . '/assets/logo.jpg',
+        dirname(__DIR__) . '/assets/logo.png',
     ];
 
     foreach ($candidates as $path) {
@@ -204,7 +204,7 @@ function rs_plate_png_chunk(string $type, string $data): string
 
 function rs_plate_background_png(): string
 {
-    $cacheDir = __DIR__ . '/.registro-servicios-data/templates';
+    $cacheDir = dirname(__DIR__) . '/.registro-servicios-data/templates';
     if (!is_dir($cacheDir)) {
         @mkdir($cacheDir, 0750, true);
     }
@@ -378,7 +378,7 @@ function rs_plate_pdf_stream_bytes(string $pdf, int $objectNumber): string
  */
 function rs_plate_embedded_font_path(int $fontObject, string $cacheName): string
 {
-    $cacheDir = __DIR__ . '/.registro-servicios-data/fonts';
+    $cacheDir = dirname(__DIR__) . '/.registro-servicios-data/fonts';
     if (!is_dir($cacheDir) && !@mkdir($cacheDir, 0750, true) && !is_dir($cacheDir)) {
         throw new RuntimeException('No fue posible preparar el cache de fuentes de la placa.');
     }
@@ -439,8 +439,8 @@ function rs_plate_embedded_font_path(int $fontObject, string $cacheName): string
 function rs_plate_pagella_font_path(): string
 {
     $candidates = [
-        __DIR__ . '/assets/fonts/texgyrepagella-regular.otf',
-        __DIR__ . '/fonts/texgyrepagella-regular.otf',
+        dirname(__DIR__) . '/assets/fonts/texgyrepagella-regular.otf',
+        dirname(__DIR__) . '/fonts/texgyrepagella-regular.otf',
         '/usr/share/texmf/fonts/opentype/public/tex-gyre/texgyrepagella-regular.otf',
         '/usr/share/texlive/texmf-dist/fonts/opentype/public/tex-gyre/texgyrepagella-regular.otf',
         '/usr/share/fonts/opentype/texgyre/texgyrepagella-regular.otf',
