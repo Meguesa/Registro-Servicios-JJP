@@ -48,22 +48,35 @@ Claves soportadas:
 
 Siguiente mejora recomendada: administrar destinatarios desde SharePoint o desde un módulo restringido del Portal Interno.
 
-## Componentes principales
+## Estructura principal
 
-- `index.php`: selector Capillas / Parque.
-- `capillas.php`: formulario de Capillas.
-- `capillas.js`: reglas del formulario, borradores, QR y publicación.
-- `registro-servicio.php`: orquestación principal.
-- `registro-sharepoint.php`: autenticación y acceso a SharePoint.
-- `registro-calendario.php`: creación de eventos de calendario.
-- `registro-imagenes.php`: imágenes informativas.
-- `registro-esquela.php`: generación local de esquela.
-- `registro-placa.php`: generación de placa.
-- `registro-placa-template.php`: plantilla usada por la placa.
-- `registro-carta.php`: carta de servicio otorgado.
-- `registro-tellmebye.php`: disparo del bot TellMeBye.
-- `registro-storage.php`: almacenamiento de borradores y publicaciones.
-- `mis-servicios.php`: consulta de borradores y servicios publicados.
+```text
+Registro-Servicios-JJP/
+├── index.php
+├── capillas.php
+├── mis-servicios.php
+├── api/
+│   ├── registro-servicio.php
+│   ├── guardar-borrador.php
+│   └── mis-servicios-api.php
+├── includes/
+│   ├── registro-sharepoint.php
+│   ├── registro-calendario.php
+│   ├── registro-imagenes.php
+│   ├── registro-esquela.php
+│   ├── registro-placa.php
+│   ├── registro-placa-template.php
+│   ├── registro-carta.php
+│   ├── registro-storage.php
+│   └── registro-tellmebye.php
+├── assets/
+│   ├── css/
+│   ├── js/
+│   └── esquelas/
+└── docs/
+```
+
+Las páginas visibles permanecen en la raíz. Los endpoints se concentran en `api/`, la lógica interna en `includes/` y los recursos web en `assets/`.
 
 ## Seguridad
 
