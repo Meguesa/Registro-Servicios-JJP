@@ -770,7 +770,7 @@ async function rsSubmitToSharePoint(){
     const orden=document.getElementById("ordenInhumacionCremacion")?.files?.[0];
     if(orden) body.append("ordenInhumacionCremacion",orden,orden.name);
 
-    const response=await fetch("registro-servicio.php",{
+    const response=await fetch("api/registro-servicio.php",{
       method:"POST",
       body,
       credentials:"same-origin",
@@ -911,7 +911,7 @@ async function rsSaveDraft(){
   try{
     const body=rsDraftFormData();
     await rsAddDraftFiles(body);
-    const response=await fetch("guardar-borrador.php",{method:"POST",body,credentials:"same-origin",headers:{"Accept":"application/json"}});
+    const response=await fetch("api/guardar-borrador.php",{method:"POST",body,credentials:"same-origin",headers:{"Accept":"application/json"}});
     const result=await response.json().catch(()=>null);
     if(!response.ok||!result?.ok) throw new Error(result?.message||("HTTP "+response.status));
     document.getElementById("draftId").value=result.draftId||"";
