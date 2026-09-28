@@ -1,46 +1,72 @@
 # Registro de Servicios JJP
 
-Herramienta interna de Jardines de Juan Pablo para capturar servicios de Capillas y Parque desde el Portal Interno JJP y registrar la información directamente en las listas existentes de SharePoint.
+Herramienta interna de Jardines de Juan Pablo para capturar y dar seguimiento a servicios operativos desde el Portal Interno.
 
-## Objetivo
+## Estado actual
 
-Sustituir gradualmente la captura actual en Power Apps por formularios web integrados al Portal Interno, sin modificar:
+### Capillas
+Producción activa.
 
-- Las listas `Eventos Capillas` y `Eventos Parque`.
-- Los flujos de Power Automate existentes.
-- Los flujos del Dashboard de Dirección.
-- Las automatizaciones posteriores que se disparan al crear un nuevo elemento en SharePoint.
-
-## Arquitectura prevista
+Flujo principal:
 
 ```text
 Portal Interno JJP
   -> Registro de Servicios
       -> Capillas
           -> Formulario web
-          -> Backend PHP
           -> SharePoint: Eventos Capillas
-          -> Power Automate existente
-      -> Parque
-          -> Formulario web
-          -> Backend PHP
-          -> SharePoint: Eventos Parque
-          -> Power Automate existente
+          -> Calendario
+          -> Correo operativo
+          -> Generación de placa / carta / imágenes / esquela
+          -> TellMeBye
 ```
 
-## Fases
+El flujo anterior de Power Automate de Eventos Capillas debe permanecer desactivado para evitar duplicidad de registros, correos y automatizaciones.
 
-1. Crear repositorio y estructura base.
-2. Levantar el esquema exacto de `Eventos Capillas`.
-3. Replicar el formulario de Capillas.
-4. Validar escritura en SharePoint sin alterar Power Automate.
-5. Probar con un registro controlado.
-6. Crear formulario de Parque.
-7. Integrar la herramienta al Portal Interno.
-8. Transición gradual desde Power Apps.
+### Parque
+Visible en el selector como **En desarrollo**. No tiene captura productiva habilitada todavía.
 
-## Principio de compatibilidad
+## Modo normal y modo prueba
 
-La herramienta debe crear un elemento nuevo con los mismos nombres internos de columnas, tipos de datos y valores que espera actualmente el proceso.
+- Producción es el modo predeterminado.
+- `ModoPrueba = No` en registros normales.
+- Solo `sistemas@juanpablo.com.mx` y `gabriel.guerra@juanpablo.com.mx` pueden activar el modo prueba desde el formulario.
+- En modo prueba:
+  - `ModoPrueba = Sí`
+  - correo y calendario quedan identificados como prueba
+  - TellMeBye usa el modo de prueba configurado
 
-No se agregarán campos de control a las listas de producción durante esta primera fase.
+## Destinatarios
+
+Los destinatarios productivos del correo están centralizados en `registro-servicio.php` con soporte para sobreescribirlos desde la configuración privada del portal.
+
+Claves soportadas:
+
+- `registro_servicios_email_recipients`
+- `registro_servicios_plate_email_recipients`
+- `registro_servicios_test_email_recipients`
+
+Siguiente mejora recomendada: administrar destinatarios desde SharePoint o desde un módulo restringido del Portal Interno.
+
+## Componentes principales
+
+- `index.php`: selector Capillas / Parque.
+- `capillas.php`: formulario de Capillas.
+- `capillas.js`: reglas del formulario, borradores, QR y publicación.
+- `registro-servicio.php`: orquestación principal.
+- `registro-sharepoint.php`: autenticación y acceso a SharePoint.
+- `registro-calendario.php`: creación de eventos de calendario.
+- `registro-imagenes.php`: imágenes informativas.
+- `registro-esquela.php`: generación local de esquela.
+- `registro-placa.php`: generación de placa.
+- `registro-placa-template.php`: plantilla usada por la placa.
+- `registro-carta.php`: carta de servicio otorgado.
+- `registro-tellmebye.php`: disparo del bot TellMeBye.
+- `registro-storage.php`: almacenamiento de borradores y publicaciones.
+- `mis-servicios.php`: consulta de borradores y servicios publicados.
+
+## Seguridad
+
+- No almacenar contraseñas, tokens ni secretos en este repositorio.
+- Las credenciales privadas permanecen fuera del repo, en la configuración del Portal.
+- Los endpoints temporales de diagnóstico fueron retirados al cerrar la fase de Capillas.
