@@ -39,7 +39,7 @@ function rs_storage_bootstrap(): array
 
     $candidates = [];
     if ($configuredBase !== '') $candidates[] = rtrim($configuredBase, '/');
-    $candidates[] = __DIR__ . '/.registro-servicios-data';
+    $candidates[] = dirname(__DIR__) . '/.registro-servicios-data';
     $candidates[] = $home . '/registro-servicios-data';
     $candidates[] = rtrim(sys_get_temp_dir(), '/') . '/registro-servicios-data';
 
