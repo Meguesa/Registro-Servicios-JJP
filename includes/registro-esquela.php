@@ -25,10 +25,10 @@ function rs_esquela_norm(string $value): string
 function rs_esquela_asset_candidates(string $baseName): array
 {
     return [
-        __DIR__ . '/assets/esquelas/' . $baseName . '.jpg',
-        __DIR__ . '/assets/esquelas/' . $baseName . '.jpeg',
-        __DIR__ . '/assets/esquelas/' . $baseName . '.png',
-        __DIR__ . '/assets/esquelas/' . $baseName . '.b64',
+        dirname(__DIR__) . '/assets/esquelas/' . $baseName . '.jpg',
+        dirname(__DIR__) . '/assets/esquelas/' . $baseName . '.jpeg',
+        dirname(__DIR__) . '/assets/esquelas/' . $baseName . '.png',
+        dirname(__DIR__) . '/assets/esquelas/' . $baseName . '.b64',
     ];
 }
 
