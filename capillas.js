@@ -667,6 +667,35 @@ function rsPayload(){
   };
 }
 
+
+function rsTellMeByeUrl(fullName){
+  let name=String(fullName||"").trim().replace(/\s+/g," ");
+  name=name.normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  name=name.toUpperCase().replace(/[^A-Z0-9 ]+/g,"").trim().replace(/\s+/g,"-");
+  return "https://tellmebye.com/"+encodeURIComponent(name)+"&accessbycode=1";
+}
+
+async function rsQrFileForEsquela(){
+  const fallecido=String(form.elements.namedItem("fallecido")?.value||"").trim();
+  if(!fallecido) throw new Error("Falta el nombre del fallecido para generar el QR.");
+  if(!window.QRCode || typeof window.QRCode.toDataURL!=="function"){
+    throw new Error("No fue posible cargar el generador de QR. Recarga la pagina e intenta de nuevo.");
+  }
+  const url=rsTellMeByeUrl(fallecido);
+  const dataUrl=await window.QRCode.toDataURL(url,{
+    width:420,
+    margin:2,
+    errorCorrectionLevel:"M",
+    color:{dark:"#111111",light:"#FFFFFF"}
+  });
+  const response=await fetch(dataUrl);
+  const blob=await response.blob();
+  return {
+    url,
+    file:new File([blob],"QR_Esquela.png",{type:"image/png"})
+  };
+}
+
 async function rsCroppedFile(){
   const value=String(document.getElementById("esquelaProcesada")?.value||"");
   if(!value.startsWith("data:image/")) return null;
@@ -687,12 +716,17 @@ async function rsSubmitToSharePoint(){
 
   try{
     const body=new FormData();
-    body.append("payload",JSON.stringify(rsPayload()));
+    const payload=rsPayload();
+    body.append("payload",JSON.stringify(payload));
     const draftId=document.getElementById("draftId")?.value||"";
     if(draftId) body.append("draftId",draftId);
 
     const cropped=await rsCroppedFile();
     if(cropped) body.append("esquelaProcesadaFile",cropped,cropped.name);
+
+    if(status) status.textContent="Generando codigo QR de la esquela...";
+    const qr=await rsQrFileForEsquela();
+    body.append("qrEsquelaFile",qr.file,qr.file.name);
 
     const cert=document.getElementById("certificadoDefuncion")?.files?.[0];
     if(cert) body.append("certificadoDefuncion",cert,cert.name);
