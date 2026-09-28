@@ -14,7 +14,7 @@ $email = htmlspecialchars((string)($user['email'] ?? ''), ENT_QUOTES, 'UTF-8');
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Registro de Servicios | Jardines de Juan Pablo</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
 <header class="solicitud-topbar">
