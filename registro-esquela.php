@@ -442,74 +442,99 @@ function rs_esquela_draw_circular_photo(GdImage $canvas, ?GdImage $photo, int $c
 }
 
 
+function rs_esquela_make_light_transparent(GdImage $source, int $threshold = 238): GdImage
+{
+    $w = imagesx($source);
+    $h = imagesy($source);
+
+    $out = imagecreatetruecolor($w, $h);
+    if (!$out instanceof GdImage) {
+        throw new RuntimeException('No fue posible preparar el crespon de la esquela.');
+    }
+
+    imagealphablending($out, false);
+    imagesavealpha($out, true);
+    $transparent = imagecolorallocatealpha($out, 0, 0, 0, 127);
+    imagefill($out, 0, 0, $transparent);
+
+    for ($y = 0; $y < $h; $y++) {
+        for ($x = 0; $x < $w; $x++) {
+            $rgba = imagecolorat($source, $x, $y);
+            $a = ($rgba & 0x7F000000) >> 24;
+            $r = ($rgba >> 16) & 0xFF;
+            $g = ($rgba >> 8) & 0xFF;
+            $b = $rgba & 0xFF;
+
+            // Fondo blanco/claro del archivo adjunto: hacerlo transparente.
+            if ($r >= $threshold && $g >= $threshold && $b >= $threshold) {
+                continue;
+            }
+
+            $color = imagecolorallocatealpha($out, $r, $g, $b, $a);
+            imagesetpixel($out, $x, $y, $color);
+        }
+    }
+
+    return $out;
+}
+
 function rs_esquela_draw_ribbon(GdImage $image, int $cx, int $cy, int $size = 78, ?string $assetBytes = null): void
 {
-    // El crespon se dibuja localmente para evitar recortes o assets incompletos.
-    // "$size" es el ancho aproximado total del simbolo.
-    $w = max(36, $size);
-    $h = (int)round($w * 1.18);
+    $ribbon = null;
 
-    $tmp = imagecreatetruecolor($w, $h);
-    if (!$tmp instanceof GdImage) {
+    if (is_string($assetBytes) && $assetBytes !== '') {
+        $ribbon = rs_esquela_image_from_bytes($assetBytes);
+    }
+    if (!$ribbon instanceof GdImage) {
+        $ribbon = rs_esquela_load_asset('crespon');
+    }
+    if (!$ribbon instanceof GdImage) {
         return;
     }
 
-    imagealphablending($tmp, false);
-    imagesavealpha($tmp, true);
-    $transparent = imagecolorallocatealpha($tmp, 0, 0, 0, 127);
-    imagefill($tmp, 0, 0, $transparent);
+    $clean = rs_esquela_make_light_transparent($ribbon);
+    $sw = imagesx($clean);
+    $sh = imagesy($clean);
 
-    $dark = imagecolorallocatealpha($tmp, 55, 55, 58, 0);
-    $shadow = imagecolorallocatealpha($tmp, 72, 72, 76, 0);
+    if ($sw <= 0 || $sh <= 0) {
+        imagedestroy($ribbon);
+        imagedestroy($clean);
+        return;
+    }
 
-    $px = static fn(float $v): int => (int)round($v * $w);
-    $py = static fn(float $v): int => (int)round($v * $h);
+    $targetW = max(36, $size);
+    $targetH = max(1, (int)round(($sh / $sw) * $targetW));
+    $x = (int)round($cx - ($targetW / 2));
+    $y = (int)round($cy - ($targetH / 2));
 
-    // Lazo superior completo.
-    imagefilledellipse($tmp, $px(0.50), $py(0.25), $px(0.52), $py(0.43), $dark);
-    imagefilledellipse($tmp, $px(0.50), $py(0.25), $px(0.25), $py(0.22), $transparent);
-
-    // Cola que cruza hacia la derecha.
-    imagefilledpolygon($tmp, [
-        $px(0.39), $py(0.34),
-        $px(0.51), $py(0.42),
-        $px(0.80), $py(0.91),
-        $px(0.64), $py(0.91),
-        $px(0.45), $py(0.60),
-        $px(0.33), $py(0.47),
-    ], 6, $dark);
-
-    // Cola que cruza hacia la izquierda.
-    imagefilledpolygon($tmp, [
-        $px(0.61), $py(0.34),
-        $px(0.49), $py(0.42),
-        $px(0.20), $py(0.91),
-        $px(0.36), $py(0.91),
-        $px(0.55), $py(0.60),
-        $px(0.67), $py(0.47),
-    ], 6, $shadow);
-
-    // Refuerzo del cruce central para que no aparezca "cortado".
-    imagefilledpolygon($tmp, [
-        $px(0.40), $py(0.38),
-        $px(0.60), $py(0.38),
-        $px(0.56), $py(0.55),
-        $px(0.44), $py(0.55),
-    ], 4, $dark);
+    if (function_exists('imagesetinterpolation') && defined('IMG_BICUBIC_FIXED')) {
+        @imagesetinterpolation($clean, IMG_BICUBIC_FIXED);
+    }
 
     imagealphablending($image, true);
-    $x = (int)round($cx - ($w / 2));
-    $y = (int)round($cy - ($h / 2));
-    imagecopy($image, $tmp, $x, $y, 0, 0, $w, $h);
-    imagedestroy($tmp);
+    imagesavealpha($image, true);
+    imagecopyresampled(
+        $image,
+        $clean,
+        $x,
+        $y,
+        0,
+        0,
+        $targetW,
+        $targetH,
+        $sw,
+        $sh
+    );
+
+    imagedestroy($clean);
+    imagedestroy($ribbon);
 }
 
 function rs_esquela_draw_logo(GdImage $canvas, int $x, int $y, int $size): bool
 {
     $logo = rs_esquela_load_asset('logo_jjp');
 
-    // Respaldo: si el asset no estuviera publicado por alguna razon,
-    // usar el logo ya existente del Portal.
+    // Respaldo: usar el logo ya publicado por el Portal si el asset local falta.
     if (!$logo instanceof GdImage) {
         $root = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
         foreach ([
@@ -536,20 +561,62 @@ function rs_esquela_draw_logo(GdImage $canvas, int $x, int $y, int $size): bool
         return false;
     }
 
-    $white = imagecolorallocate($canvas, 255, 255, 255);
-    imagefilledrectangle($canvas, $x, $y, $x + $size, $y + $size, $white);
+    // El contenedor conserva exactamente el mismo tamaño visual que antes,
+    // pero ahora es circular en lugar de un cuadro blanco.
+    $circle = imagecreatetruecolor($size, $size);
+    if (!$circle instanceof GdImage) {
+        imagedestroy($logo);
+        return false;
+    }
+
+    imagealphablending($circle, false);
+    imagesavealpha($circle, true);
+    $transparent = imagecolorallocatealpha($circle, 0, 0, 0, 127);
+    $white = imagecolorallocatealpha($circle, 255, 255, 255, 0);
+    imagefill($circle, 0, 0, $transparent);
+    imagefilledellipse(
+        $circle,
+        (int)round($size / 2),
+        (int)round($size / 2),
+        $size - 2,
+        $size - 2,
+        $white
+    );
 
     $sw = imagesx($logo);
     $sh = imagesy($logo);
-    $inner = max(1, (int)round($size * 0.94));
+
+    // Mantener aire alrededor del logo para que el texto no se corte al
+    // convertir el antiguo cuadro en un circulo del mismo tamaño.
+    $inner = max(1, (int)round($size * 0.72));
     $scale = min($inner / max(1, $sw), $inner / max(1, $sh));
     $dw = max(1, (int)round($sw * $scale));
     $dh = max(1, (int)round($sh * $scale));
-    $dx = $x + (int)round(($size - $dw) / 2);
-    $dy = $y + (int)round(($size - $dh) / 2);
+    $dx = (int)round(($size - $dw) / 2);
+    $dy = (int)round(($size - $dh) / 2);
+
+    imagealphablending($circle, true);
+    imagecopyresampled($circle, $logo, $dx, $dy, 0, 0, $dw, $dh, $sw, $sh);
+
+    // Eliminar cualquier pixel que haya quedado fuera del circulo.
+    $radius = ($size - 2) / 2;
+    $center = $size / 2;
+    imagealphablending($circle, false);
+    for ($py = 0; $py < $size; $py++) {
+        for ($px = 0; $px < $size; $px++) {
+            $ddx = $px - $center + 0.5;
+            $ddy = $py - $center + 0.5;
+            if (($ddx * $ddx + $ddy * $ddy) > ($radius * $radius)) {
+                imagesetpixel($circle, $px, $py, $transparent);
+            }
+        }
+    }
 
     imagealphablending($canvas, true);
-    imagecopyresampled($canvas, $logo, $dx, $dy, 0, 0, $dw, $dh, $sw, $sh);
+    imagesavealpha($canvas, true);
+    imagecopy($canvas, $circle, $x, $y, 0, 0, $size, $size);
+
+    imagedestroy($circle);
     imagedestroy($logo);
     return true;
 }
@@ -624,10 +691,9 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?
         throw new RuntimeException('El servidor no tiene GD disponible para generar la esquela.');
     }
 
-    // Formato vertical basado en la cartulina de referencia.
-    // 0.775 produce ~558 x 794 px: suficiente para correo y reduce
-    // drásticamente el reescalado de los fondos fotograficos actuales.
-    $scale = 0.775;
+    // Formato vertical 720 x 1024. Mantiene la composicion aprobada y
+    // aprovecha la resolucion original de los fondos sin pixelarlos.
+    $scale = 1.0;
     $baseWidth = 720;
     $baseHeight = 1024;
     $width = (int)round($baseWidth * $scale);
@@ -762,7 +828,7 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?
 
     imageinterlace($canvas, true);
     ob_start();
-    imagejpeg($canvas, null, 96);
+    imagejpeg($canvas, null, 98);
     $jpeg = (string)ob_get_clean();
     imagedestroy($canvas);
 
