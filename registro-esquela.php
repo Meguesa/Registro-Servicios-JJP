@@ -41,29 +41,17 @@ function rs_esquela_image_from_bytes(string $bytes): ?GdImage
     return $image instanceof GdImage ? $image : null;
 }
 
+
 function rs_esquela_load_asset(string $baseName): ?GdImage
 {
-    foreach (rs_esquela_asset_candidates($baseName) as $path) {
+    $dir = __DIR__ . '/assets/esquelas';
+
+    // 1) Archivos binarios directos, si existen.
+    foreach (['jpg', 'jpeg', 'png'] as $ext) {
+        $path = $dir . '/' . $baseName . '.' . $ext;
         if (!is_file($path) || !is_readable($path)) {
             continue;
         }
-
-        if (str_ends_with(strtolower($path), '.b64')) {
-            $raw = @file_get_contents($path);
-            if (!is_string($raw) || trim($raw) === '') {
-                continue;
-            }
-            $decoded = base64_decode(preg_replace('/\s+/', '', $raw) ?? '', true);
-            if (!is_string($decoded) || $decoded === '') {
-                continue;
-            }
-            $image = rs_esquela_image_from_bytes($decoded);
-            if ($image instanceof GdImage) {
-                return $image;
-            }
-            continue;
-        }
-
         $raw = @file_get_contents($path);
         if (!is_string($raw) || $raw === '') {
             continue;
@@ -71,6 +59,46 @@ function rs_esquela_load_asset(string $baseName): ?GdImage
         $image = rs_esquela_image_from_bytes($raw);
         if ($image instanceof GdImage) {
             return $image;
+        }
+    }
+
+    // 2) Assets base64 divididos en partes. Se usa este formato para que los
+    // fondos y elementos graficos puedan viajar por el deploy sin binarios.
+    $parts = glob($dir . '/' . $baseName . '.b64.part*') ?: [];
+    if ($parts !== []) {
+        natsort($parts);
+        $encoded = '';
+        foreach ($parts as $part) {
+            $piece = @file_get_contents($part);
+            if (!is_string($piece)) {
+                $encoded = '';
+                break;
+            }
+            $encoded .= preg_replace('/\s+/', '', $piece) ?? '';
+        }
+        if ($encoded !== '') {
+            $decoded = base64_decode($encoded, true);
+            if (is_string($decoded) && $decoded !== '') {
+                $image = rs_esquela_image_from_bytes($decoded);
+                if ($image instanceof GdImage) {
+                    return $image;
+                }
+            }
+        }
+    }
+
+    // 3) Compatibilidad con el asset base64 de una sola pieza.
+    $b64 = $dir . '/' . $baseName . '.b64';
+    if (is_file($b64) && is_readable($b64)) {
+        $raw = @file_get_contents($b64);
+        if (is_string($raw) && trim($raw) !== '') {
+            $decoded = base64_decode(preg_replace('/\s+/', '', $raw) ?? '', true);
+            if (is_string($decoded) && $decoded !== '') {
+                $image = rs_esquela_image_from_bytes($decoded);
+                if ($image instanceof GdImage) {
+                    return $image;
+                }
+            }
         }
     }
 
@@ -153,6 +181,7 @@ function rs_esquela_parse_datetime(string $value): ?DateTimeImmutable
     }
 }
 
+
 function rs_esquela_spanish_datetime(string $value): string
 {
     $dt = rs_esquela_parse_datetime($value);
@@ -184,8 +213,10 @@ function rs_esquela_spanish_datetime(string $value): string
         12 => 'Diciembre',
     ];
 
+    // Sin punto final. Cada frase agrega su propia puntuacion para evitar "h.."
+    // o "h.," cuando una fecha aparece en medio de una oracion.
     return sprintf(
-        '%s %d de %s a las %s h.',
+        '%s %d de %s a las %s h',
         $days[(int)$dt->format('N')] ?? '',
         (int)$dt->format('j'),
         $months[(int)$dt->format('n')] ?? '',
@@ -385,13 +416,38 @@ function rs_esquela_draw_circular_photo(GdImage $canvas, ?GdImage $photo, int $c
     imagedestroy($tmp);
 }
 
-function rs_esquela_draw_ribbon(GdImage $image, int $cx, int $cy): void
+
+function rs_esquela_draw_ribbon(GdImage $image, int $cx, int $cy, int $size = 78): void
 {
-    $gray = imagecolorallocate($image, 70, 70, 70);
-    imagesetthickness($image, 8);
-    imageline($image, $cx - 15, $cy - 20, $cx + 15, $cy + 22, $gray);
-    imageline($image, $cx + 15, $cy - 20, $cx - 15, $cy + 22, $gray);
-    imagearc($image, $cx, $cy - 11, 30, 34, 180, 360, $gray);
+    $asset = rs_esquela_load_asset('crespon');
+    if ($asset instanceof GdImage) {
+        $x = (int)round($cx - ($size / 2));
+        $y = (int)round($cy - ($size / 2));
+        imagealphablending($image, true);
+        imagecopyresampled(
+            $image,
+            $asset,
+            $x,
+            $y,
+            0,
+            0,
+            $size,
+            $size,
+            imagesx($asset),
+            imagesy($asset)
+        );
+        imagedestroy($asset);
+        return;
+    }
+
+    // Respaldo vectorial de mejor calidad que el dibujo anterior.
+    $dark = imagecolorallocate($image, 67, 67, 70);
+    $light = imagecolorallocate($image, 84, 84, 88);
+    $w = max(8, (int)round($size * 0.16));
+    imagesetthickness($image, $w);
+    imageline($image, $cx - (int)($size * 0.17), $cy - (int)($size * 0.25), $cx + (int)($size * 0.27), $cy + (int)($size * 0.34), $dark);
+    imageline($image, $cx + (int)($size * 0.17), $cy - (int)($size * 0.25), $cx - (int)($size * 0.27), $cy + (int)($size * 0.34), $light);
+    imagearc($image, $cx, $cy - (int)($size * 0.18), (int)($size * 0.50), (int)($size * 0.48), 180, 360, $dark);
     imagesetthickness($image, 1);
 }
 
@@ -411,7 +467,8 @@ function rs_esquela_logo_path(): ?string
     return null;
 }
 
-function rs_esquela_draw_logo(GdImage $canvas, int $x, int $y, int $maxW, int $maxH): void
+
+function rs_esquela_draw_logo(GdImage $canvas, int $cx, int $cy, int $diameter): void
 {
     $path = rs_esquela_logo_path();
     if ($path === null) {
@@ -426,22 +483,52 @@ function rs_esquela_draw_logo(GdImage $canvas, int $x, int $y, int $maxW, int $m
         return;
     }
 
+    $tmp = imagecreatetruecolor($diameter, $diameter);
+    imagealphablending($tmp, false);
+    imagesavealpha($tmp, true);
+    $transparent = imagecolorallocatealpha($tmp, 255, 255, 255, 127);
+    imagefill($tmp, 0, 0, $transparent);
+
+    $white = imagecolorallocate($tmp, 255, 255, 255);
+    imagefilledellipse($tmp, (int)($diameter / 2), (int)($diameter / 2), $diameter - 2, $diameter - 2, $white);
+
+    // Ajustar el logo completo dentro del circulo, sin recortarlo.
     $sw = imagesx($logo);
     $sh = imagesy($logo);
-    $scale = min($maxW / max(1, $sw), $maxH / max(1, $sh));
+    $inner = (int)round($diameter * 0.82);
+    $scale = min($inner / max(1, $sw), $inner / max(1, $sh));
     $dw = max(1, (int)round($sw * $scale));
     $dh = max(1, (int)round($sh * $scale));
-    imagecopyresampled($canvas, $logo, $x, $y, 0, 0, $dw, $dh, $sw, $sh);
+    $dx = (int)round(($diameter - $dw) / 2);
+    $dy = (int)round(($diameter - $dh) / 2);
+
+    imagealphablending($tmp, true);
+    imagecopyresampled($tmp, $logo, $dx, $dy, 0, 0, $dw, $dh, $sw, $sh);
+
+    $x0 = $cx - (int)round($diameter / 2);
+    $y0 = $cy - (int)round($diameter / 2);
+    imagealphablending($canvas, true);
+    imagecopy($canvas, $tmp, $x0, $y0, 0, 0, $diameter, $diameter);
+
+    $border = imagecolorallocate($canvas, 235, 224, 196);
+    imagesetthickness($canvas, max(1, (int)round($diameter * 0.015)));
+    imageellipse($canvas, $cx, $cy, $diameter - 2, $diameter - 2, $border);
+    imagesetthickness($canvas, 1);
+
     imagedestroy($logo);
+    imagedestroy($tmp);
 }
+
 
 function rs_esquela_fetch_qr(string $url): ?GdImage
 {
-    $endpoint = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' . rawurlencode($url);
+    // Respaldo unicamente. La ruta principal genera el QR en el navegador y lo
+    // envia junto con el registro para evitar depender de salidas HTTP del servidor.
+    $endpoint = 'https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=2&data=' . rawurlencode($url);
 
     $context = stream_context_create([
         'http' => [
-            'timeout' => 8,
+            'timeout' => 6,
             'ignore_errors' => true,
             'header' => "User-Agent: JDJP-Registro-Servicios\r\n",
         ],
@@ -458,31 +545,47 @@ function rs_esquela_fetch_qr(string $url): ?GdImage
     return rs_esquela_image_from_bytes($bytes);
 }
 
-function rs_esquela_draw_qr(GdImage $canvas, string $url, int $x, int $y, int $size): bool
-{
-    $qr = rs_esquela_fetch_qr($url);
-    if ($qr instanceof GdImage) {
-        imagecopyresampled($canvas, $qr, $x, $y, 0, 0, $size, $size, imagesx($qr), imagesy($qr));
-        imagedestroy($qr);
-        return true;
+function rs_esquela_draw_qr(
+    GdImage $canvas,
+    string $url,
+    int $x,
+    int $y,
+    int $size,
+    ?string $qrBytes = null
+): bool {
+    $qr = rs_esquela_image_from_bytes((string)$qrBytes);
+    if (!$qr instanceof GdImage) {
+        $qr = rs_esquela_fetch_qr($url);
+    }
+    if (!$qr instanceof GdImage) {
+        return false;
     }
 
+    $pad = max(8, (int)round($size * 0.07));
     $white = imagecolorallocate($canvas, 255, 255, 255);
-    $black = imagecolorallocate($canvas, 35, 35, 35);
-    imagefilledrectangle($canvas, $x, $y, $x + $size, $y + $size, $white);
-    imagerectangle($canvas, $x, $y, $x + $size, $y + $size, $black);
-    imagestring($canvas, 5, $x + (int)($size / 2) - 12, $y + (int)($size / 2) - 8, 'QR', $black);
-    return false;
+    imagefilledrectangle($canvas, $x - $pad, $y - $pad, $x + $size + $pad, $y + $size + $pad, $white);
+    imagecopyresampled($canvas, $qr, $x, $y, 0, 0, $size, $size, imagesx($qr), imagesy($qr));
+    imagedestroy($qr);
+    return true;
 }
 
-function rs_generate_local_esquela(array $payload, ?string $photoBytes = null): array
+
+function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?string $qrBytes = null): array
 {
     if (!extension_loaded('gd') || !function_exists('imagecreatetruecolor')) {
         throw new RuntimeException('El servidor no tiene GD disponible para generar la esquela.');
     }
 
-    $width = 558;
-    $height = 788;
+    // Formato vertical basado en la cartulina de referencia: 720 x 1024.
+    // Se renderiza 1.5x para conservar texto y elementos graficos nitidos.
+    $scale = 1.5;
+    $baseWidth = 720;
+    $baseHeight = 1024;
+    $width = (int)round($baseWidth * $scale);
+    $height = (int)round($baseHeight * $scale);
+    $S = static fn(float|int $v): int => (int)round($v * $scale);
+    $FS = static fn(float|int $v): float => (float)$v * $scale;
+
     $backgroundKey = rs_esquela_background_key($payload);
 
     $canvas = imagecreatetruecolor($width, $height);
@@ -498,21 +601,22 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null): 
     rs_esquela_copy_cover($canvas, $background);
     imagedestroy($background);
 
-    $overlay = imagecolorallocatealpha($canvas, 255, 255, 255, 52);
-    imagefilledrectangle($canvas, 0, 0, $width, $height, $overlay);
+    // Los fondos ya vienen suavizados para lectura; no aplicar una capa blanca
+    // adicional porque elimina el detalle del bosque/flor/cielo.
+    imagealphablending($canvas, true);
 
     $photo = rs_esquela_image_from_bytes((string)$photoBytes);
     if (!$photo instanceof GdImage) {
         $photo = rs_esquela_load_asset('foto_fallback');
     }
 
-    rs_esquela_draw_circular_photo($canvas, $photo, (int)($width / 2), 112, 170);
+    rs_esquela_draw_circular_photo($canvas, $photo, $S(360), $S(150), $S(238));
     if ($photo instanceof GdImage) {
         imagedestroy($photo);
     }
 
-    $black = imagecolorallocate($canvas, 45, 45, 45);
-    $brown = imagecolorallocate($canvas, 90, 48, 34);
+    $black = imagecolorallocate($canvas, 52, 52, 55);
+    $brown = imagecolorallocate($canvas, 102, 57, 44);
     $font = rs_esquela_font(false);
     $bold = rs_esquela_font(true) ?? $font;
 
@@ -528,13 +632,13 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null): 
     $destino = trim((string)($payload['destinoFinal'] ?? ''));
     $address = rs_esquela_location_address((string)($payload['ubicacion'] ?? ''));
 
-    $y = 226;
-    $y = rs_esquela_center_text($canvas, 'Informamos el sensible fallecimiento', $y, 500, $black, $font, 15, 19);
-    $y = rs_esquela_center_text($canvas, 'de ' . $prefix . ' ' . $name, $y, 500, $black, $bold, 16, 20, true);
-    $y = rs_esquela_center_text($canvas, 'a la edad de ' . $age . ' años.', $y, 500, $black, $font, 15, 19);
+    $y = $S(300);
+    $y = rs_esquela_center_text($canvas, 'Informamos el sensible fallecimiento', $y, $S(640), $black, $font, $FS(21), $S(27));
+    $y = rs_esquela_center_text($canvas, 'de ' . $prefix . ' ' . $name, $y, $S(640), $black, $bold, $FS(22), $S(28), true);
+    $y = rs_esquela_center_text($canvas, 'a la edad de ' . $age . ' años.', $y, $S(640), $black, $font, $FS(21), $S(27));
 
-    rs_esquela_draw_ribbon($canvas, (int)($width / 2), $y + 29);
-    $y += 73;
+    rs_esquela_draw_ribbon($canvas, $S(360), $y + $S(39), $S(80));
+    $y += $S(105);
 
     $serviceText = 'El homenaje de vida se llevará a cabo en ' . $ubicacion
         . ($sala !== '' ? ' ' . $sala : '')
@@ -545,7 +649,7 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null): 
         $serviceText .= ' Se llevará a cabo una ceremonia de cuerpo presente el ' . $exequia . '.';
     }
 
-    $y = rs_esquela_center_text($canvas, $serviceText, $y, 500, $black, $font, 14, 19);
+    $y = rs_esquela_center_text($canvas, $serviceText, $y, $S(635), $black, $font, $FS(20), $S(27));
 
     $serviceNorm = rs_esquela_norm((string)($payload['servicio'] ?? ''));
     if (str_contains($serviceNorm, 'inhumacion') && $inhumacion !== '') {
@@ -554,35 +658,49 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null): 
             $inhText .= ' en ' . $destino;
         }
         $inhText .= '.';
-        $y += 10;
-        $y = rs_esquela_center_text($canvas, $inhText, $y, 500, $black, $font, 14, 19);
+        $y += $S(18);
+        $y = rs_esquela_center_text($canvas, $inhText, $y, $S(635), $black, $font, $FS(20), $S(27));
     }
 
-    $y = max($y + 28, 520);
+    $memoryY = max($y + $S(48), $S(670));
+    $memoryY = min($memoryY, $S(760));
     rs_esquela_center_text(
         $canvas,
         'Ayúdanos a mantener viva su memoria, dejando recuerdos y condolencias en su homenaje de vida, usando este QR.',
-        $y,
-        410,
+        $memoryY,
+        $S(500),
         $black,
         $font,
-        14,
-        19
+        $FS(20),
+        $S(27)
     );
 
-    rs_esquela_draw_logo($canvas, 12, 638, 105, 105);
+    // Pie alineado en una misma franja: logo circular, direccion y QR.
+    $footerCenterY = $S(890);
+    rs_esquela_draw_logo($canvas, $S(105), $footerCenterY, $S(135));
 
-    $brandY = 675;
-    rs_esquela_center_text($canvas, 'Jardines de Juan Pablo', $brandY, 300, $brown, $font, 14, 18);
+    $brandY = $S(858);
+    rs_esquela_center_text($canvas, 'Jardines de Juan Pablo', $brandY, $S(360), $brown, $font, $FS(20), $S(26));
+    imagesetthickness($canvas, max(1, $S(1)));
+    imageline($canvas, $S(252), $S(884), $S(468), $S(884), $brown);
+    imagesetthickness($canvas, 1);
     if ($address !== '') {
-        rs_esquela_center_text($canvas, $address, $brandY + 24, 320, $brown, $font, 12, 16);
+        rs_esquela_center_text($canvas, $address, $S(914), $S(430), $brown, $font, $FS(18), $S(23));
     }
 
     $qrUrl = rs_esquela_qr_url($name);
-    $qrOk = rs_esquela_draw_qr($canvas, $qrUrl, 456, 650, 88);
+    $qrSize = $S(112);
+    $qrX = $S(592);
+    $qrY = $footerCenterY - (int)round($qrSize / 2);
+    $qrOk = rs_esquela_draw_qr($canvas, $qrUrl, $qrX, $qrY, $qrSize, $qrBytes);
+    if (!$qrOk) {
+        imagedestroy($canvas);
+        throw new RuntimeException('No fue posible generar el codigo QR de la esquela.');
+    }
 
+    imageinterlace($canvas, true);
     ob_start();
-    imagejpeg($canvas, null, 92);
+    imagejpeg($canvas, null, 96);
     $jpeg = (string)ob_get_clean();
     imagedestroy($canvas);
 
@@ -599,8 +717,10 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null): 
         'fileName' => 'Esquela_' . $id . '.jpg',
         'jpeg' => $jpeg,
         'qrUrl' => $qrUrl,
-        'qrGenerated' => $qrOk,
+        'qrGenerated' => true,
         'background' => $backgroundKey,
         'prefix' => $prefix,
+        'width' => $width,
+        'height' => $height,
     ];
 }
