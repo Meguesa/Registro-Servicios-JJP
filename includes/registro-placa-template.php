@@ -4,7 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/registro-sharepoint.php';
 
 function rs_plate_template_pdf(): string {
-    $dir = __DIR__ . '/.registro-servicios-data/templates';
+    $dir = dirname(__DIR__) . '/.registro-servicios-data/templates';
     if (!is_dir($dir)) @mkdir($dir, 0750, true);
     $cache = $dir . '/plantilla_placa_urna.pdf';
 
