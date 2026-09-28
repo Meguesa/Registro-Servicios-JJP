@@ -62,15 +62,6 @@ function rs_uppercase_export(mixed $value): mixed
  */
 function rs_send_controlled_test_email(array $payload, array $attachments): array
 {
-    if (!rs_is_preview_mode()) {
-        return [
-            'enabled' => false,
-            'sent' => false,
-            'recipients' => [],
-            'attachmentNames' => [],
-        ];
-    }
-
     $sender = 'sistemas@juanpablo.com.mx';
     $recipients = [
         'sistemas@juanpablo.com.mx',
@@ -218,7 +209,8 @@ function rs_send_controlled_test_email(array $payload, array $attachments): arra
         ? ($horaExequia !== '' ? $horaExequia : 'PENDIENTE')
         : 'NO APLICA';
 
-    $subject = '[PRUEBA CONTROLADA] Nuevo evento de Capillas: '
+    $subject = (rs_is_preview_mode() ? '[PRUEBA CONTROLADA] ' : '')
+        . 'Nuevo evento de Capillas: '
         . ($ubicacion !== '' ? $ubicacion : 'Sin ubicación')
         . ($sala !== '' ? ', ' . $sala : '')
         . ($referencia !== '' ? ', ' . $referencia : '');
@@ -236,13 +228,16 @@ function rs_send_controlled_test_email(array $payload, array $attachments): arra
             . '</tr>';
     };
 
+    $previewBanner = rs_is_preview_mode()
+        ? '<div style="margin:0 0 14px 0;padding:10px 12px;border:1px solid #d8b45a;background:#fff8e6;">'
+            . '<strong>PRUEBA CONTROLADA - REGISTRO DE SERVICIOS</strong><br>'
+            . 'Este correo fue generado desde el módulo Preview.'
+            . '</div>'
+        : '';
+
     $bodyHtml = ''
         . '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.3;color:#111;">'
-        . '<div style="margin:0 0 14px 0;padding:10px 12px;border:1px solid #d8b45a;background:#fff8e6;">'
-        . '<strong>PRUEBA CONTROLADA - REGISTRO DE SERVICIOS</strong><br>'
-        . 'Este correo fue generado desde el módulo Preview. '
-        . '<strong>No se agregó ningún evento al calendario.</strong>'
-        . '</div>'
+        . $previewBanner
         . '<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:auto;">'
         . $row('EVENTO', $evento)
         . $row('EXEQUIA', $exequia)
@@ -359,15 +354,6 @@ function rs_send_controlled_test_email(array $payload, array $attachments): arra
  */
 function rs_send_plate_email(array $payload, array $plateAttachment): array
 {
-    if (!rs_is_preview_mode()) {
-        return [
-            'enabled' => false,
-            'sent' => false,
-            'recipients' => [],
-            'attachmentNames' => [],
-        ];
-    }
-
     $name = trim((string)($plateAttachment['name'] ?? ''));
     $bytes = (string)($plateAttachment['bytes'] ?? '');
     $contentType = trim((string)($plateAttachment['contentType'] ?? 'image/png'));
@@ -777,7 +763,7 @@ try {
     $fieldIndex = rs_fields_by_norm(is_array($fieldRows) ? $fieldRows : []);
 
     $sp = [];
-    rs_add_value($sp, $fieldIndex, ['ModoPrueba', 'Modo Prueba'], true, false);
+    rs_add_value($sp, $fieldIndex, ['ModoPrueba', 'Modo Prueba'], rs_is_preview_mode(), false);
     rs_add_value($sp, $fieldIndex, ['field_1', 'Numero de Referencia', 'Número de Referencia'], trim((string) ($payload['numeroReferencia'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['field_32', 'Servicio', 'Tipo de Servicio'], trim((string) ($payload['servicio'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['field_39', 'Ubicación Servicio Capillas', 'Ubicacion Servicio Capillas'], trim((string) ($payload['ubicacion'] ?? '')));
@@ -1223,32 +1209,30 @@ try {
     // Correo CONTROLADO del Preview. Un fallo de correo no debe provocar
     // duplicidad del servicio ya creado en SharePoint.
     $emailResult = [
-        'enabled' => rs_is_preview_mode(),
+        'enabled' => true,
         'sent' => false,
         'recipients' => [],
         'attachmentNames' => [],
         'error' => null,
     ];
-    if (rs_is_preview_mode()) {
-        try {
-            $emailResult = array_merge(
-                $emailResult,
-                rs_send_controlled_test_email(rs_uppercase_export($payload), $emailAttachments)
-            );
-        } catch (Throwable $emailError) {
-            $emailResult['error'] = $emailError->getMessage();
-            error_log('Registro Servicios Correo item ' . $itemId . ': ' . $emailError->getMessage());
-        }
+    try {
+        $emailResult = array_merge(
+            $emailResult,
+            rs_send_controlled_test_email(rs_uppercase_export($payload), $emailAttachments)
+        );
+    } catch (Throwable $emailError) {
+        $emailResult['error'] = $emailError->getMessage();
+        error_log('Registro Servicios Correo item ' . $itemId . ': ' . $emailError->getMessage());
     }
 
     $plateEmailResult = [
-        'enabled' => rs_is_preview_mode() && is_array($plateEmailAttachment),
+        'enabled' => is_array($plateEmailAttachment),
         'sent' => false,
         'recipients' => [],
         'attachmentNames' => [],
         'error' => null,
     ];
-    if (rs_is_preview_mode() && is_array($plateEmailAttachment)) {
+    if (is_array($plateEmailAttachment)) {
         try {
             $plateEmailResult = array_merge(
                 $plateEmailResult,
