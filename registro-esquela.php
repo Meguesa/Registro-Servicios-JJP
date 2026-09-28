@@ -105,6 +105,18 @@ function rs_esquela_load_asset(string $baseName): ?GdImage
     return null;
 }
 
+function rs_esquela_asset_image(array $assets, string $key): ?GdImage
+{
+    $bytes = $assets[$key] ?? null;
+    if (is_string($bytes) && $bytes !== '') {
+        $image = rs_esquela_image_from_bytes($bytes);
+        if ($image instanceof GdImage) {
+            return $image;
+        }
+    }
+    return rs_esquela_load_asset($key);
+}
+
 function rs_esquela_background_key(array $payload): string
 {
     $age = max(0, (int)($payload['edad'] ?? 0));
@@ -417,9 +429,12 @@ function rs_esquela_draw_circular_photo(GdImage $canvas, ?GdImage $photo, int $c
 }
 
 
-function rs_esquela_draw_ribbon(GdImage $image, int $cx, int $cy, int $size = 78): void
+function rs_esquela_draw_ribbon(GdImage $image, int $cx, int $cy, int $size = 78, ?string $assetBytes = null): void
 {
-    $asset = rs_esquela_load_asset('crespon');
+    $asset = rs_esquela_image_from_bytes((string)$assetBytes);
+    if (!$asset instanceof GdImage) {
+        $asset = rs_esquela_load_asset('crespon');
+    }
     if ($asset instanceof GdImage) {
         $x = (int)round($cx - ($size / 2));
         $y = (int)round($cy - ($size / 2));
@@ -570,7 +585,7 @@ function rs_esquela_draw_qr(
 }
 
 
-function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?string $qrBytes = null): array
+function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?string $qrBytes = null, array $assets = []): array
 {
     if (!extension_loaded('gd') || !function_exists('imagecreatetruecolor')) {
         throw new RuntimeException('El servidor no tiene GD disponible para generar la esquela.');
@@ -593,7 +608,7 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?
         throw new RuntimeException('No fue posible crear el lienzo de esquela.');
     }
 
-    $background = rs_esquela_load_asset($backgroundKey);
+    $background = rs_esquela_asset_image($assets, $backgroundKey);
     if (!$background instanceof GdImage) {
         $background = rs_esquela_fallback_background($backgroundKey, $width, $height);
     }
@@ -607,7 +622,7 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?
 
     $photo = rs_esquela_image_from_bytes((string)$photoBytes);
     if (!$photo instanceof GdImage) {
-        $photo = rs_esquela_load_asset('foto_fallback');
+        $photo = rs_esquela_asset_image($assets, 'foto_fallback');
     }
 
     rs_esquela_draw_circular_photo($canvas, $photo, $S(360), $S(150), $S(238));
@@ -637,7 +652,7 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?
     $y = rs_esquela_center_text($canvas, 'de ' . $prefix . ' ' . $name, $y, $S(640), $black, $bold, $FS(22), $S(28), true);
     $y = rs_esquela_center_text($canvas, 'a la edad de ' . $age . ' años.', $y, $S(640), $black, $font, $FS(21), $S(27));
 
-    rs_esquela_draw_ribbon($canvas, $S(360), $y + $S(39), $S(80));
+    rs_esquela_draw_ribbon($canvas, $S(360), $y + $S(39), $S(80), is_string($assets['crespon'] ?? null) ? $assets['crespon'] : null);
     $y += $S(105);
 
     $serviceText = 'El homenaje de vida se llevará a cabo en ' . $ubicacion
