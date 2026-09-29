@@ -35,9 +35,9 @@ $isPreview = str_contains(
         <span>Portal Interno JdJP · Jardines de Juan Pablo</span>
       </div>
     </div>
-    <div class="solicitud-topbar-context">Servicios Parque</div>
+    <div class="solicitud-topbar-context">Captura y seguimiento de servicios operativos</div>
     <div class="solicitud-topbar-actions">
-      <a class="solicitud-topbar-back" href="index.php">Cambiar área</a>
+      <a class="solicitud-topbar-back" href="mis-servicios.php?area=parque">Mis servicios</a>
       <a class="solicitud-topbar-back" href="/">Regresar al portal</a>
       <button class="account-trigger-static" type="button" aria-label="Usuario" title="Usuario">
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -54,7 +54,7 @@ $isPreview = str_contains(
     <div>
       <span class="status-pill">Parque</span>
       <h1>Registro de servicio</h1>
-      <p>Captura el servicio de Parque desde el portal. SharePoint se conserva como registro oficial mientras migramos los procesos al modulo.</p>
+      <p>Captura la información por etapas. Los cálculos y campos condicionales conservan la lógica actual de Parque.</p>
     </div>
     <div class="form-banner-meta">
       <span class="preview-pill" id="modePill"><?= $isPreview ? 'Prueba · conectado a SharePoint' : 'Producción · conectado a SharePoint' ?></span>
@@ -71,20 +71,15 @@ $isPreview = str_contains(
     </div>
   </section>
 
-  <section class="selector-notice">
-    <strong>Compatible con el proceso actual de Parque</strong>
-    <span>Al publicar se crea el elemento en <b>Eventos Parque</b> y el calendario se genera directamente desde Registro de Servicios.</span>
-  </section>
-
-  <form id="parqueForm" novalidate class="form-shell">
-    <nav class="wizard-steps" aria-label="Progreso del formulario">
+  <nav class="wizard-steps" aria-label="Progreso del formulario">
       <button type="button" class="wizard-step active" data-step-target="0"><span>1</span><strong>Servicio</strong><small>Fechas y tipo</small></button>
       <button type="button" class="wizard-step" data-step-target="1"><span>2</span><strong>Propiedad</strong><small>Sección y placa</small></button>
       <button type="button" class="wizard-step" data-step-target="2"><span>3</span><strong>Fallecido</strong><small>Datos personales</small></button>
       <button type="button" class="wizard-step" data-step-target="3"><span>4</span><strong>Operación</strong><small>Liquidación y reubicación</small></button>
       <button type="button" class="wizard-step" data-step-target="4"><span>5</span><strong>Confirmar</strong><small>Resumen final</small></button>
-    </nav>
+  </nav>
 
+  <form id="parqueForm" novalidate class="form-shell">
     <section class="form-section wizard-panel active" data-step="0">
       <div class="section-title">
         <span>1</span>
@@ -291,16 +286,17 @@ $isPreview = str_contains(
 
     <div class="wizard-actions">
       <div>
-        <a class="secondary-button" href="index.php">Cancelar</a>
+        <button type="button" class="secondary-button" id="resetBtn">Limpiar</button>
+        <button type="button" class="secondary-button draft-button" id="saveDraftBtn">Guardar borrador</button>
       </div>
       <div>
         <button type="button" class="secondary-button" id="prevStep">Anterior</button>
         <button type="button" class="primary-button" id="nextStep">Siguiente</button>
-        <button type="submit" class="primary-button hidden" id="submitBtn">Registrar Servicio Parque</button>
+        <button type="submit" class="primary-button hidden" id="submitBtn">Registrar servicio</button>
       </div>
     </div>
-
-    <p id="status" class="status">Listo para capturar un servicio de Parque.</p>
+    <input type="hidden" id="draftId" name="draftId" value="">
+    <p id="status" class="status">Listo para registrar en SharePoint.</p>
   </form>
 </main>
 
