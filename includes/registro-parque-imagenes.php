@@ -14,7 +14,7 @@ function rp_image_location(array $payload): string
         $seccion,
         $lote!==''?$tipo.' '.$lote:'',
         $manzana,
-    ],static fn(string $v):bool=>$v!==''));
+    ],static fn(string $v):bool=>$v!=='')));
 }
 
 function rp_image_service_rows(array $payload): array
