@@ -1,13 +1,23 @@
 const PARQUE_SERVICIOS = ["Basico","Total Service","Total Service Complemento","Coffee Break"];
-const PARQUE_TIPOS = ["Inhumación","Deposito de Cenizas","Resguardo de Cenizas","Aniversario Luctuoso"];
+const PARQUE_TIPOS = ["Aniversario Luctuoso","Deposito de Cenizas","Exhumación","Inhumación","Otro","Resguardo de Cenizas"];
 const PARQUE_VELACION = ["Capilla Churubusco","Capilla Externa","Capilla Agua Fria","Otro","sin Velación"];
 const PARQUE_PREVISION = ["Prevision","Uso Inmediato","No Aplica"];
 const PARQUE_DESTAPE = ["Primero","Segundo","Tercero","Cuarto","No Aplica"];
 const PARQUE_PLACAS = ["Nicho","Urna","Granito"];
 const PARQUE_LIQUIDACION = ["Liquidado","No liquidado"];
-const PARQUE_PARENTESCO = ["Padre","Madre","Hijo","Hermano"];
+const PARQUE_PARENTESCO = ["Esposa","Esposo","Familiar","Hermana","Hermano","Hija","Hijo","Madre","Otro","Padre"];
 const PARQUE_SECCIONES = ["ORO - RBR","PLN","ORO","SPN","SPV","SAB","PLATINO","PLATA","SJV","SMV"];
-const PARQUE_MANZANAS = ["A","B","C","D","E","F","G","K","L","M","R","U","AX","AF","BX","CX","DX"];
+const PARQUE_MANZANAS = (()=> {
+  const values=[];
+  for(let i=0;i<26;i++) values.push(String.fromCharCode(65+i));
+  for(let first=0;first<2;first++){
+    for(let second=0;second<26;second++){
+      values.push(String.fromCharCode(65+first)+String.fromCharCode(65+second));
+    }
+  }
+  ["CX","DX","EX","FX"].forEach(v=>{ if(!values.includes(v)) values.push(v); });
+  return values;
+})();
 
 function fillSelect(id, items, placeholder="Seleccionar"){
   const el=document.getElementById(id);
@@ -83,12 +93,27 @@ document.querySelectorAll(".wizard-step").forEach(button=>{
 });
 
 if(window.flatpickr && flatpickr.l10ns?.es)flatpickr.localize(flatpickr.l10ns.es);
-document.querySelectorAll(".datetime-picker").forEach(el=>{
-  flatpickr(el,{enableTime:true,time_24hr:true,dateFormat:"d/m/Y H:i",allowInput:true,disableMobile:true,locale:"es"});
-});
 document.querySelectorAll(".date-only-picker").forEach(el=>{
   flatpickr(el,{enableTime:false,dateFormat:"d/m/Y",allowInput:true,disableMobile:true,locale:"es"});
 });
+document.querySelectorAll(".time-only-picker").forEach(el=>{
+  flatpickr(el,{enableTime:true,noCalendar:true,time_24hr:true,dateFormat:"H:i",allowInput:true,disableMobile:true,locale:"es"});
+});
+
+function isVipSection(value){
+  const sec=String(value||"").trim().toUpperCase();
+  return sec.endsWith("V");
+}
+
+function syncFraseRule(){
+  const destape=document.getElementById("destape")?.value||"";
+  const seccion=document.getElementById("seccion")?.value||"";
+  const allowed=destape==="Primero" && isVipSection(seccion);
+  const wrap=document.getElementById("fraseWrap");
+  const input=document.getElementById("frase");
+  wrap?.classList.toggle("hidden",!allowed);
+  if(input && !allowed) input.value="";
+}
 
 function syncPropertyRules(){
   const destape=document.getElementById("destape")?.value||"";
@@ -105,6 +130,7 @@ function syncPropertyRules(){
   }else{
     document.getElementById("tipoPlaca").setCustomValidity("");
   }
+  syncFraseRule();
   syncLocation();
 }
 ["destape","tipoPlaca","seccion","manzana","numLoteNicho"].forEach(id=>document.getElementById(id)?.addEventListener("input",syncPropertyRules));
@@ -132,11 +158,13 @@ function syncLocation(){
   const sec=document.getElementById("seccion")?.value||"";
   const man=document.getElementById("manzana")?.value||"";
   const lote=document.getElementById("numLoteNicho")?.value||"";
+  const placa=document.getElementById("tipoPlaca")?.value||"";
+  const tipo=placa==="Nicho"?"NICHO":"LOTE";
   const parts=[];
   if(sec)parts.push(sec);
-  if(man)parts.push("MZ "+man);
-  if(lote)parts.push("LOTE/NICHO "+lote);
-  const value=parts.join(" · ")||"—";
+  if(lote)parts.push(tipo+" "+lote);
+  if(man)parts.push(man);
+  const value=parts.join(" - ")||"—";
   const target=document.getElementById("ubicacionPreview");
   if(target)target.textContent=value;
 }
@@ -150,9 +178,17 @@ function fieldValue(name){
 }
 
 function payload(){
+  const fechaInicio=fieldValue("fechaInicio");
+  const horaInicio=fieldValue("horaInicio");
+  const fechaFin=fieldValue("fechaFin");
+  const horaFin=fieldValue("horaFin");
   return {
-    fechaHoraInicio:fieldValue("fechaHoraInicio"),
-    fechaHoraFin:fieldValue("fechaHoraFin"),
+    fechaInicio,
+    horaInicio,
+    fechaFin,
+    horaFin,
+    fechaHoraInicio:[fechaInicio,horaInicio].filter(Boolean).join(" "),
+    fechaHoraFin:[fechaFin,horaFin].filter(Boolean).join(" "),
     velacion:fieldValue("velacion"),
     previsionUsoInmediato:fieldValue("previsionUsoInmediato"),
     tipoServicio:fieldValue("tipoServicio"),
@@ -169,7 +205,7 @@ function payload(){
     titular:fieldValue("titular"),
     fallecido:fieldValue("fallecido"),
     parentescoTitular:fieldValue("parentescoTitular"),
-    frase:fieldValue("frase"),
+    frase:(fieldValue("destape")==="Primero" && isVipSection(fieldValue("seccion")))?fieldValue("frase"):"",
     fechaNacimiento:fieldValue("fechaNacimiento"),
     fechaDefuncion:fieldValue("fechaDefuncion"),
     estatusLiquidacion:fieldValue("estatusLiquidacion"),
@@ -219,7 +255,8 @@ form.addEventListener("submit",async e=>{
       "ID: "+result.itemId,
       "Lista: Eventos Parque",
       result.modoPrueba?"Modo: PRUEBA":"Modo: PRODUCCIÓN",
-      result.calendar?.created ? "Calendario: CREADO DIRECTAMENTE" : ("Calendario: "+(result.calendar?.error||"NO CREADO"))
+      result.calendar?.created ? "Calendario: CREADO DIRECTAMENTE" : ("Calendario: "+(result.calendar?.error||"NO CREADO")),
+      result.email?.sent ? "Correo: ENVIADO" : ("Correo: "+(result.email?.error||"NO ENVIADO"))
     ];
     if(status)status.textContent=lines.join(" | ");
     alert(lines.join("\n"));
