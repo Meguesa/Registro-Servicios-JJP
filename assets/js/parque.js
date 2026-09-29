@@ -1,13 +1,13 @@
-const PARQUE_SERVICIOS = ["Inhumación","Inhumación de Cenizas","Exhumación","Retiro de Cenizas","Reubicación","Otro"];
-const PARQUE_TIPOS = ["Inhumación","Exhumación","Depósito/Retiro","Otro"];
-const PARQUE_VELACION = ["Capillas Churubusco","Capillas Agua Fría","Domicilio","Sin velación"];
-const PARQUE_PREVISION = ["Previsión","Uso Inmediato"];
+const PARQUE_SERVICIOS = ["Basico","Total Service","Total Service Complemento","Coffee Break"];
+const PARQUE_TIPOS = ["Inhumación","Deposito de Cenizas","Resguardo de Cenizas","Aniversario Luctuoso"];
+const PARQUE_VELACION = ["Capilla Churubusco","Capilla Externa","Capilla Agua Fria","Otro","sin Velación"];
+const PARQUE_PREVISION = ["Prevision","Uso Inmediato","No Aplica"];
 const PARQUE_DESTAPE = ["Primero","Segundo","Tercero","Cuarto","No Aplica"];
-const PARQUE_PLACAS = ["Granito","Nicho","Urna","No Aplica"];
+const PARQUE_PLACAS = ["Nicho","Urna","Granito"];
 const PARQUE_LIQUIDACION = ["Liquidado","No liquidado"];
-const PARQUE_PARENTESCO = ["Cónyuge","Hijo(a)","Padre/Madre","Hermano(a)","Nieto(a)","Otro"];
-const PARQUE_SECCIONES = ["SPN","PLN","ORO","PLATINO","SAB","AMERICANO","VIP","OTRA"];
-const PARQUE_MANZANAS = Array.from({length:40},(_,i)=>String(i+1));
+const PARQUE_PARENTESCO = ["Padre","Madre","Hijo","Hermano"];
+const PARQUE_SECCIONES = ["ORO - RBR","PLN","ORO","SPN","SPV","SAB","PLATINO","PLATA","SJV","SMV"];
+const PARQUE_MANZANAS = ["A","B","C","D","E","F","G","K","L","M","R","U","AX","AF","BX","CX","DX"];
 
 function fillSelect(id, items, placeholder="Seleccionar"){
   const el=document.getElementById(id);
