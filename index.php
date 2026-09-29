@@ -70,15 +70,15 @@ $email = htmlspecialchars((string)($user['email'] ?? ''), ENT_QUOTES, 'UTF-8');
       <a class="primary-button selector-action" href="mis-servicios.php">Seleccionar Capillas</a>
     </article>
 
-    <article class="selector-card selector-card-disabled">
+    <article class="selector-card">
       <div class="selector-card-top">
-        <span class="selector-card-kicker">PRÓXIMAMENTE</span>
-        <span class="selector-card-status development">En desarrollo</span>
+        <span class="selector-card-kicker">CAPTURA ACTUAL</span>
+        <span class="selector-card-status available">Disponible</span>
       </div>
       <div class="selector-card-icon">⌖</div>
       <h2>Parque</h2>
-      <p>El módulo para captura y seguimiento de servicios de Parque se encuentra actualmente en desarrollo.</p>
-      <span class="secondary-button selector-action disabled-action" aria-disabled="true">Servicio Parque · En desarrollo</span>
+      <p>Captura servicios de Parque en Eventos Parque conservando las reglas y automatizaciones operativas existentes.</p>
+      <a class="primary-button selector-action" href="parque.php">Seleccionar Parque</a>
     </article>
   </section>
 
