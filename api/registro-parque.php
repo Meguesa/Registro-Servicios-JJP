@@ -1,0 +1,298 @@
+<?php
+declare(strict_types=1);
+
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
+header('X-Content-Type-Options: nosniff');
+
+require_once __DIR__ . '/../includes/registro-sharepoint.php';
+
+function rp_json(int $status, array $payload): never
+{
+    http_response_code($status);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+function rp_norm(string $value): string
+{
+    $value = trim($value);
+    $value = preg_replace_callback(
+        '/_x([0-9a-fA-F]{4})_/',
+        static function (array $m): string {
+            $code = hexdec($m[1]);
+            if ($code <= 0x7F) return chr($code);
+            return html_entity_decode('&#' . $code . ';', ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        },
+        $value
+    ) ?? $value;
+
+    $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+    if (is_string($ascii) && $ascii !== '') $value = $ascii;
+    $value = strtolower($value);
+    return preg_replace('/[^a-z0-9]+/', '', $value) ?? '';
+}
+
+/** @return array<string,array<string,mixed>> */
+function rp_fields_by_norm(array $rows): array
+{
+    $out = [];
+    foreach ($rows as $row) {
+        if (!is_array($row)) continue;
+        foreach ([(string)($row['Title'] ?? ''), (string)($row['InternalName'] ?? '')] as $candidate) {
+            $key = rp_norm($candidate);
+            if ($key !== '' && !isset($out[$key])) $out[$key] = $row;
+        }
+    }
+    return $out;
+}
+
+/** @return array<string,mixed>|null */
+function rp_find_field(array $fields, array $aliases): ?array
+{
+    foreach ($aliases as $alias) {
+        $key = rp_norm((string)$alias);
+        if ($key !== '' && isset($fields[$key])) return $fields[$key];
+    }
+    return null;
+}
+
+function rp_upper(mixed $value): mixed
+{
+    if (is_string($value)) return mb_strtoupper(trim($value), 'UTF-8');
+    if (is_array($value)) {
+        $out=[];
+        foreach ($value as $k=>$v) $out[$k]=rp_upper($v);
+        return $out;
+    }
+    return $value;
+}
+
+function rp_local_datetime_to_utc(string $value): ?string
+{
+    $value=trim($value);
+    if($value==='')return null;
+    foreach(['d/m/Y H:i','Y-m-d\\TH:i:s','Y-m-d\\TH:i'] as $format){
+        $dt=DateTimeImmutable::createFromFormat($format,$value,new DateTimeZone('America/Monterrey'));
+        if($dt instanceof DateTimeImmutable){
+            return $dt->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\\TH:i:s\\Z');
+        }
+    }
+    return null;
+}
+
+function rp_date_only(string $value): ?string
+{
+    $value=trim($value);
+    if($value==='')return null;
+    foreach(['d/m/Y','Y-m-d'] as $format){
+        $dt=DateTimeImmutable::createFromFormat($format,$value,new DateTimeZone('UTC'));
+        if($dt instanceof DateTimeImmutable)return $dt->format('Y-m-d\\T00:00:00\\Z');
+    }
+    return null;
+}
+
+function rp_add_value(array &$target, array $fieldIndex, array $aliases, mixed $value, bool $skipBlank=true): void
+{
+    $field=rp_find_field($fieldIndex,$aliases);
+    if($field===null)return;
+    if($skipBlank && ($value===null || $value==='' || $value===[]))return;
+
+    $internal=(string)($field['InternalName']??'');
+    if($internal==='')return;
+
+    $type=strtolower((string)($field['TypeAsString']??''));
+    $value=rp_upper($value);
+
+    if($type==='multichoice'){
+        $target[$internal]=is_array($value)?array_values($value):[(string)$value];
+        return;
+    }
+    if($type==='boolean'){
+        $target[$internal]=(bool)$value;
+        return;
+    }
+    if(in_array($type,['number','currency'],true)){
+        if($value===''||$value===null)return;
+        $target[$internal]=(float)$value;
+        return;
+    }
+
+    // Eventos Parque sustituyo el campo Persona del asistente por
+    // AsistenteFunerarioTexto. Si apareciera un campo User heredado, no lo
+    // escribimos con texto para evitar un error de SharePoint.
+    if(in_array($type,['user','usermulti'],true))return;
+
+    $target[$internal]=$value;
+}
+
+/** @return array{status:int,body:string,json:array<string,mixed>} */
+function rp_request(string $method,string $url,string $token,?string $body=null,array $headers=[]): array
+{
+    $curl=curl_init($url);
+    if($curl===false)throw new RuntimeException('No fue posible inicializar la conexion con SharePoint.');
+    $base=[
+        'Authorization: Bearer '.$token,
+        'Accept: application/json;odata=nometadata',
+    ];
+    curl_setopt_array($curl,[
+        CURLOPT_RETURNTRANSFER=>true,
+        CURLOPT_FOLLOWLOCATION=>true,
+        CURLOPT_CONNECTTIMEOUT=>10,
+        CURLOPT_TIMEOUT=>45,
+        CURLOPT_CUSTOMREQUEST=>$method,
+        CURLOPT_HTTPHEADER=>array_merge($base,$headers),
+        CURLOPT_SSL_VERIFYPEER=>true,
+        CURLOPT_SSL_VERIFYHOST=>2,
+    ]);
+    if($body!==null)curl_setopt($curl,CURLOPT_POSTFIELDS,$body);
+    $response=curl_exec($curl);
+    $status=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE);
+    $error=curl_error($curl);
+    curl_close($curl);
+
+    if($response===false)throw new RuntimeException('La conexion con SharePoint fallo: '.$error);
+    $decoded=json_decode((string)$response,true);
+    if($status<200||$status>=300){
+        $detail='';
+        if(is_array($decoded)){
+            $messageNode=$decoded['error']['message']??'';
+            if(is_array($messageNode))$detail=(string)($messageNode['value']??'');
+            elseif(is_string($messageNode))$detail=$messageNode;
+        }
+        if($detail==='')$detail=mb_substr(trim((string)$response),0,1800);
+        throw new RuntimeException('SharePoint respondio HTTP '.$status.($detail!==''?': '.$detail:'.'));
+    }
+    return ['status'=>$status,'body'=>(string)$response,'json'=>is_array($decoded)?$decoded:[]];
+}
+
+try{
+    $root=rtrim((string)($_SERVER['DOCUMENT_ROOT']??''),'/');
+    $bootstrap=$root.'/includes/bootstrap.php';
+    if(!is_file($bootstrap))throw new RuntimeException('No se encontro el bootstrap del Portal.');
+    require_once $bootstrap;
+    portal_require_authentication();
+
+    if(($_SERVER['REQUEST_METHOD']??'GET')!=='POST'){
+        rp_json(405,['ok'=>false,'message'=>'Metodo no permitido.']);
+    }
+
+    $payload=json_decode((string)($_POST['payload']??''),true);
+    if(!is_array($payload))rp_json(400,['ok'=>false,'message'=>'La informacion del formulario no es valida.']);
+
+    $required=[
+        'fechaHoraInicio','fechaHoraFin','velacion','previsionUsoInmediato',
+        'tipoServicio','servicio','asistenteFunerarioTexto','seccion','manzana',
+        'numLoteNicho','destape','tipoPlaca','titular','fallecido',
+        'parentescoTitular','fechaNacimiento','fechaDefuncion','estatusLiquidacion'
+    ];
+    foreach($required as $key){
+        if(trim((string)($payload[$key]??''))===''){
+            rp_json(422,['ok'=>false,'message'=>'Falta el campo obligatorio: '.$key.'.']);
+        }
+    }
+
+    $tipoPlaca=trim((string)($payload['tipoPlaca']??''));
+    $destape=trim((string)($payload['destape']??''));
+    if(mb_strtolower($tipoPlaca,'UTF-8')==='nicho' && mb_strtolower($destape,'UTF-8')!=='primero'){
+        rp_json(422,['ok'=>false,'message'=>'Tipo de Placa = Nicho solo es valido cuando Destape = Primero.']);
+    }
+    if(mb_strtolower($tipoPlaca,'UTF-8')==='nicho' && trim((string)($payload['nombreFamilia']??''))===''){
+        rp_json(422,['ok'=>false,'message'=>'Nombre de Familia es obligatorio para placa de Nicho.']);
+    }
+    if((bool)($payload['requiereReubicacion']??false)){
+        if(trim((string)($payload['ubicacionNueva']??''))==='' || trim((string)($payload['motivoReubicacion']??''))===''){
+            rp_json(422,['ok'=>false,'message'=>'Completa Ubicacion Nueva y Motivo de Reubicacion.']);
+        }
+    }
+
+    $config=rs_sharepoint_config();
+    $host='meguesajdjp.sharepoint.com';
+    $siteUrl='https://'.$host.'/sites/Operaciones';
+    $listTitle='Eventos Parque';
+    $token=rs_sharepoint_token($config,$host);
+
+    $listEsc=rawurlencode($listTitle);
+    $fieldsUrl=$siteUrl."/ _api/web/lists/getbytitle('".$listEsc."')/fields";
+    $fieldsUrl=str_replace('/ _api/','/_api/',$fieldsUrl)
+        .'?$select=Title,InternalName,TypeAsString,Required,Hidden,ReadOnlyField';
+    $fieldRows=rp_request('GET',$fieldsUrl,$token)['json']['value']??[];
+    $fieldIndex=rp_fields_by_norm(is_array($fieldRows)?$fieldRows:[]);
+
+    $sp=[];
+    $modoPrueba=(bool)($payload['modoPrueba']??false);
+
+    rp_add_value($sp,$fieldIndex,['ModoPrueba','Modo Prueba'],$modoPrueba,false);
+    rp_add_value($sp,$fieldIndex,['FechaHoraInicio','Fecha Hora Inicio','Fecha y Hora Inicio'],rp_local_datetime_to_utc((string)$payload['fechaHoraInicio']));
+    rp_add_value($sp,$fieldIndex,['FechaHoraFin','Fecha Hora Fin','Fecha y Hora Fin'],rp_local_datetime_to_utc((string)$payload['fechaHoraFin']));
+    rp_add_value($sp,$fieldIndex,['Velacion','Velación'],trim((string)$payload['velacion']));
+    rp_add_value($sp,$fieldIndex,['PrevisionUsoInmediato','Prevision Uso Inmediato','Previsión/Uso Inmediato'],trim((string)$payload['previsionUsoInmediato']));
+    rp_add_value($sp,$fieldIndex,['TipodeServicio','Tipo de Servicio'],trim((string)$payload['tipoServicio']));
+    rp_add_value($sp,$fieldIndex,['Servicio'],trim((string)$payload['servicio']));
+
+    rp_add_value($sp,$fieldIndex,['Seccion','Sección'],trim((string)$payload['seccion']));
+    rp_add_value($sp,$fieldIndex,['Manzana'],trim((string)$payload['manzana']));
+    rp_add_value($sp,$fieldIndex,['NumLote_x002f_Nicho','NumLote/Nicho','Num Lote/Nicho','Lote/Nicho'],trim((string)$payload['numLoteNicho']));
+
+    $ubicacion=trim((string)$payload['seccion'])
+        .' - MZ '.trim((string)$payload['manzana'])
+        .' - '.trim((string)$payload['numLoteNicho']);
+    rp_add_value($sp,$fieldIndex,['Ubicaci_x00f3_n','Ubicacion','Ubicación'],$ubicacion);
+
+    rp_add_value($sp,$fieldIndex,['Destape'],trim((string)$payload['destape']));
+    rp_add_value($sp,$fieldIndex,['TipoPlaca','Tipo de Placa','PlacaParqueTipo'],trim((string)$payload['tipoPlaca']));
+    rp_add_value($sp,$fieldIndex,['NombreFamilia','Nombre Familia'],trim((string)($payload['nombreFamilia']??'')));
+    rp_add_value($sp,$fieldIndex,['RequiereCambioUrna','Requiere Cambio Urna'],(bool)($payload['requiereCambioUrna']??false),false);
+
+    rp_add_value($sp,$fieldIndex,['Titular'],trim((string)$payload['titular']));
+    rp_add_value($sp,$fieldIndex,['TitularSubstituto','Fallecido','Fallecido(a)'],trim((string)$payload['fallecido']));
+    rp_add_value($sp,$fieldIndex,['ParentescoTitular','Parentesco Titular'],trim((string)$payload['parentescoTitular']));
+    rp_add_value($sp,$fieldIndex,['Frase'],trim((string)($payload['frase']??'')));
+    rp_add_value($sp,$fieldIndex,['FechaNacimiento','Fecha Nacimiento'],rp_date_only((string)$payload['fechaNacimiento']));
+    rp_add_value($sp,$fieldIndex,['FechaDefuncion','Fecha Defuncion','Fecha Defunción'],rp_date_only((string)$payload['fechaDefuncion']));
+
+    rp_add_value($sp,$fieldIndex,['AsistenteFunerarioTexto','Asistente Funerario Texto','Asistente Funerario'],trim((string)$payload['asistenteFunerarioTexto']));
+    rp_add_value($sp,$fieldIndex,['Observaciones'],trim((string)($payload['observaciones']??'')));
+    rp_add_value($sp,$fieldIndex,['EstatusLiquidacion','Estatus Liquidacion','Estatus Liquidación'],trim((string)$payload['estatusLiquidacion']));
+    rp_add_value($sp,$fieldIndex,['Numero_x0020_de_x0020_Contrato','Numero de Contrato','Número de Contrato'],trim((string)($payload['numeroContrato']??'')));
+
+    rp_add_value($sp,$fieldIndex,['RequiereReubicacion','Requiere Reubicacion','Requiere Reubicación'],(bool)($payload['requiereReubicacion']??false),false);
+    rp_add_value($sp,$fieldIndex,['UbicacionNueva','Ubicacion Nueva','Ubicación Nueva'],trim((string)($payload['ubicacionNueva']??'')));
+    rp_add_value($sp,$fieldIndex,['MotivoReubicacion','Motivo Reubicacion','Motivo Reubicación'],trim((string)($payload['motivoReubicacion']??'')));
+
+    $titleField=rp_find_field($fieldIndex,['Title']);
+    if($titleField!==null){
+        $internal=(string)($titleField['InternalName']??'Title');
+        if(!array_key_exists($internal,$sp)){
+            $sp[$internal]=rp_upper(trim((string)$payload['fallecido']).' - '.$ubicacion);
+        }
+    }
+
+    $digest=trim((string)(rp_request('POST',$siteUrl.'/_api/contextinfo',$token,'',[
+        'Accept: application/json;odata=nometadata',
+        'Content-Type: application/json;odata=nometadata',
+    ])['json']['FormDigestValue']??''));
+    if($digest==='')throw new RuntimeException('SharePoint no devolvio un FormDigest valido.');
+
+    $createUrl=$siteUrl."/ _api/web/lists/getbytitle('".$listEsc."')/items";
+    $createUrl=str_replace('/ _api/','/_api/',$createUrl);
+    $created=rp_request('POST',$createUrl,$token,(string)json_encode($sp,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),[
+        'Content-Type: application/json;odata=nometadata',
+        'X-RequestDigest: '.$digest,
+    ])['json'];
+
+    $itemId=(int)($created['Id']??$created['ID']??0);
+    if($itemId<=0)throw new RuntimeException('SharePoint creo el registro, pero no devolvio un ID utilizable.');
+
+    rp_json(201,[
+        'ok'=>true,
+        'itemId'=>$itemId,
+        'list'=>$listTitle,
+        'modoPrueba'=>$modoPrueba,
+        'message'=>'Servicio Parque registrado correctamente en SharePoint.',
+        'automationSource'=>'SharePoint',
+    ]);
+}catch(Throwable $e){
+    error_log('Registro Servicios Parque: '.$e->getMessage());
+    rp_json(500,['ok'=>false,'message'=>$e->getMessage()]);
+}
