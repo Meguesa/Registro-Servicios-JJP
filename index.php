@@ -77,8 +77,8 @@ $email = htmlspecialchars((string)($user['email'] ?? ''), ENT_QUOTES, 'UTF-8');
       </div>
       <div class="selector-card-icon">⌖</div>
       <h2>Parque</h2>
-      <p>Captura servicios de Parque en Eventos Parque conservando las reglas y automatizaciones operativas existentes.</p>
-      <a class="primary-button selector-action" href="parque.php">Seleccionar Parque</a>
+      <p>Captura nuevos servicios, continúa borradores y consulta los servicios publicados de Parque desde este módulo.</p>
+      <a class="primary-button selector-action" href="mis-servicios.php?area=parque">Seleccionar Parque</a>
     </article>
   </section>
 

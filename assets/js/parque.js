@@ -183,6 +183,9 @@ function payload(){
   const fechaFin=fieldValue("fechaFin");
   const horaFin=fieldValue("horaFin");
   return {
+    _area:"parque",
+    area:"parque",
+    ubicacion:document.getElementById("ubicacionPreview")?.textContent==="—"?"":(document.getElementById("ubicacionPreview")?.textContent||""),
     fechaInicio,
     horaInicio,
     fechaFin,
@@ -241,6 +244,8 @@ form.addEventListener("submit",async e=>{
   try{
     const body=new FormData();
     body.append("payload",JSON.stringify(payload()));
+    const draftId=document.getElementById("draftId")?.value||"";
+    if(draftId)body.append("draftId",draftId);
     const response=await fetch("api/registro-parque.php",{
       method:"POST",
       body,
@@ -267,7 +272,107 @@ form.addEventListener("submit",async e=>{
   }
 });
 
+
+function setParqueField(name,value){
+  const el=form.elements.namedItem(name);
+  if(!el)return;
+  if(el instanceof RadioNodeList){el.value=value??"";return;}
+  if(el.type==="checkbox"){
+    el.checked=!!value;
+    el.dispatchEvent(new Event("change",{bubbles:true}));
+    return;
+  }
+  el.value=value??"";
+  el.dispatchEvent(new Event("change",{bubbles:true}));
+  el.dispatchEvent(new Event("input",{bubbles:true}));
+}
+
+function applyParqueDraft(p){
+  if(!p||typeof p!=="object")return;
+  [
+    "fechaInicio","horaInicio","fechaFin","horaFin","velacion","previsionUsoInmediato",
+    "tipoServicio","servicio","asistenteFunerarioTexto","numeroContrato","seccion",
+    "manzana","numLoteNicho","destape","tipoPlaca","nombreFamilia","titular",
+    "fallecido","parentescoTitular","frase","fechaNacimiento","fechaDefuncion",
+    "estatusLiquidacion","ubicacionNueva","motivoReubicacion","observaciones"
+  ].forEach(k=>setParqueField(k,p[k]??""));
+  setParqueField("requiereCambioUrna",!!p.requiereCambioUrna);
+  setParqueField("requiereReubicacion",!!p.requiereReubicacion);
+  if(document.getElementById("modoPrueba"))document.getElementById("modoPrueba").checked=!!p.modoPrueba;
+  syncPropertyRules();
+  syncReubicacion();
+  syncTestModeUi();
+  syncSummary();
+}
+
+async function saveParqueDraft(){
+  const button=document.getElementById("saveDraftBtn");
+  const status=document.getElementById("status");
+  if(!button)return;
+  const original=button.textContent;
+  button.disabled=true;
+  button.textContent="Guardando...";
+  try{
+    const body=new FormData();
+    body.append("payload",JSON.stringify(payload()));
+    const current=document.getElementById("draftId")?.value||"";
+    if(current)body.append("draftId",current);
+    const response=await fetch("api/guardar-borrador.php",{method:"POST",body,credentials:"same-origin",headers:{"Accept":"application/json"}});
+    const result=await response.json().catch(()=>null);
+    if(!response.ok||!result?.ok)throw new Error(result?.message||("HTTP "+response.status));
+    document.getElementById("draftId").value=result.draftId||"";
+    const url=new URL(location.href);
+    url.searchParams.set("draft",result.draftId);
+    url.searchParams.delete("nuevo");
+    history.replaceState(null,"",url);
+    if(status)status.textContent="Borrador guardado. Puedes continuar después desde Mis servicios.";
+    button.textContent="Borrador guardado";
+    setTimeout(()=>{button.textContent=original;button.disabled=false;},1500);
+  }catch(error){
+    if(status)status.textContent="No fue posible guardar el borrador: "+(error?.message||error);
+    button.textContent=original;
+    button.disabled=false;
+  }
+}
+
+async function loadParqueDraft(){
+  const id=new URLSearchParams(location.search).get("draft");
+  if(!id)return;
+  const status=document.getElementById("status");
+  try{
+    if(status)status.textContent="Cargando borrador...";
+    const response=await fetch("api/guardar-borrador.php?id="+encodeURIComponent(id),{cache:"no-store",credentials:"same-origin"});
+    const result=await response.json().catch(()=>null);
+    if(!response.ok||!result?.ok)throw new Error(result?.message||("HTTP "+response.status));
+    document.getElementById("draftId").value=id;
+    applyParqueDraft(result.draft?.payload||{});
+    if(status)status.textContent="Borrador cargado. Continúa la captura o publícalo cuando esté completo.";
+  }catch(error){
+    if(status)status.textContent="No fue posible cargar el borrador: "+(error?.message||error);
+  }
+}
+
+function resetParqueForm(){
+  if(!confirm("¿Deseas limpiar toda la captura?"))return;
+  form.reset();
+  document.getElementById("draftId").value="";
+  const url=new URL(location.href);
+  url.searchParams.delete("draft");
+  url.searchParams.set("nuevo","1");
+  history.replaceState(null,"",url);
+  syncPropertyRules();
+  syncReubicacion();
+  syncTestModeUi();
+  showStep(0);
+  const status=document.getElementById("status");
+  if(status)status.textContent="Listo para registrar en SharePoint.";
+}
+
+document.getElementById("saveDraftBtn")?.addEventListener("click",saveParqueDraft);
+document.getElementById("resetBtn")?.addEventListener("click",resetParqueForm);
+
 syncPropertyRules();
 syncReubicacion();
 syncTestModeUi();
 showStep(0);
+loadParqueDraft();
