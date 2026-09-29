@@ -7,6 +7,8 @@ header('X-Content-Type-Options: nosniff');
 
 require_once __DIR__ . '/../includes/registro-sharepoint.php';
 require_once __DIR__ . '/../includes/registro-parque-calendario.php';
+require_once __DIR__ . '/../includes/registro-parque-imagenes.php';
+require_once __DIR__ . '/../includes/registro-parque-correo.php';
 
 function rp_json(int $status, array $payload): never
 {
@@ -235,9 +237,10 @@ try{
     rp_add_value($sp,$fieldIndex,['Manzana'],trim((string)$payload['manzana']));
     rp_add_value($sp,$fieldIndex,['NumLote_x002f_Nicho','NumLote/Nicho','Num Lote/Nicho','Lote/Nicho'],trim((string)$payload['numLoteNicho']));
 
+    $tipoPropiedad=rp_norm((string)($payload['tipoPlaca']??''))==='nicho'?'NICHO':'LOTE';
     $ubicacion=trim((string)$payload['seccion'])
-        .' - MZ '.trim((string)$payload['manzana'])
-        .' - '.trim((string)$payload['numLoteNicho']);
+        .' - '.$tipoPropiedad.' '.trim((string)$payload['numLoteNicho'])
+        .' - '.trim((string)$payload['manzana']);
     rp_add_value($sp,$fieldIndex,['Ubicaci_x00f3_n','Ubicacion','Ubicación'],$ubicacion);
 
     rp_add_value($sp,$fieldIndex,['Destape'],trim((string)$payload['destape']));
@@ -276,7 +279,9 @@ try{
     rp_add_value($sp,$fieldIndex,['Titular'],trim((string)$payload['titular']));
     rp_add_value($sp,$fieldIndex,['TitularSubstituto','Fallecido','Fallecido(a)'],trim((string)$payload['fallecido']));
     rp_add_value($sp,$fieldIndex,['ParentescoTitular','Parentesco Titular'],trim((string)$payload['parentescoTitular']));
-    rp_add_value($sp,$fieldIndex,['Frase'],trim((string)($payload['frase']??'')));
+    $vipSection=str_ends_with(mb_strtoupper(trim((string)$payload['seccion']),'UTF-8'),'V');
+    $fraseAllowed=rp_norm((string)$payload['destape'])==='primero' && $vipSection;
+    rp_add_value($sp,$fieldIndex,['Frase'],$fraseAllowed?trim((string)($payload['frase']??'')):'');
     rp_add_value($sp,$fieldIndex,['FechaNacimiento','Fecha Nacimiento'],rp_date_only((string)$payload['fechaNacimiento']));
     rp_add_value($sp,$fieldIndex,['FechaDefuncion','Fecha Defuncion','Fecha Defunción'],rp_date_only((string)$payload['fechaDefuncion']));
 
@@ -336,6 +341,27 @@ try{
         error_log('Registro Servicios Parque Calendario item '.$itemId.': '.$calendarError->getMessage());
     }
 
+
+    // Generar las tablas informativas y enviar el correo directamente desde
+    // Registro de Servicios, igual que en Capillas.
+    $emailResult=[
+        'enabled'=>true,
+        'sent'=>false,
+        'recipients'=>[],
+        'attachmentNames'=>[],
+        'error'=>null,
+    ];
+    try{
+        $infoAttachments=rp_generate_information_images($payload);
+        $emailResult=array_merge(
+            $emailResult,
+            rp_send_service_email($payload,$infoAttachments,$modoPrueba)
+        );
+    }catch(Throwable $emailError){
+        $emailResult['error']=$emailError->getMessage();
+        error_log('Registro Servicios Parque Correo item '.$itemId.': '.$emailError->getMessage());
+    }
+
     rp_json(201,[
         'ok'=>true,
         'itemId'=>$itemId,
@@ -343,6 +369,7 @@ try{
         'modoPrueba'=>$modoPrueba,
         'message'=>'Servicio Parque registrado correctamente en SharePoint.',
         'calendar'=>$calendarResult,
+        'email'=>$emailResult,
         'automationSource'=>'RegistroServicios',
     ]);
 }catch(Throwable $e){

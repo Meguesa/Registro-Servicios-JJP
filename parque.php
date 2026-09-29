@@ -92,11 +92,17 @@ $isPreview = str_contains(
       </div>
 
       <div class="form-grid grid-2">
-        <label>Fecha y Hora Inicio
-          <input type="text" name="fechaHoraInicio" id="fechaHoraInicio" class="datetime-picker" placeholder="Ej. 29/09/2026 10:00" autocomplete="off" required>
+        <label>Fecha Inicio
+          <input type="text" name="fechaInicio" id="fechaInicio" class="date-only-picker" placeholder="Ej. 29/09/2026" autocomplete="off" required>
         </label>
-        <label>Fecha y Hora Fin
-          <input type="text" name="fechaHoraFin" id="fechaHoraFin" class="datetime-picker" placeholder="Ej. 29/09/2026 12:00" autocomplete="off" required>
+        <label>Hora Inicio
+          <input type="text" name="horaInicio" id="horaInicio" class="time-only-picker" placeholder="Ej. 10:00" autocomplete="off" required>
+        </label>
+        <label>Fecha Fin
+          <input type="text" name="fechaFin" id="fechaFin" class="date-only-picker" placeholder="Ej. 29/09/2026" autocomplete="off" required>
+        </label>
+        <label>Hora Fin
+          <input type="text" name="horaFin" id="horaFin" class="time-only-picker" placeholder="Ej. 12:00" autocomplete="off" required>
         </label>
         <label>Velación
           <select name="velacion" id="velacion" required></select>
@@ -192,8 +198,9 @@ $isPreview = str_contains(
         <label>Parentesco del Titular
           <select name="parentescoTitular" id="parentescoTitular" required></select>
         </label>
-        <label>Frase
+        <label id="fraseWrap" class="hidden">Frase
           <input name="frase" id="frase" placeholder="Frase o texto para el servicio">
+          <small class="hint">Solo aplica cuando Destape = Primero y la sección es VIP.</small>
         </label>
       </div>
 
