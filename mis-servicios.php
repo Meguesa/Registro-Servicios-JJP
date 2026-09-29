@@ -6,6 +6,10 @@ portal_require_authentication();
 $user = portal_user();
 $name = htmlspecialchars((string)($user['name'] ?? 'Usuario'), ENT_QUOTES, 'UTF-8');
 $email = htmlspecialchars((string)($user['email'] ?? ''), ENT_QUOTES, 'UTF-8');
+$areaRaw = mb_strtolower(trim((string)($_GET['area'] ?? 'capillas')), 'UTF-8');
+$area = $areaRaw === 'parque' ? 'parque' : 'capillas';
+$areaLabel = $area === 'parque' ? 'PARQUE' : 'CAPILLAS';
+$newServiceHref = $area === 'parque' ? 'parque.php?nuevo=1' : 'capillas.php?nuevo=1';
 ?><!doctype html>
 <html lang="es-MX">
 <head>
@@ -34,8 +38,8 @@ $email = htmlspecialchars((string)($user['email'] ?? ''), ENT_QUOTES, 'UTF-8');
 
 <main class="page-shell services-home">
   <section class="form-banner">
-    <div><span class="status-pill">CAPILLAS</span><h1>Mis servicios</h1><p>Continúa borradores y consulta los servicios publicados desde este módulo.</p></div>
-    <a class="primary-button button-link" href="capillas.php?nuevo=1">＋ Nuevo servicio</a>
+    <div><span class="status-pill"><?= $areaLabel ?></span><h1>Mis servicios</h1><p>Continúa borradores y consulta los servicios publicados desde este módulo.</p></div>
+    <a class="primary-button button-link" href="<?= $newServiceHref ?>">＋ Nuevo servicio</a>
   </section>
 
   <section class="service-menu-grid">
@@ -50,6 +54,7 @@ $email = htmlspecialchars((string)($user['email'] ?? ''), ENT_QUOTES, 'UTF-8');
     <div id="servicesEmpty" class="empty-state" hidden>No hay registros en esta sección.</div>
   </section>
 </main>
+<script>window.JDJP_SERVICES_AREA = <?= json_encode($area, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;</script>
 <script src="assets/js/mis-servicios.js"></script>
 </body>
 </html>
