@@ -9,6 +9,7 @@ require_once __DIR__ . '/../includes/registro-sharepoint.php';
 require_once __DIR__ . '/../includes/registro-parque-calendario.php';
 require_once __DIR__ . '/../includes/registro-parque-imagenes.php';
 require_once __DIR__ . '/../includes/registro-parque-correo.php';
+require_once __DIR__ . '/../includes/registro-storage.php';
 
 function rp_json(int $status, array $payload): never
 {
@@ -182,6 +183,12 @@ try{
 
     $payload=json_decode((string)($_POST['payload']??''),true);
     if(!is_array($payload))rp_json(400,['ok'=>false,'message'=>'La informacion del formulario no es valida.']);
+    $draftId=trim((string)($_POST['draftId']??''));
+    $storageCtx=null;
+    if($draftId!==''){
+        $storageCtx=rs_storage_bootstrap();
+        $draftId=rs_safe_id($draftId);
+    }
 
     $required=[
         'fechaHoraInicio','fechaHoraFin','velacion','previsionUsoInmediato',
@@ -360,6 +367,10 @@ try{
     }catch(Throwable $emailError){
         $emailResult['error']=$emailError->getMessage();
         error_log('Registro Servicios Parque Correo item '.$itemId.': '.$emailError->getMessage());
+    }
+
+    if(is_array($storageCtx) && $draftId!==''){
+        rs_remove_tree(rs_draft_dir($storageCtx,$draftId));
     }
 
     rp_json(201,[
