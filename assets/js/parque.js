@@ -219,7 +219,7 @@ form.addEventListener("submit",async e=>{
       "ID: "+result.itemId,
       "Lista: Eventos Parque",
       result.modoPrueba?"Modo: PRUEBA":"Modo: PRODUCCIÓN",
-      "Automatizaciones: continúan desde SharePoint"
+      result.calendar?.created ? "Calendario: CREADO DIRECTAMENTE" : ("Calendario: "+(result.calendar?.error||"NO CREADO"))
     ];
     if(status)status.textContent=lines.join(" | ");
     alert(lines.join("\n"));
