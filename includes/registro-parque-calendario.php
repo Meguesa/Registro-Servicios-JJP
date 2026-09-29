@@ -121,10 +121,13 @@ function rp_calendar_create_event(array $payload): array
     $fallecido = trim((string)($payload['fallecido'] ?? ''));
     $tipoServicio = trim((string)($payload['tipoServicio'] ?? ''));
 
+    $tipoPropiedad = mb_strtolower(trim((string)($payload['tipoPlaca'] ?? '')), 'UTF-8') === 'nicho'
+        ? 'NICHO'
+        : 'LOTE';
     $ubicacion = implode(' - ', array_values(array_filter([
         $seccion,
-        $manzana !== '' ? 'MZ ' . $manzana : '',
-        $lote !== '' ? 'LOTE/NICHO ' . $lote : '',
+        $lote !== '' ? $tipoPropiedad . ' ' . $lote : '',
+        $manzana,
     ], static fn(string $v): bool => $v !== '')));
 
     $subject = implode(' - ', array_values(array_filter([
