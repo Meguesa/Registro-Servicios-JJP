@@ -6,6 +6,7 @@ header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
 
 require_once __DIR__ . '/../includes/registro-sharepoint.php';
+require_once __DIR__ . '/../includes/registro-parque-calendario.php';
 
 function rp_json(int $status, array $payload): never
 {
@@ -312,13 +313,37 @@ try{
     $itemId=(int)($created['Id']??$created['ID']??0);
     if($itemId<=0)throw new RuntimeException('SharePoint creo el registro, pero no devolvio un ID utilizable.');
 
+    // FASE 1 DEL REEMPLAZO DE POWER AUTOMATE:
+    // crear directamente el evento de Parque desde Registro de Servicios.
+    // En preview / ModoPrueba el asunto queda marcado como (PRUEBA).
+    $calendarResult=[
+        'enabled'=>false,
+        'created'=>false,
+        'error'=>null,
+    ];
+    try{
+        $calendarPayload=$payload;
+        $calendarPayload['_previewMode']=$modoPrueba;
+        $calendarResult=array_merge(
+            $calendarResult,
+            rp_calendar_create_event($calendarPayload)
+        );
+    }catch(Throwable $calendarError){
+        // El elemento ya existe en SharePoint; no pedir al usuario repetir
+        // el registro por un fallo aislado del calendario.
+        $calendarResult['enabled']=true;
+        $calendarResult['error']=$calendarError->getMessage();
+        error_log('Registro Servicios Parque Calendario item '.$itemId.': '.$calendarError->getMessage());
+    }
+
     rp_json(201,[
         'ok'=>true,
         'itemId'=>$itemId,
         'list'=>$listTitle,
         'modoPrueba'=>$modoPrueba,
         'message'=>'Servicio Parque registrado correctamente en SharePoint.',
-        'automationSource'=>'SharePoint',
+        'calendar'=>$calendarResult,
+        'automationSource'=>'RegistroServicios',
     ]);
 }catch(Throwable $e){
     error_log('Registro Servicios Parque: '.$e->getMessage());

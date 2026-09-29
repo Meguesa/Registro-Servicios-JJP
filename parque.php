@@ -54,7 +54,7 @@ $isPreview = str_contains(
     <div>
       <span class="status-pill">Parque</span>
       <h1>Registro de servicio</h1>
-      <p>Captura el servicio de Parque con los mismos datos que utiliza Eventos Parque y las automatizaciones actuales.</p>
+      <p>Captura el servicio de Parque desde el portal. SharePoint se conserva como registro oficial mientras migramos los procesos al modulo.</p>
     </div>
     <div class="form-banner-meta">
       <span class="preview-pill" id="modePill"><?= $isPreview ? 'Prueba · conectado a SharePoint' : 'Producción · conectado a SharePoint' ?></span>
@@ -73,7 +73,7 @@ $isPreview = str_contains(
 
   <section class="selector-notice">
     <strong>Compatible con el proceso actual de Parque</strong>
-    <span>Al publicar se crea un elemento en <b>Eventos Parque</b>. No se llama directamente a Power Automate ni a GitHub; las automatizaciones existentes continúan por el disparador de SharePoint.</span>
+    <span>Al publicar se crea el elemento en <b>Eventos Parque</b> y el calendario se genera directamente desde Registro de Servicios.</span>
   </section>
 
   <form id="parqueForm" novalidate class="form-shell">
@@ -278,7 +278,7 @@ $isPreview = str_contains(
 
       <div class="selector-notice">
         <strong>Después de publicar</strong>
-        <span>El proceso actual de Power Automate seguirá manejando calendario, cartas, placas, correo y demás automatizaciones. Este módulo no sustituye ni modifica esas ramas.</span>
+        <span>Calendario ya se procesa directamente desde Registro de Servicios. Placas, cartas y correo se migraran en las siguientes fases.</span>
       </div>
     </section>
 
