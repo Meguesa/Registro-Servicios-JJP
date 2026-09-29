@@ -240,9 +240,37 @@ try{
     rp_add_value($sp,$fieldIndex,['Ubicaci_x00f3_n','Ubicacion','Ubicación'],$ubicacion);
 
     rp_add_value($sp,$fieldIndex,['Destape'],trim((string)$payload['destape']));
-    rp_add_value($sp,$fieldIndex,['TipoPlaca','Tipo de Placa','PlacaParqueTipo'],trim((string)$payload['tipoPlaca']));
+    rp_add_value($sp,$fieldIndex,['TipoPlaca','Tipo de Placa'],trim((string)$payload['tipoPlaca']));
+    rp_add_value($sp,$fieldIndex,['PlacaParqueTipo'],trim((string)$payload['tipoPlaca']));
     rp_add_value($sp,$fieldIndex,['NombreFamilia','Nombre Familia'],trim((string)($payload['nombreFamilia']??'')));
-    rp_add_value($sp,$fieldIndex,['RequiereCambioUrna','Requiere Cambio Urna'],(bool)($payload['requiereCambioUrna']??false),false);
+    $requiereCambioUrna=(bool)($payload['requiereCambioUrna']??false);
+    rp_add_value($sp,$fieldIndex,['RequiereCambioUrna','Requiere Cambio Urna'],$requiereCambioUrna,false);
+
+    // Mantener el protocolo actual de placas de Parque.
+    // Nicho: solo cuando TipoPlaca=Nicho y Destape=Primero.
+    // Urna: cuando TipoPlaca=Urna o cuando RequiereCambioUrna=true.
+    $tipoPlacaNorm=rp_norm((string)$payload['tipoPlaca']);
+    $destapeNorm=rp_norm((string)$payload['destape']);
+    $solicitaNicho=$tipoPlacaNorm==='nicho' && $destapeNorm==='primero';
+    $solicitaUrna=$tipoPlacaNorm==='urna' || $requiereCambioUrna;
+
+    if($solicitaNicho){
+        rp_add_value($sp,$fieldIndex,['PlacaNichoEstatus'],'Pendiente',false);
+        rp_add_value($sp,$fieldIndex,['PlacaNichoArchivoCorreoListo'],'No',false);
+        rp_add_value($sp,$fieldIndex,['PlacaNichoPngNombre'],'',false);
+        rp_add_value($sp,$fieldIndex,['PlacaNichoError'],'',false);
+    }
+    if($solicitaUrna){
+        rp_add_value($sp,$fieldIndex,['PlacaUrnaEstatus'],'Pendiente',false);
+        rp_add_value($sp,$fieldIndex,['PlacaUrnaArchivoCorreoListo'],'No',false);
+        rp_add_value($sp,$fieldIndex,['PlacaUrnaPngNombre'],'',false);
+        rp_add_value($sp,$fieldIndex,['PlacaUrnaError'],'',false);
+        // Si solo se solicita urna adicional, la automatizacion actual identifica
+        // el tipo de placa a procesar mediante PlacaParqueTipo.
+        if($tipoPlacaNorm!=='nicho'){
+            rp_add_value($sp,$fieldIndex,['PlacaParqueTipo'],'Urna',false);
+        }
+    }
 
     rp_add_value($sp,$fieldIndex,['Titular'],trim((string)$payload['titular']));
     rp_add_value($sp,$fieldIndex,['TitularSubstituto','Fallecido','Fallecido(a)'],trim((string)$payload['fallecido']));
