@@ -79,21 +79,31 @@ function rs_sharepoint_value(mixed $value): string
  *
  * @return array<int,array<string,string>>
  */
-function rs_preview_publications_from_sharepoint(): array
+function rs_preview_publications_from_sharepoint(string $area): array
 {
     $config = rs_sharepoint_config();
     $host = 'meguesajdjp.sharepoint.com';
     $siteUrl = 'https://' . $host . '/sites/Operaciones';
     $token = rs_sharepoint_token($config, $host);
 
+    $isParque = $area === 'parque';
+    $listTitle = $isParque ? 'Eventos Parque' : 'Eventos Capillas';
+
+    if ($isParque) {
+        $select = 'Id,Numero_x0020_de_x0020_Contrato,TitularSubstituto,Servicio,Ubicaci_x00f3_n,FechaHoraInicio,Created,ModoPrueba';
+    } else {
+        $select = 'Id,field_1,Referencia,field_2,field_32,field_39,field_36,Created,ModoPrueba';
+    }
+
     $query = http_build_query([
-        '$select' => 'Id,field_1,Referencia,field_2,field_32,field_39,field_36,Created,ModoPrueba',
+        '$select' => $select,
         '$filter' => 'ModoPrueba eq 1',
         '$orderby' => 'Created desc',
         '$top' => '5000',
     ], '', '&', PHP_QUERY_RFC3986);
 
-    $url = $siteUrl . "/_api/web/lists/getbytitle('Eventos%20Capillas')/items?" . $query;
+    $listEsc = rawurlencode($listTitle);
+    $url = $siteUrl . "/_api/web/lists/getbytitle('" . $listEsc . "')/items?" . $query;
     $curl = curl_init($url);
     if ($curl === false) {
         throw new RuntimeException('No fue posible iniciar la consulta de publicaciones en SharePoint.');
@@ -133,23 +143,41 @@ function rs_preview_publications_from_sharepoint(): array
         $itemId = trim((string)($item['Id'] ?? $item['ID'] ?? ''));
         if ($itemId === '') continue;
 
-        $rows[] = [
-            'itemId' => $itemId,
-            'status' => 'PUBLICADO',
-            'numeroReferencia' => rs_sharepoint_value($item['field_1'] ?? ''),
-            'referencia' => rs_sharepoint_value($item['Referencia'] ?? ''),
-            'fallecido' => rs_sharepoint_value($item['field_2'] ?? ''),
-            'servicio' => rs_sharepoint_value($item['field_32'] ?? ''),
-            'ubicacion' => rs_sharepoint_value($item['field_39'] ?? ''),
-            'fechaServicio' => rs_sharepoint_value($item['field_36'] ?? ''),
-            'publishedAt' => rs_sharepoint_value($item['Created'] ?? ''),
-        ];
+        if ($isParque) {
+            $rows[] = [
+                'itemId' => $itemId,
+                'status' => 'PUBLICADO',
+                'numeroReferencia' => rs_sharepoint_value($item['Numero_x0020_de_x0020_Contrato'] ?? ''),
+                'referencia' => rs_sharepoint_value($item['Numero_x0020_de_x0020_Contrato'] ?? ''),
+                'fallecido' => rs_sharepoint_value($item['TitularSubstituto'] ?? ''),
+                'servicio' => rs_sharepoint_value($item['Servicio'] ?? ''),
+                'ubicacion' => rs_sharepoint_value($item['Ubicaci_x00f3_n'] ?? ''),
+                'fechaServicio' => rs_sharepoint_value($item['FechaHoraInicio'] ?? ''),
+                'publishedAt' => rs_sharepoint_value($item['Created'] ?? ''),
+                'area' => 'parque',
+            ];
+        } else {
+            $rows[] = [
+                'itemId' => $itemId,
+                'status' => 'PUBLICADO',
+                'numeroReferencia' => rs_sharepoint_value($item['field_1'] ?? ''),
+                'referencia' => rs_sharepoint_value($item['Referencia'] ?? ''),
+                'fallecido' => rs_sharepoint_value($item['field_2'] ?? ''),
+                'servicio' => rs_sharepoint_value($item['field_32'] ?? ''),
+                'ubicacion' => rs_sharepoint_value($item['field_39'] ?? ''),
+                'fechaServicio' => rs_sharepoint_value($item['field_36'] ?? ''),
+                'publishedAt' => rs_sharepoint_value($item['Created'] ?? ''),
+                'area' => 'capillas',
+            ];
+        }
     }
 
     return $rows;
 }
 
 try {
+    $areaRaw = mb_strtolower(trim((string)($_GET['area'] ?? 'capillas')), 'UTF-8');
+    $area = $areaRaw === 'parque' ? 'parque' : 'capillas';
     $ctx = rs_storage_bootstrap();
     $draftRoot = $ctx['userDir'] . '/drafts';
     $drafts = [];
@@ -159,14 +187,16 @@ try {
             $data = rs_read_draft($ctx, $entry);
             if (!is_array($data)) continue;
             $p = is_array($data['payload'] ?? null) ? $data['payload'] : [];
+            $draftArea = mb_strtolower(trim((string)($p['_area'] ?? $p['area'] ?? 'capillas')), 'UTF-8');
+            if (($draftArea === 'parque' ? 'parque' : 'capillas') !== $area) continue;
             $drafts[] = [
                 'id'=>(string)($data['id'] ?? $entry),
                 'status'=>'BORRADOR',
-                'numeroReferencia'=>(string)($p['numeroReferencia'] ?? ''),
+                'numeroReferencia'=>(string)($p['numeroReferencia'] ?? $p['numeroContrato'] ?? ''),
                 'fallecido'=>(string)($p['fallecido'] ?? ''),
                 'servicio'=>(string)($p['servicio'] ?? ''),
-                'ubicacion'=>(string)($p['ubicacion'] ?? ''),
-                'fechaServicio'=>(string)($p['inicio'] ?? ''),
+                'ubicacion'=>(string)($p['ubicacion'] ?? $p['ubicacionPreview'] ?? ''),
+                'fechaServicio'=>(string)($p['inicio'] ?? $p['fechaHoraInicio'] ?? ''),
                 'updatedAt'=>(string)($data['updatedAt'] ?? ''),
             ];
         }
@@ -179,7 +209,7 @@ try {
     $published = [];
     $sync = ['ok'=>false, 'removed'=>0, 'source'=>'sharepoint'];
     try {
-        $published = rs_preview_publications_from_sharepoint();
+        $published = rs_preview_publications_from_sharepoint($area);
         $sync = ['ok'=>true, 'removed'=>0, 'source'=>'sharepoint'];
     } catch (Throwable $syncError) {
         // Fallback defensivo al índice local para no dejar el módulo inutilizable
