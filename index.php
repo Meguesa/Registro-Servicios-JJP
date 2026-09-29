@@ -55,7 +55,7 @@ $email = htmlspecialchars((string)($user['email'] ?? ''), ENT_QUOTES, 'UTF-8');
 
   <section class="selector-notice">
     <strong>Conexión a procesos operativos reales</strong>
-    <span>Los servicios de Capillas pueden registrar información en SharePoint y activar calendario, correo y automatizaciones asociadas. Verifica la información antes de publicar.</span>
+    <span>Los servicios de Capillas y Parque pueden registrar información en SharePoint y activar las automatizaciones operativas asociadas. Verifica la información antes de publicar.</span>
   </section>
 
   <section class="selector-grid" aria-label="Áreas de Registro de Servicios">
