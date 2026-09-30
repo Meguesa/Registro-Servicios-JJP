@@ -259,7 +259,10 @@ function rs_send_controlled_test_email(array $payload, array $attachments, bool 
         return $value;
     };
 
-    $numeroServicio = (string)rs_uppercase_export($payload['numeroServicio'] ?? '');
+    // El valor mostrado como NUMERO DE SERVICIO debe corresponder al campo
+    // Numero de Referencia de Eventos Capillas (field_1), no al numero usado
+    // para construir la referencia operativa VC/VI/CD.
+    $numeroServicio = (string)rs_uppercase_export($payload['numeroReferencia'] ?? '');
     $fallecido = (string)rs_uppercase_export($payload['fallecido'] ?? '');
     $servicio = (string)rs_uppercase_export($payload['servicio'] ?? '');
     $referencia = (string)rs_uppercase_export($payload['referencia'] ?? '');
