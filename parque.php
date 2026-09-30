@@ -286,7 +286,7 @@ $isPreview = str_contains(
 
       <div class="selector-notice">
         <strong>Después de publicar</strong>
-        <span>Calendario ya se procesa directamente desde Registro de Servicios. Placas, cartas y correo se migraran en las siguientes fases.</span>
+        <span>Calendario, tablas operativas, cartas y correo se procesan directamente desde Registro de Servicios cuando corresponda.</span>
       </div>
     </section>
 
