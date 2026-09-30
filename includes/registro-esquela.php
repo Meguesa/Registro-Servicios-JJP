@@ -44,7 +44,7 @@ function rs_esquela_image_from_bytes(string $bytes): ?GdImage
 
 function rs_esquela_load_asset(string $baseName): ?GdImage
 {
-    $dir = __DIR__ . '/assets/esquelas';
+    $dir = dirname(__DIR__) . '/assets/esquelas';
 
     // 1) Archivos binarios directos, si existen.
     foreach (['jpg', 'jpeg', 'png'] as $ext) {
