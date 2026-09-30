@@ -398,47 +398,64 @@ function rs_esquela_fallback_background(string $key, int $width, int $height): G
     return $img;
 }
 
-function rs_esquela_draw_circular_photo(GdImage $canvas, ?GdImage $photo, int $cx, int $cy, int $diameter): void
-{
+function rs_esquela_draw_square_photo(
+    GdImage $canvas,
+    ?GdImage $photo,
+    int $cx,
+    int $cy,
+    int $size
+): void {
     if (!$photo instanceof GdImage) {
         return;
     }
 
     $sw = imagesx($photo);
     $sh = imagesy($photo);
+    if ($sw <= 0 || $sh <= 0) {
+        return;
+    }
+
+    // Recorte tipo cover al centro para conservar proporcion sin deformar.
     $side = min($sw, $sh);
     $sx = max(0, (int)round(($sw - $side) / 2));
     $sy = max(0, (int)round(($sh - $side) / 2));
 
-    $tmp = imagecreatetruecolor($diameter, $diameter);
-    imagealphablending($tmp, false);
-    imagesavealpha($tmp, true);
-    $transparent = imagecolorallocatealpha($tmp, 0, 0, 0, 127);
-    imagefill($tmp, 0, 0, $transparent);
-    imagecopyresampled($tmp, $photo, 0, 0, $sx, $sy, $diameter, $diameter, $side, $side);
+    $x0 = (int)round($cx - ($size / 2));
+    $y0 = (int)round($cy - ($size / 2));
 
-    $radius = $diameter / 2;
-    $x0 = $cx - (int)$radius;
-    $y0 = $cy - (int)$radius;
+    // Borde recto y uniforme. Se dibuja como un rectangulo relleno para
+    // evitar dientes/pixelado en el contorno.
+    $borderWidth = max(3, (int)round($size * 0.018));
+    $border = imagecolorallocate($canvas, 229, 184, 55);
+    imagefilledrectangle(
+        $canvas,
+        $x0,
+        $y0,
+        $x0 + $size - 1,
+        $y0 + $size - 1,
+        $border
+    );
 
-    for ($y = 0; $y < $diameter; $y++) {
-        for ($x = 0; $x < $diameter; $x++) {
-            $dx = $x - $radius + 0.5;
-            $dy = $y - $radius + 0.5;
-            if (($dx * $dx + $dy * $dy) <= ($radius * $radius)) {
-                $color = imagecolorat($tmp, $x, $y);
-                imagesetpixel($canvas, $x0 + $x, $y0 + $y, $color);
-            }
-        }
+    $inner = max(1, $size - (2 * $borderWidth));
+    $destX = $x0 + $borderWidth;
+    $destY = $y0 + $borderWidth;
+
+    if (function_exists('imagesetinterpolation') && defined('IMG_BICUBIC_FIXED')) {
+        @imagesetinterpolation($photo, IMG_BICUBIC_FIXED);
     }
 
-    // Borde amarillo/dorado visible alrededor de la fotografia.
-    $border = imagecolorallocate($canvas, 229, 184, 55);
-    $borderWidth = max(3, (int)round($diameter * 0.022));
-    imagesetthickness($canvas, $borderWidth);
-    imageellipse($canvas, $cx, $cy, $diameter + $borderWidth, $diameter + $borderWidth, $border);
-    imagesetthickness($canvas, 1);
-    imagedestroy($tmp);
+    imagecopyresampled(
+        $canvas,
+        $photo,
+        $destX,
+        $destY,
+        $sx,
+        $sy,
+        $inner,
+        $inner,
+        $side,
+        $side
+    );
 }
 
 
@@ -731,7 +748,7 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?
         throw new RuntimeException('No se pudo cargar la fotografia ni la imagen de respaldo de la esquela.');
     }
 
-    rs_esquela_draw_circular_photo($canvas, $photo, $S(360), $S(150), $S(238));
+    rs_esquela_draw_square_photo($canvas, $photo, $S(360), $S(150), $S(238));
     if ($photo instanceof GdImage) {
         imagedestroy($photo);
     }

@@ -367,7 +367,7 @@ function openCropperFromFile(file){
     if(cropper){cropper.destroy();cropper=null;}
     cropImage.onload=()=>{
       cropper=new Cropper(cropImage,{
-        aspectRatio:4/5,
+        aspectRatio:1,
         viewMode:1,
         dragMode:"move",
         autoCropArea:.82,
@@ -392,7 +392,7 @@ document.getElementById("rotateBtn").addEventListener("click",()=>cropper&&cropp
 document.getElementById("resetCropBtn").addEventListener("click",()=>cropper&&cropper.reset());
 document.getElementById("applyCropBtn").addEventListener("click",()=>{
   if(!cropper)return;
-  const canvas=cropper.getCroppedCanvas({width:800,height:1000,imageSmoothingEnabled:true,imageSmoothingQuality:"high"});
+  const canvas=cropper.getCroppedCanvas({width:800,height:800,imageSmoothingEnabled:true,imageSmoothingQuality:"high"});
   const data=canvas.toDataURL("image/jpeg",.9);
   processedInput.value=data;
   croppedPreview.src=data;
@@ -747,7 +747,7 @@ async function rsCroppedFile(){
   if(cropper){
     const canvas=cropper.getCroppedCanvas({
       width:800,
-      height:1000,
+      height:800,
       imageSmoothingEnabled:true,
       imageSmoothingQuality:"high"
     });
