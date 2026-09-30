@@ -1,6 +1,19 @@
 const PARQUE_SERVICIOS = ["Basico","Total Service","Total Service Complemento","Coffee Break"];
-const PARQUE_TIPOS = ["Aniversario Luctuoso","Deposito de Cenizas","Exhumación","Inhumación","Otro","Resguardo de Cenizas"];
-const PARQUE_VELACION = ["Capilla Churubusco","Capilla Externa","Capilla Agua Fria","Otro","sin Velación"];
+const PARQUE_TIPOS = [
+  {value:"Inhumación",label:"Inhumacion"},
+  {value:"Exhumación",label:"Exhumacion"},
+  {value:"Deposito de Cenizas",label:"Deposito de Cenizas"},
+  {value:"Resguardo de Cenizas",label:"Resguardo de Cenizas"},
+  {value:"Aniversario Luctuoso",label:"Aniversario Luctuoso"},
+  {value:"Otro",label:"Otro"}
+];
+const PARQUE_VELACION = [
+  {value:"Capilla Churubusco",label:"Capillas Churubusco"},
+  {value:"Capilla Agua Fria",label:"Capillas Agua Fria"},
+  {value:"Capilla Externa",label:"Capillas Externas"},
+  {value:"sin Velación",label:"Sin Velacion"},
+  {value:"Otro",label:"Otro"}
+];
 const PARQUE_PREVISION = ["Prevision","Uso Inmediato","No Aplica"];
 const PARQUE_DESTAPE = ["Primero","Segundo","Tercero","Cuarto","No Aplica"];
 const PARQUE_PLACAS = ["Nicho","Urna","Granito"];
@@ -30,10 +43,11 @@ function fillSelect(id, items, placeholder="Seleccionar"){
   ph.hidden=true;
   ph.selected=true;
   el.appendChild(ph);
-  items.forEach(value=>{
+  items.forEach(item=>{
     const option=document.createElement("option");
-    option.value=value;
-    option.textContent=value;
+    const isObject=item && typeof item==="object";
+    option.value=isObject?String(item.value??""):String(item);
+    option.textContent=isObject?String(item.label??item.value??""):String(item);
     el.appendChild(option);
   });
 }
@@ -96,9 +110,6 @@ if(window.flatpickr && flatpickr.l10ns?.es)flatpickr.localize(flatpickr.l10ns.es
 document.querySelectorAll(".date-only-picker").forEach(el=>{
   flatpickr(el,{enableTime:false,dateFormat:"d/m/Y",allowInput:true,disableMobile:true,locale:"es"});
 });
-document.querySelectorAll(".time-only-picker").forEach(el=>{
-  flatpickr(el,{enableTime:true,noCalendar:true,time_24hr:true,dateFormat:"H:i",allowInput:true,disableMobile:true,locale:"es"});
-});
 
 function isVipSection(value){
   const sec=String(value||"").trim().toUpperCase();
@@ -134,6 +145,7 @@ function syncPropertyRules(){
   syncLocation();
 }
 ["destape","tipoPlaca","seccion","manzana","numLoteNicho"].forEach(id=>document.getElementById(id)?.addEventListener("input",syncPropertyRules));
+document.getElementById("servicioParque")?.addEventListener("change",syncLocation);
 
 function syncReubicacion(){
   const active=document.getElementById("requiereReubicacion")?.checked===true;
@@ -154,15 +166,22 @@ function syncTestModeUi(){
 }
 document.getElementById("modoPrueba")?.addEventListener("change",syncTestModeUi);
 
+function servicePrefix(){
+  const service=document.getElementById("servicioParque")?.value||"";
+  if(service==="Total Service Complemento")return "TSC";
+  if(service==="Total Service")return "TS";
+  return "";
+}
+
 function syncLocation(){
   const sec=document.getElementById("seccion")?.value||"";
   const man=document.getElementById("manzana")?.value||"";
   const lote=document.getElementById("numLoteNicho")?.value||"";
-  const placa=document.getElementById("tipoPlaca")?.value||"";
-  const tipo=placa==="Nicho"?"NICHO":"LOTE";
   const parts=[];
+  const prefix=servicePrefix();
+  if(prefix)parts.push(prefix);
   if(sec)parts.push(sec);
-  if(lote)parts.push(tipo+" "+lote);
+  if(lote)parts.push(lote);
   if(man)parts.push(man);
   const value=parts.join(" - ")||"—";
   const target=document.getElementById("ubicacionPreview");

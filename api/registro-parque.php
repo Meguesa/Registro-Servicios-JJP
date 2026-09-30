@@ -9,6 +9,7 @@ require_once __DIR__ . '/../includes/registro-sharepoint.php';
 require_once __DIR__ . '/../includes/registro-parque-calendario.php';
 require_once __DIR__ . '/../includes/registro-parque-imagenes.php';
 require_once __DIR__ . '/../includes/registro-parque-correo.php';
+require_once __DIR__ . '/../includes/registro-parque-documentos.php';
 require_once __DIR__ . '/../includes/registro-storage.php';
 
 function rp_json(int $status, array $payload): never
@@ -76,7 +77,7 @@ function rp_local_datetime_to_utc(string $value): ?string
 {
     $value=trim($value);
     if($value==='')return null;
-    foreach(['d/m/Y H:i','Y-m-d\\TH:i:s','Y-m-d\\TH:i'] as $format){
+    foreach(['d/m/Y H:i','Y-m-d H:i','Y-m-d\\TH:i:s','Y-m-d\\TH:i'] as $format){
         $dt=DateTimeImmutable::createFromFormat($format,$value,new DateTimeZone('America/Monterrey'));
         if($dt instanceof DateTimeImmutable){
             return $dt->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\\TH:i:s\\Z');
@@ -244,10 +245,16 @@ try{
     rp_add_value($sp,$fieldIndex,['Manzana'],trim((string)$payload['manzana']));
     rp_add_value($sp,$fieldIndex,['NumLote_x002f_Nicho','NumLote/Nicho','Num Lote/Nicho','Lote/Nicho'],trim((string)$payload['numLoteNicho']));
 
-    $tipoPropiedad=rp_norm((string)($payload['tipoPlaca']??''))==='nicho'?'NICHO':'LOTE';
-    $ubicacion=trim((string)$payload['seccion'])
-        .' - '.$tipoPropiedad.' '.trim((string)$payload['numLoteNicho'])
-        .' - '.trim((string)$payload['manzana']);
+    $serviceNorm=rp_norm((string)($payload['servicio']??''));
+    $prefix=$serviceNorm==='totalservicecomplemento'
+        ? 'TSC'
+        : ($serviceNorm==='totalservice' ? 'TS' : '');
+    $ubicacion=implode(' - ',array_values(array_filter([
+        $prefix,
+        trim((string)$payload['seccion']),
+        trim((string)$payload['numLoteNicho']),
+        trim((string)$payload['manzana']),
+    ],static fn(string $v):bool=>$v!=='')));
     rp_add_value($sp,$fieldIndex,['Ubicaci_x00f3_n','Ubicacion','Ubicación'],$ubicacion);
 
     rp_add_value($sp,$fieldIndex,['Destape'],trim((string)$payload['destape']));
@@ -360,9 +367,16 @@ try{
     ];
     try{
         $infoAttachments=rp_generate_information_images($payload);
+        $operationalAttachments=rp_generate_operational_tables($payload);
+        $letterAttachments=rp_generate_letter_attachments($payload);
+        $allAttachments=array_merge(
+            $infoAttachments,
+            $operationalAttachments,
+            $letterAttachments
+        );
         $emailResult=array_merge(
             $emailResult,
-            rp_send_service_email($payload,$infoAttachments,$modoPrueba)
+            rp_send_service_email($payload,$allAttachments,$modoPrueba)
         );
     }catch(Throwable $emailError){
         $emailResult['error']=$emailError->getMessage();

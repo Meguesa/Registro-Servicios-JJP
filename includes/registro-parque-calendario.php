@@ -24,7 +24,7 @@ function rp_calendar_private_config(): array
 function rp_calendar_parse_local(string $value): DateTimeImmutable
 {
     $value = trim($value);
-    foreach (['d/m/Y H:i','Y-m-d\\TH:i:s','Y-m-d\\TH:i'] as $format) {
+    foreach (['d/m/Y H:i','Y-m-d H:i','Y-m-d\\TH:i:s','Y-m-d\\TH:i'] as $format) {
         $dt = DateTimeImmutable::createFromFormat($format, $value, new DateTimeZone('America/Monterrey'));
         if ($dt instanceof DateTimeImmutable) return $dt;
     }
@@ -121,12 +121,14 @@ function rp_calendar_create_event(array $payload): array
     $fallecido = trim((string)($payload['fallecido'] ?? ''));
     $tipoServicio = trim((string)($payload['tipoServicio'] ?? ''));
 
-    $tipoPropiedad = mb_strtolower(trim((string)($payload['tipoPlaca'] ?? '')), 'UTF-8') === 'nicho'
-        ? 'NICHO'
-        : 'LOTE';
+    $serviceNorm = rp_calendar_norm((string)($payload['servicio'] ?? ''));
+    $prefix = $serviceNorm === 'totalservicecomplemento'
+        ? 'TSC'
+        : ($serviceNorm === 'totalservice' ? 'TS' : '');
     $ubicacion = implode(' - ', array_values(array_filter([
+        $prefix,
         $seccion,
-        $lote !== '' ? $tipoPropiedad . ' ' . $lote : '',
+        $lote,
         $manzana,
     ], static fn(string $v): bool => $v !== '')));
 

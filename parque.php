@@ -72,8 +72,8 @@ $isPreview = str_contains(
   </section>
 
   <nav class="wizard-steps" aria-label="Progreso del formulario">
-      <button type="button" class="wizard-step active" data-step-target="0"><span>1</span><strong>Servicio</strong><small>Fechas y tipo</small></button>
-      <button type="button" class="wizard-step" data-step-target="1"><span>2</span><strong>Propiedad</strong><small>Sección y placa</small></button>
+      <button type="button" class="wizard-step active" data-step-target="0"><span>1</span><strong>Servicio</strong><small>Fechas y datos</small></button>
+      <button type="button" class="wizard-step" data-step-target="1"><span>2</span><strong>Propiedad</strong><small>Servicio, sección y placa</small></button>
       <button type="button" class="wizard-step" data-step-target="2"><span>3</span><strong>Fallecido</strong><small>Datos personales</small></button>
       <button type="button" class="wizard-step" data-step-target="3"><span>4</span><strong>Operación</strong><small>Liquidación y reubicación</small></button>
       <button type="button" class="wizard-step" data-step-target="4"><span>5</span><strong>Confirmar</strong><small>Resumen final</small></button>
@@ -86,30 +86,27 @@ $isPreview = str_contains(
         <div><h2>Información del servicio</h2><p>Datos principales usados por Eventos Parque y el calendario operativo.</p></div>
       </div>
 
-      <div class="form-grid grid-2">
+      <div class="form-grid grid-4">
         <label>Fecha Inicio
-          <input type="text" name="fechaInicio" id="fechaInicio" class="date-only-picker" placeholder="Ej. 29/09/2026" autocomplete="off" required>
+          <input type="date" name="fechaInicio" id="fechaInicio" required>
         </label>
         <label>Hora Inicio
-          <input type="text" name="horaInicio" id="horaInicio" class="time-only-picker" placeholder="Ej. 10:00" autocomplete="off" required>
+          <input type="time" name="horaInicio" id="horaInicio" step="60" required>
         </label>
         <label>Fecha Fin
-          <input type="text" name="fechaFin" id="fechaFin" class="date-only-picker" placeholder="Ej. 29/09/2026" autocomplete="off" required>
+          <input type="date" name="fechaFin" id="fechaFin" required>
         </label>
         <label>Hora Fin
-          <input type="text" name="horaFin" id="horaFin" class="time-only-picker" placeholder="Ej. 12:00" autocomplete="off" required>
+          <input type="time" name="horaFin" id="horaFin" step="60" required>
         </label>
+      </div>
+
+      <div class="form-grid grid-2">
         <label>Velación
           <select name="velacion" id="velacion" required></select>
         </label>
         <label>Previsión / Uso Inmediato
           <select name="previsionUsoInmediato" id="previsionUsoInmediato" required></select>
-        </label>
-        <label>Tipo de Servicio
-          <select name="tipoServicio" id="tipoServicio" required></select>
-        </label>
-        <label>Servicio
-          <select name="servicio" id="servicioParque" required></select>
         </label>
         <label>Asistente Funerario
           <input name="asistenteFunerarioTexto" id="asistenteFunerarioTexto" placeholder="Ej. Nombre del asistente" required>
@@ -124,6 +121,15 @@ $isPreview = str_contains(
       <div class="section-title">
         <span>2</span>
         <div><h2>Propiedad y placas</h2><p>Ubicación de la propiedad y reglas actuales de Nicho, Urna y Granito.</p></div>
+      </div>
+
+      <div class="form-grid grid-2">
+        <label>Tipo de Servicio
+          <select name="tipoServicio" id="tipoServicio" required></select>
+        </label>
+        <label>Servicio
+          <select name="servicio" id="servicioParque" required></select>
+        </label>
       </div>
 
       <div class="form-grid grid-3">
