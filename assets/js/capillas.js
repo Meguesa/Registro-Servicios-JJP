@@ -734,10 +734,46 @@ async function rsQrFileForEsquela(){
 
 async function rsCroppedFile(){
   const value=String(document.getElementById("esquelaProcesada")?.value||"");
-  if(!value.startsWith("data:image/")) return null;
-  const response=await fetch(value);
-  const blob=await response.blob();
-  return new File([blob],"Imagen_Esquela.jpg",{type:blob.type||"image/jpeg"});
+
+  // 1) Si el usuario ya aplico el recorte, usar exactamente esa imagen.
+  if(value.startsWith("data:image/")){
+    const response=await fetch(value);
+    const blob=await response.blob();
+    return new File([blob],"Imagen_Esquela.jpg",{type:blob.type||"image/jpeg"});
+  }
+
+  // 2) Si selecciono una foto pero no presiono "Aplicar", tomar el recorte
+  // actual del editor automaticamente al publicar/guardar borrador.
+  if(cropper){
+    const canvas=cropper.getCroppedCanvas({
+      width:800,
+      height:1000,
+      imageSmoothingEnabled:true,
+      imageSmoothingQuality:"high"
+    });
+    if(canvas){
+      const blob=await new Promise((resolve,reject)=>{
+        canvas.toBlob(
+          value=>value?resolve(value):reject(new Error("No fue posible preparar la foto de la esquela.")),
+          "image/jpeg",
+          .9
+        );
+      });
+      return new File([blob],"Imagen_Esquela.jpg",{type:"image/jpeg"});
+    }
+  }
+
+  // 3) Ultimo respaldo: si existe un archivo seleccionado pero Cropper no
+  // alcanzo a inicializar, enviar el archivo original. El servidor aplicara
+  // el recorte circular centrado al componer la esquela.
+  const original=esquelaInput?.files?.[0];
+  if(original){
+    return new File([original],"Imagen_Esquela"+(original.name.match(/\.[A-Za-z0-9]+$/)?.[0]||".jpg"),{
+      type:original.type||"image/jpeg"
+    });
+  }
+
+  return null;
 }
 
 async function rsSubmitToSharePoint(){
