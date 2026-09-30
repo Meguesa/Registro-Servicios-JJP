@@ -106,9 +106,32 @@ document.querySelectorAll(".wizard-step").forEach(button=>{
   });
 });
 
+function formatJdjpDateOnly(raw){
+  const digits=String(raw||"").replace(/\D/g,"").slice(0,8);
+  if(digits.length<=2) return digits;
+  if(digits.length<=4) return digits.slice(0,2)+"/"+digits.slice(2);
+  return digits.slice(0,2)+"/"+digits.slice(2,4)+"/"+digits.slice(4);
+}
+
+function applyJdjpDateOnlyMask(el){
+  if(!el || el.dataset.jdjpMask==="1") return;
+  el.dataset.jdjpMask="1";
+  el.addEventListener("input",()=>{
+    const formatted=formatJdjpDateOnly(el.value);
+    if(el.value!==formatted) el.value=formatted;
+  });
+}
+
 if(window.flatpickr && flatpickr.l10ns?.es)flatpickr.localize(flatpickr.l10ns.es);
 document.querySelectorAll(".date-only-picker").forEach(el=>{
-  flatpickr(el,{enableTime:false,dateFormat:"d/m/Y",allowInput:true,disableMobile:true,locale:"es"});
+  applyJdjpDateOnlyMask(el);
+  flatpickr(el,{
+    enableTime:false,
+    dateFormat:"d/m/Y",
+    allowInput:true,
+    disableMobile:true,
+    locale:"es"
+  });
 });
 
 function isVipSection(value){
