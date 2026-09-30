@@ -88,16 +88,16 @@ $isPreview = str_contains(
 
       <div class="form-grid grid-4">
         <label>Fecha Inicio
-          <input type="date" name="fechaInicio" id="fechaInicio" required>
+          <input type="text" name="fechaInicio" id="fechaInicio" class="date-only-picker" placeholder="dd/mm/yyyy" autocomplete="off" required>
         </label>
         <label>Hora Inicio
-          <input type="time" name="horaInicio" id="horaInicio" step="60" required>
+          <input type="time" name="horaInicio" id="horaInicio" step="300" required>
         </label>
         <label>Fecha Fin
-          <input type="date" name="fechaFin" id="fechaFin" required>
+          <input type="text" name="fechaFin" id="fechaFin" class="date-only-picker" placeholder="dd/mm/yyyy" autocomplete="off" required>
         </label>
         <label>Hora Fin
-          <input type="time" name="horaFin" id="horaFin" step="60" required>
+          <input type="time" name="horaFin" id="horaFin" step="300" required>
         </label>
       </div>
 
