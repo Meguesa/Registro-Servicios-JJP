@@ -9,6 +9,7 @@ require_once __DIR__ . '/../includes/registro-sharepoint.php';
 require_once __DIR__ . '/../includes/registro-parque-calendario.php';
 require_once __DIR__ . '/../includes/registro-parque-imagenes.php';
 require_once __DIR__ . '/../includes/registro-parque-correo.php';
+require_once __DIR__ . '/../includes/registro-parque-documentos.php';
 require_once __DIR__ . '/../includes/registro-storage.php';
 
 function rp_json(int $status, array $payload): never
@@ -366,9 +367,16 @@ try{
     ];
     try{
         $infoAttachments=rp_generate_information_images($payload);
+        $operationalAttachments=rp_generate_operational_tables($payload);
+        $letterAttachments=rp_generate_letter_attachments($payload);
+        $allAttachments=array_merge(
+            $infoAttachments,
+            $operationalAttachments,
+            $letterAttachments
+        );
         $emailResult=array_merge(
             $emailResult,
-            rp_send_service_email($payload,$infoAttachments,$modoPrueba)
+            rp_send_service_email($payload,$allAttachments,$modoPrueba)
         );
     }catch(Throwable $emailError){
         $emailResult['error']=$emailError->getMessage();
