@@ -65,11 +65,13 @@ function rp_email_location(array $payload): string
     $seccion=trim((string)($payload['seccion']??''));
     $manzana=trim((string)($payload['manzana']??''));
     $lote=trim((string)($payload['numLoteNicho']??''));
-    $tipo=mb_strtolower(trim((string)($payload['tipoPlaca']??'')),'UTF-8')==='nicho'?'NICHO':'LOTE';
+    $serviceNorm=strtolower((string)preg_replace('/[^a-z0-9]+/','',@iconv('UTF-8','ASCII//TRANSLIT//IGNORE',(string)($payload['servicio']??''))?:''));
+    $prefix=$serviceNorm==='totalservicecomplemento'?'TSC':($serviceNorm==='totalservice'?'TS':'');
 
     return implode(' - ',array_values(array_filter([
+        $prefix,
         $seccion,
-        $lote!==''?$tipo.' '.$lote:'',
+        $lote,
         $manzana,
     ],static fn(string $v):bool=>$v!=='')));
 }
