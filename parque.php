@@ -72,8 +72,8 @@ $isPreview = str_contains(
   </section>
 
   <nav class="wizard-steps" aria-label="Progreso del formulario">
-      <button type="button" class="wizard-step active" data-step-target="0"><span>1</span><strong>Servicio</strong><small>Fechas y tipo</small></button>
-      <button type="button" class="wizard-step" data-step-target="1"><span>2</span><strong>Propiedad</strong><small>Sección y placa</small></button>
+      <button type="button" class="wizard-step active" data-step-target="0"><span>1</span><strong>Servicio</strong><small>Fechas y datos</small></button>
+      <button type="button" class="wizard-step" data-step-target="1"><span>2</span><strong>Propiedad</strong><small>Servicio, sección y placa</small></button>
       <button type="button" class="wizard-step" data-step-target="2"><span>3</span><strong>Fallecido</strong><small>Datos personales</small></button>
       <button type="button" class="wizard-step" data-step-target="3"><span>4</span><strong>Operación</strong><small>Liquidación y reubicación</small></button>
       <button type="button" class="wizard-step" data-step-target="4"><span>5</span><strong>Confirmar</strong><small>Resumen final</small></button>
