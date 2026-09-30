@@ -44,7 +44,7 @@ function rs_esquela_image_from_bytes(string $bytes): ?GdImage
 
 function rs_esquela_load_asset(string $baseName): ?GdImage
 {
-    $dir = __DIR__ . '/assets/esquelas';
+    $dir = dirname(__DIR__) . '/assets/esquelas';
 
     // 1) Archivos binarios directos, si existen.
     foreach (['jpg', 'jpeg', 'png'] as $ext) {
@@ -710,7 +710,9 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?
 
     $background = rs_esquela_asset_image($assets, $backgroundKey);
     if (!$background instanceof GdImage) {
-        $background = rs_esquela_fallback_background($backgroundKey, $width, $height);
+        throw new RuntimeException(
+            'No se pudo cargar el fondo de esquela requerido: ' . $backgroundKey . '.'
+        );
     }
 
     rs_esquela_copy_cover($canvas, $background);
@@ -723,6 +725,10 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?
     $photo = rs_esquela_image_from_bytes((string)$photoBytes);
     if (!$photo instanceof GdImage) {
         $photo = rs_esquela_asset_image($assets, 'foto_fallback');
+    }
+    if (!$photo instanceof GdImage) {
+        imagedestroy($canvas);
+        throw new RuntimeException('No se pudo cargar la fotografia ni la imagen de respaldo de la esquela.');
     }
 
     rs_esquela_draw_circular_photo($canvas, $photo, $S(360), $S(150), $S(238));
