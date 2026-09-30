@@ -148,12 +148,16 @@ function rp_doc_letter_pdf(array $payload,string $kind): array
             145,$y,985,$black,$font);
         $y+=30;
         $y=rp_doc_paragraph($image,
-            'EL RETIRO SE REALIZA DE TOTAL CONFORMIDAD, CUBRIENDO LOS COSTOS CORRESPONDIENTES Y CEDIENDO A MEGUESA, S.A. DE C.V. EL DERECHO DE USO DEL NICHO EN LOS TERMINOS DEL CONTRATO.',
-            145,$y,985,$black,$font);
-        $y+=35;
+            'RETIRAR LAS CENIZAS SIENDO POR MI CUENTA LOS COSTOS QUE SE GENEREN. ESTO DEBIDO A QUE HUBO INCUMPLIMIENTO DE PAGO POR PARTE MIA DE LA OBLIGACION CONTRAIDA CON SU EMPRESA MEGUESA, S.A. DE C.V., LEGITIMA PROPIETARIA DEL PARQUE DE DESCANSO JARDINES DE JUAN PABLO.',
+            145,$y,985,$black,$font,18.0,31);
+        $y+=24;
         $y=rp_doc_paragraph($image,
-            'RECIBO DE CONFORMIDAD LAS CENIZAS DE MI '.$relationship.' Y AGRADEZCO LAS ATENCIONES BRINDADAS. ESTA CARTA ES DE CARACTER IRREVOCABLE.',
-            145,$y,985,$black,$font);
+            'DICHO RETIRO LO REALIZO DE TOTAL CONFORMIDAD PAGANDO LOS COSTOS CORRESPONDIENTES, SIN PREJUICIO ALGUNO DEMANDABLE PARA LA EMPRESA MEGUESA S.A. DE C.V. POR LO TANTO DEVUELVO Y CEDO EL DERECHO DE USO A PERPETUIDAD DEL NICHO ADQUIRIDO SEGUN NUMERO DE CONTRATO ANTES MENCIONADO.',
+            145,$y,985,$black,$font,18.0,31);
+        $y+=24;
+        $y=rp_doc_paragraph($image,
+            'RECIBO DE CONFORMIDAD LAS CENIZAS DE MI '.$relationship.' Y AGRADEZCO LAS ATENCIONES BRINDADAS A LA PRESENTE. ESTA CARTA ES DE CARACTER IRREVOCABLE.',
+            145,$y,985,$black,$font,18.0,31);
     }elseif($kind==='exhumacion'){
         $title='EXHUMACION DE RESTOS';
         $filename='Carta_Exhumacion.pdf';
@@ -168,28 +172,32 @@ function rp_doc_letter_pdf(array $payload,string $kind): array
             145,$y,985,$black,$font);
         $y+=30;
         $y=rp_doc_paragraph($image,
-            'LA EXHUMACION SE REALIZA DE TOTAL CONFORMIDAD, CUBRIENDO LOS COSTOS DE EXHUMACION Y TRASLADO, ASI COMO LOS GASTOS ADMINISTRATIVOS QUE CORRESPONDAN.',
-            145,$y,985,$black,$font);
-        $y+=35;
+            'SIENDO POR MI CUENTA CUBIERTOS LOS COSTOS DE EXHUMACION Y TRASLADO, ASI COMO EL PAGO CONVENCIONAL POR USO DE LOTE Y GASTOS ADMINISTRATIVOS DE COBRANZA.',
+            145,$y,985,$black,$font,18.0,31);
+        $y+=24;
         $y=rp_doc_paragraph($image,
-            'RECIBO DE CONFORMIDAD LOS RESTOS DE MI '.$relationship.' Y AGRADEZCO LAS ATENCIONES BRINDADAS. ESTA CARTA ES DE CARACTER IRREVOCABLE.',
-            145,$y,985,$black,$font);
+            'DICHA EXHUMACION LA REALIZO DE TOTAL CONFORMIDAD PAGANDO LOS COSTOS CORRESPONDIENTES, SIN PREJUICIO ALGUNO DEMANDABLE PARA LA EMPRESA MEGUESA S.A. DE C.V. POR LO TANTO DEVUELVO Y CEDO EL DERECHO DE USO A PERPETUIDAD DEL LOTE ADQUIRIDO SEGUN NUMERO DE CONTRATO ANTES MENCIONADO.',
+            145,$y,985,$black,$font,18.0,31);
+        $y+=24;
+        $y=rp_doc_paragraph($image,
+            'RECIBO DE CONFORMIDAD LOS RESTOS DE MI '.$relationship.' Y AGRADEZCO LAS ATENCIONES BRINDADAS A LA PRESENTE. ESTA CARTA ES DE CARACTER IRREVOCABLE.',
+            145,$y,985,$black,$font,18.0,31);
     }else{
         $title='REUBICACION DE LOTE';
         $filename='Carta_Reubicacion.pdf';
         rs_carta_center($image,$cx,$y,'ATENCION: '.$holder,$black,$font,24.0,true);
         $y+=90;
         $y=rp_doc_paragraph($image,
-            'POR MEDIO DE LA PRESENTE LE INFORMAMOS QUE, DEBIDO A LA NECESIDAD DE USO SOBRE SU LOTE Y DE ACUERDO CON LAS CONDICIONES DEL CONTRATO, ES NECESARIO REALIZAR UNA REUBICACION PARA PODER LLEVAR A CABO EL SERVICIO.',
-            145,$y,985,$black,$font);
-        $y+=35;
+            'POR MEDIO DE LA PRESENTE LE INFORMAMOS QUE DEBIDO A LA NECESIDAD DE USO SOBRE SU LOTE QUE AUN ESTA EN PROCESO DE CONSTRUCCION Y DE ACUERDO A LAS CONDICIONES DE SU CONTRATO, SE LE ASIGNARA UNO CON LAS MISMAS CARACTERISTICAS Y PRECIO U OTRO PREVIA AUTORIZACION Y ACUERDO CON EL CLIENTE.',
+            145,$y,985,$black,$font,18.0,31);
+        $y+=24;
         $y=rp_doc_paragraph($image,
-            'UBICACION ORIGINAL: '.$location.'. NUEVA UBICACION: '.($newLocation!==''?$newLocation:'POR CONFIRMAR').'. FALLECIDO(A): '.$deceased.'.',
-            145,$y,985,$black,$font);
-        $y+=35;
+            'SU LOTE '.$location.' SERA REASIGNADO POR EL LOTE '.($newLocation!==''?$newLocation:'POR CONFIRMAR').' PARA PODER LLEVAR A CABO SU SERVICIO DE INHUMACION A SU SER QUERIDO '.$deceased.' CON LA CALIDAD Y SERVICIO CON LOS CUALES COMO EMPRESA NOS COMPROMETIMOS.',
+            145,$y,985,$black,$font,18.0,31);
+        $y+=24;
         $y=rp_doc_paragraph($image,
-            'LA REASIGNACION SE REALIZARA SIN CARGO ADICIONAL POR ESTE CONCEPTO. SIN MAS POR EL MOMENTO, QUEDAMOS A SUS ORDENES.',
-            145,$y,985,$black,$font);
+            'LA REASIGNACION QUEDA SIN NINGUN CARGO ADICIONAL POR ESTE CONCEPTO. SIN MAS POR EL MOMENTO QUEDO A SUS ORDENES.',
+            145,$y,985,$black,$font,18.0,31);
     }
 
     rs_carta_center($image,$cx,1425,$title,$gray,$font,18.0,true);
