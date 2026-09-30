@@ -859,7 +859,7 @@ function rs_image_service_columns(array $payload): array
         ['label' => 'Fecha de defunción', 'value' => rs_image_date((string) ($payload['fechaDefuncion'] ?? ''), false)],
         ['label' => 'Edad', 'value' => rs_image_clean_text($payload['edad'] ?? '')],
         ['label' => 'Referencia', 'value' => rs_image_reference($payload)],
-        ['label' => 'Número de servicio', 'value' => rs_image_clean_text($payload['numeroServicio'] ?? $payload['numeroReferencia'] ?? '')],
+        ['label' => 'Número de servicio', 'value' => rs_image_clean_text($payload['numeroReferencia'] ?? '')],
         ['label' => 'Ataúd / Urna', 'value' => rs_image_clean_text($payload['tipoAtaud'] ?? '')],
     ];
 
