@@ -8,11 +8,14 @@ function rp_image_location(array $payload): string
     $seccion=rs_image_clean_text($payload['seccion']??'');
     $manzana=rs_image_clean_text($payload['manzana']??'');
     $lote=rs_image_clean_text($payload['numLoteNicho']??'');
-    $tipo=rs_image_lower((string)($payload['tipoPlaca']??''))==='nicho'?'NICHO':'LOTE';
+    $service=rs_image_lower((string)($payload['servicio']??''));
+    $serviceNorm=preg_replace('/[^a-z0-9]+/','',$service)??'';
+    $prefix=$serviceNorm==='totalservicecomplemento'?'TSC':($serviceNorm==='totalservice'?'TS':'');
 
     return implode(' - ',array_values(array_filter([
+        $prefix,
         $seccion,
-        $lote!==''?$tipo.' '.$lote:'',
+        $lote,
         $manzana,
     ],static fn(string $v):bool=>$v!=='')));
 }
