@@ -30,6 +30,41 @@ function rp_doc_flower_arrangement(array $payload): string
 }
 
 
+function rp_nicho_template_png(): string
+{
+    $local=dirname(__DIR__).'/assets/templates/parque/plantilla_placa_nicho_correcta.png';
+    if(is_file($local) && is_readable($local)){
+        $bytes=@file_get_contents($local);
+        if(is_string($bytes) && str_starts_with($bytes,"\x89PNG\r\n\x1a\n")){
+            return $bytes;
+        }
+    }
+
+    $url='https://raw.githubusercontent.com/Meguesa/Registro-Servicios-JJP/main/assets/templates/parque/plantilla_placa_nicho_correcta.png';
+    $curl=curl_init($url);
+    if($curl===false){
+        throw new RuntimeException('No fue posible inicializar la plantilla de placa de nicho.');
+    }
+    curl_setopt_array($curl,[
+        CURLOPT_RETURNTRANSFER=>true,
+        CURLOPT_FOLLOWLOCATION=>true,
+        CURLOPT_CONNECTTIMEOUT=>8,
+        CURLOPT_TIMEOUT=>20,
+        CURLOPT_SSL_VERIFYPEER=>true,
+        CURLOPT_SSL_VERIFYHOST=>2,
+        CURLOPT_USERAGENT=>'Registro-Servicios-JJP',
+        CURLOPT_HTTPHEADER=>['Accept: image/png'],
+    ]);
+    $bytes=curl_exec($curl);
+    $status=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE);
+    curl_close($curl);
+
+    if(!is_string($bytes) || $status<200 || $status>=300 || !str_starts_with($bytes,"\x89PNG\r\n\x1a\n")){
+        throw new RuntimeException('No fue posible cargar la plantilla correcta de placa de nicho.');
+    }
+    return $bytes;
+}
+
 function rp_generate_nicho_plate(array $payload): array
 {
     rs_image_require_gd();
@@ -39,59 +74,52 @@ function rp_generate_nicho_plate(array $payload): array
         throw new RuntimeException('La placa de nicho requiere Nombre de Familia.');
     }
 
-    // Proporción exacta de la plantilla oficial: 544.8 x 271.2 pt a 300 dpi.
-    $width=2270;
-    $height=1130;
-    $image=imagecreatetruecolor($width,$height);
+    // La plantilla ya contiene "FAMILIA" y el logotipo inferior.
+    // Evitar duplicar la palabra cuando el usuario captura "FAMILIA ...".
+    $family=preg_replace('/^FAMILIA\s+/u','',$family)??$family;
+    $family=trim($family);
+    if($family===''){
+        throw new RuntimeException('La placa de nicho requiere el nombre de la familia.');
+    }
+
+    $image=@imagecreatefromstring(rp_nicho_template_png());
     if(!$image instanceof GdImage){
-        throw new RuntimeException('No fue posible crear la placa de nicho.');
+        throw new RuntimeException('No fue posible abrir la plantilla correcta de placa de nicho.');
     }
 
-    $white=imagecolorallocate($image,255,255,255);
-    $black=imagecolorallocate($image,0,0,0);
-    imagefilledrectangle($image,0,0,$width,$height,$white);
-
-    // Cuatro logotipos, respetando la distribución del PDF oficial.
-    $logoW=260;
-    $logoH=150;
-    $positions=[
-        [70,170],
-        [580,170],
-        [1090,170],
-        [1600,170],
-    ];
-    foreach($positions as [$x,$y]){
-        rs_plate_draw_logo($image,$x,$y,$logoW,$logoH);
-    }
-
-    // Nombre de familia centrado en el ancho total de la placa.
     try{
-        $font=rs_plate_pagella_font_path();
-    }catch(Throwable){
-        $font=rs_image_bold_font_path() ?: rs_image_font_path();
-    }
-    if($font===null){
-        imagedestroy($image);
-        throw new RuntimeException('No fue posible resolver la tipografia para la placa de nicho.');
-    }
+        $font=rs_image_font_path();
+        if($font===null){
+            throw new RuntimeException('No fue posible resolver la tipografia de la placa de nicho.');
+        }
 
-    $size=108.0;
-    while($size>58.0){
+        $black=imagecolorallocate($image,0,0,0);
+        $width=imagesx($image);
+
+        // El formato oficial usa el apellido/nombre familiar centrado debajo de
+        // la palabra FAMILIA. Reducir la fuente solo cuando el texto sea largo.
+        $maxWidth=(int)round($width*0.68);
+        $size=116.0;
+        while($size>54.0){
+            $box=@imagettfbbox($size,0,$font,$family);
+            $textWidth=is_array($box)?abs((int)$box[2]-(int)$box[0]):0;
+            if($textWidth<=$maxWidth)break;
+            $size-=3.0;
+        }
+
         $box=@imagettfbbox($size,0,$font,$family);
         $textWidth=is_array($box)?abs((int)$box[2]-(int)$box[0]):0;
-        if($textWidth<=1950)break;
-        $size-=3.0;
+        $x=max(20,(int)round(($width-$textWidth)/2));
+
+        // Baseline calibrada contra el formato correcto entregado por Operaciones.
+        imagettftext($image,$size,0,$x,565,$black,$font,$family);
+
+        ob_start();
+        imagepng($image,null,6);
+        $png=(string)ob_get_clean();
+    }finally{
+        imagedestroy($image);
     }
-
-    $box=@imagettfbbox($size,0,$font,$family);
-    $textWidth=is_array($box)?abs((int)$box[2]-(int)$box[0]):0;
-    $x=max(30,(int)round(($width-$textWidth)/2));
-    imagettftext($image,$size,0,$x,665,$black,$font,$family);
-
-    ob_start();
-    imagepng($image,null,6);
-    $png=(string)ob_get_clean();
-    imagedestroy($image);
 
     if($png===''){
         throw new RuntimeException('No fue posible codificar la placa de nicho.');
