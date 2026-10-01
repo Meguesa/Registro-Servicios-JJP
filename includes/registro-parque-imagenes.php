@@ -37,16 +37,24 @@ function rp_image_service_rows(array $payload): array
 
 function rp_image_property_rows(array $payload): array
 {
+    $hasRelocation=!empty($payload['requiereReubicacion']);
+    $locationLabel=$hasRelocation?'Ubicación anterior':'Ubicación';
+
     $rows=[
         ['label'=>'Sección','value'=>rs_image_clean_text($payload['seccion']??'')],
         ['label'=>'Manzana','value'=>rs_image_clean_text($payload['manzana']??'')],
         ['label'=>'Lote / Nicho','value'=>rs_image_clean_text($payload['numLoteNicho']??'')],
-        ['label'=>'Ubicación','value'=>rp_image_location($payload)],
+        ['label'=>$locationLabel,'value'=>rp_image_location($payload)],
         ['label'=>'Destape','value'=>rs_image_clean_text($payload['destape']??'')],
         ['label'=>'Tipo de placa','value'=>rs_image_clean_text($payload['tipoPlaca']??'')],
         ['label'=>'Nombre de familia','value'=>rs_image_clean_text($payload['nombreFamilia']??'')],
         ['label'=>'Requiere placa de urna adicional','value'=>!empty($payload['requiereCambioUrna'])?'SI':'NO'],
     ];
+
+    if($hasRelocation){
+        $rows[]=['label'=>'Requiere reubicación','value'=>'SI'];
+        $rows[]=['label'=>'Ubicación nueva','value'=>rs_image_clean_text($payload['ubicacionNueva']??'')];
+    }
 
     $frase=rs_image_clean_text($payload['frase']??'');
     if($frase!==''){
@@ -64,11 +72,9 @@ function rp_image_person_rows(array $payload): array
         ['label'=>'Fecha de nacimiento','value'=>rs_image_date((string)($payload['fechaNacimiento']??''),false)],
         ['label'=>'Fecha de defunción','value'=>rs_image_date((string)($payload['fechaDefuncion']??''),false)],
         ['label'=>'Estatus de liquidación','value'=>rs_image_clean_text($payload['estatusLiquidacion']??'')],
-        ['label'=>'Requiere reubicación','value'=>!empty($payload['requiereReubicacion'])?'SI':'NO'],
     ];
 
     if(!empty($payload['requiereReubicacion'])){
-        $rows[]=['label'=>'Ubicación nueva','value'=>rs_image_clean_text($payload['ubicacionNueva']??'')];
         $rows[]=['label'=>'Motivo de reubicación','value'=>rs_image_clean_text($payload['motivoReubicacion']??'')];
     }
 
