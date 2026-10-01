@@ -3,7 +3,7 @@
 ## Fuente de verdad
 
 - Capillas: lista SharePoint `Eventos Capillas`.
-- Parque: lista SharePoint `Eventos Parque` cuando se habilite su módulo.
+- Parque: lista SharePoint `Eventos Parque`.
 
 ## Capillas
 
@@ -22,11 +22,10 @@ Responsabilidades del módulo:
 
 El flujo antiguo de Power Automate de Eventos Capillas debe estar desactivado para evitar duplicidades.
 
-## Modo prueba
+## Modos de operación
 
-El modo normal es el predeterminado. Solo Sistemas y Gabriel Guerra pueden activar el modo prueba desde el formulario.
-
-El backend valida nuevamente el permiso, por lo que no depende únicamente del control visual del navegador.
+- Capillas conserva su modo de prueba restringido para validaciones controladas.
+- Parque opera únicamente en producción desde la herramienta oficial.
 
 ## Portal
 
@@ -35,14 +34,14 @@ Rutas productivas:
 - `/registro-servicios/` -> selector de área.
 - `/registro-servicios/mis-servicios.php` -> servicios de Capillas.
 - `/registro-servicios/capillas.php` -> captura de Capillas.
-
-Parque permanece visible como **En desarrollo**.
+- `/registro-servicios/mis-servicios.php?area=parque` -> servicios de Parque.
+- `/registro-servicios/parque.php` -> captura oficial de Parque.
 
 ## Despliegue
 
 La publicación se controla desde `Portal-Interno-JJP` mediante GitHub Actions y FTPS.
 
-Se conserva un workflow de preview para validaciones controladas, pero los endpoints PHP de diagnóstico temporal ya no forman parte del despliegue.
+El despliegue oficial publica Registro de Servicios en `/registro-servicios/`. El workflow aislado de preview fue retirado al liberar Parque a producción.
 
 
 ## Organización del repositorio
