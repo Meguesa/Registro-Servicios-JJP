@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/registro-parque-imagenes.php';
 require_once __DIR__ . '/registro-carta.php';
+require_once __DIR__ . '/registro-placa.php';
 
 function rp_doc_norm(string $value): string
 {
@@ -26,6 +27,81 @@ function rp_doc_flower_arrangement(array $payload): string
         return '40 Rosas Blancas y 2 arreglos de exterior';
     }
     return '40 Rosas Blancas y 2 arreglos de exterior';
+}
+
+
+function rp_generate_nicho_plate(array $payload): array
+{
+    rs_image_require_gd();
+
+    $family=mb_strtoupper(trim((string)($payload['nombreFamilia']??'')),'UTF-8');
+    if($family===''){
+        throw new RuntimeException('La placa de nicho requiere Nombre de Familia.');
+    }
+
+    // Proporción exacta de la plantilla oficial: 544.8 x 271.2 pt a 300 dpi.
+    $width=2270;
+    $height=1130;
+    $image=imagecreatetruecolor($width,$height);
+    if(!$image instanceof GdImage){
+        throw new RuntimeException('No fue posible crear la placa de nicho.');
+    }
+
+    $white=imagecolorallocate($image,255,255,255);
+    $black=imagecolorallocate($image,0,0,0);
+    imagefilledrectangle($image,0,0,$width,$height,$white);
+
+    // Cuatro logotipos, respetando la distribución del PDF oficial.
+    $logoW=260;
+    $logoH=150;
+    $positions=[
+        [70,170],
+        [580,170],
+        [1090,170],
+        [1600,170],
+    ];
+    foreach($positions as [$x,$y]){
+        rs_plate_draw_logo($image,$x,$y,$logoW,$logoH);
+    }
+
+    // Nombre de familia centrado en el ancho total de la placa.
+    try{
+        $font=rs_plate_pagella_font_path();
+    }catch(Throwable){
+        $font=rs_image_bold_font_path() ?: rs_image_font_path();
+    }
+    if($font===null){
+        imagedestroy($image);
+        throw new RuntimeException('No fue posible resolver la tipografia para la placa de nicho.');
+    }
+
+    $size=108.0;
+    while($size>58.0){
+        $box=@imagettfbbox($size,0,$font,$family);
+        $textWidth=is_array($box)?abs((int)$box[2]-(int)$box[0]):0;
+        if($textWidth<=1950)break;
+        $size-=3.0;
+    }
+
+    $box=@imagettfbbox($size,0,$font,$family);
+    $textWidth=is_array($box)?abs((int)$box[2]-(int)$box[0]):0;
+    $x=max(30,(int)round(($width-$textWidth)/2));
+    imagettftext($image,$size,0,$x,665,$black,$font,$family);
+
+    ob_start();
+    imagepng($image,null,6);
+    $png=(string)ob_get_clean();
+    imagedestroy($image);
+
+    if($png===''){
+        throw new RuntimeException('No fue posible codificar la placa de nicho.');
+    }
+
+    return [
+        'name'=>'Placa_Nicho.png',
+        'contentType'=>'image/png',
+        'bytes'=>$png,
+    ];
 }
 
 /**
@@ -53,6 +129,11 @@ function rp_generate_operational_tables(array $payload): array
                 ]
             ),
         ];
+    }
+
+    $destape=rp_doc_norm((string)($payload['destape']??''));
+    if($typePlate==='nicho' && $destape==='primero'){
+        $attachments[]=rp_generate_nicho_plate($payload);
     }
 
     if($typePlate==='granito'){
