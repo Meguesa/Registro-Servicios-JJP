@@ -260,9 +260,11 @@ try{
     $fieldIndex=rp_fields_by_norm(is_array($fieldRows)?$fieldRows:[]);
 
     $sp=[];
-    $modoPrueba=(bool)($payload['modoPrueba']??false);
+    // Parque opera oficialmente en producción. Mantener ModoPrueba en No
+    // para compatibilidad con la lista de SharePoint existente.
+    $modoPrueba=false;
 
-    rp_add_value($sp,$fieldIndex,['ModoPrueba','Modo Prueba'],$modoPrueba,false);
+    rp_add_value($sp,$fieldIndex,['ModoPrueba','Modo Prueba'],false,false);
     rp_add_value($sp,$fieldIndex,['FechaHoraInicio','Fecha Hora Inicio','Fecha y Hora Inicio'],rp_local_datetime_to_utc((string)$payload['fechaHoraInicio']));
     rp_add_value($sp,$fieldIndex,['FechaHoraFin','Fecha Hora Fin','Fecha y Hora Fin'],rp_local_datetime_to_utc((string)$payload['fechaHoraFin']));
     rp_add_value($sp,$fieldIndex,['Velacion','Velación'],trim((string)$payload['velacion']));
@@ -360,20 +362,16 @@ try{
     $itemId=(int)($created['Id']??$created['ID']??0);
     if($itemId<=0)throw new RuntimeException('SharePoint creo el registro, pero no devolvio un ID utilizable.');
 
-    // FASE 1 DEL REEMPLAZO DE POWER AUTOMATE:
-    // crear directamente el evento de Parque desde Registro de Servicios.
-    // En preview / ModoPrueba el asunto queda marcado como (PRUEBA).
+    // Crear directamente el evento oficial de Parque desde Registro de Servicios.
     $calendarResult=[
         'enabled'=>false,
         'created'=>false,
         'error'=>null,
     ];
     try{
-        $calendarPayload=$payload;
-        $calendarPayload['_previewMode']=$modoPrueba;
         $calendarResult=array_merge(
             $calendarResult,
-            rp_calendar_create_event($calendarPayload)
+            rp_calendar_create_event($payload)
         );
     }catch(Throwable $calendarError){
         // El elemento ya existe en SharePoint; no pedir al usuario repetir
@@ -404,7 +402,7 @@ try{
         );
         $emailResult=array_merge(
             $emailResult,
-            rp_send_service_email($payload,$allAttachments,$modoPrueba)
+            rp_send_service_email($payload,$allAttachments)
         );
     }catch(Throwable $emailError){
         $emailResult['error']=$emailError->getMessage();
@@ -419,7 +417,6 @@ try{
         'ok'=>true,
         'itemId'=>$itemId,
         'list'=>$listTitle,
-        'modoPrueba'=>$modoPrueba,
         'message'=>'Servicio Parque registrado correctamente en SharePoint.',
         'calendar'=>$calendarResult,
         'email'=>$emailResult,
