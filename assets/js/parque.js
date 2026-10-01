@@ -58,6 +58,8 @@ fillSelect("tipoServicio",PARQUE_TIPOS);
 fillSelect("servicioParque",PARQUE_SERVICIOS);
 fillSelect("seccion",PARQUE_SECCIONES);
 fillSelect("manzana",PARQUE_MANZANAS);
+fillSelect("seccionNueva",PARQUE_SECCIONES);
+fillSelect("manzanaNueva",PARQUE_MANZANAS);
 fillSelect("destape",PARQUE_DESTAPE);
 fillSelect("tipoPlaca",PARQUE_PLACAS);
 fillSelect("parentescoTitular",PARQUE_PARENTESCO);
@@ -197,20 +199,62 @@ function syncPropertyRules(){
   }
   syncFraseRule();
   syncLocation();
+  syncNewLocation();
 }
 ["destape","tipoPlaca","seccion","manzana","numLoteNicho"].forEach(id=>document.getElementById(id)?.addEventListener("input",syncPropertyRules));
 document.getElementById("tipoServicio")?.addEventListener("change",syncTipoPlacaPorServicio);
-document.getElementById("servicioParque")?.addEventListener("change",syncLocation);
+document.getElementById("servicioParque")?.addEventListener("change",()=>{
+  syncLocation();
+  syncNewLocation();
+});
+
+function syncNewLocation(){
+  const sec=document.getElementById("seccionNueva")?.value||"";
+  const man=document.getElementById("manzanaNueva")?.value||"";
+  const lote=document.getElementById("numLoteNichoNuevo")?.value||"";
+  const parts=[];
+  const prefix=servicePrefix();
+  if(prefix)parts.push(prefix);
+  if(sec)parts.push(sec);
+  if(lote)parts.push(lote);
+  if(man)parts.push(man);
+
+  const value=parts.join(" - ");
+  const preview=document.getElementById("ubicacionNuevaPreview");
+  const hidden=document.getElementById("ubicacionNueva");
+  if(preview)preview.textContent=value||"—";
+  if(hidden)hidden.value=value;
+}
 
 function syncReubicacion(){
   const active=document.getElementById("requiereReubicacion")?.checked===true;
   document.getElementById("reubicacionFields")?.classList.toggle("hidden",!active);
-  const nueva=document.getElementById("ubicacionNueva");
+
+  const seccionNueva=document.getElementById("seccionNueva");
+  const manzanaNueva=document.getElementById("manzanaNueva");
+  const loteNuevo=document.getElementById("numLoteNichoNuevo");
   const motivo=document.getElementById("motivoReubicacion");
-  if(nueva)nueva.required=active;
+
+  if(seccionNueva)seccionNueva.required=active;
+  if(manzanaNueva)manzanaNueva.required=active;
+  if(loteNuevo)loteNuevo.required=active;
   if(motivo)motivo.required=active;
+
+  if(!active){
+    if(seccionNueva)seccionNueva.value="";
+    if(manzanaNueva)manzanaNueva.value="";
+    if(loteNuevo)loteNuevo.value="";
+    const hidden=document.getElementById("ubicacionNueva");
+    if(hidden)hidden.value="";
+  }
+
+  syncNewLocation();
 }
 document.getElementById("requiereReubicacion")?.addEventListener("change",syncReubicacion);
+["seccionNueva","manzanaNueva","numLoteNichoNuevo"].forEach(id=>{
+  document.getElementById(id)?.addEventListener("input",syncNewLocation);
+  document.getElementById(id)?.addEventListener("change",syncNewLocation);
+});
 
 function syncTestModeUi(){
   const active=document.getElementById("modoPrueba")?.checked===true;
@@ -287,6 +331,9 @@ function payload(){
     fechaDefuncion:fieldValue("fechaDefuncion"),
     estatusLiquidacion:fieldValue("estatusLiquidacion"),
     requiereReubicacion:fieldValue("requiereReubicacion"),
+    seccionNueva:fieldValue("seccionNueva"),
+    manzanaNueva:fieldValue("manzanaNueva"),
+    numLoteNichoNuevo:fieldValue("numLoteNichoNuevo"),
     ubicacionNueva:fieldValue("ubicacionNueva"),
     motivoReubicacion:fieldValue("motivoReubicacion"),
     observaciones:fieldValue("observaciones"),
@@ -368,7 +415,7 @@ function applyParqueDraft(p){
     "tipoServicio","servicio","asistenteFunerarioTexto","numeroContrato","seccion",
     "manzana","numLoteNicho","destape","tipoPlaca","nombreFamilia","titular",
     "fallecido","parentescoTitular","frase","fechaNacimiento","fechaDefuncion",
-    "estatusLiquidacion","ubicacionNueva","motivoReubicacion","observaciones"
+    "estatusLiquidacion","seccionNueva","manzanaNueva","numLoteNichoNuevo","ubicacionNueva","motivoReubicacion","observaciones"
   ].forEach(k=>setParqueField(k,p[k]??""));
   setParqueField("requiereCambioUrna",!!p.requiereCambioUrna);
   setParqueField("requiereReubicacion",!!p.requiereReubicacion);
