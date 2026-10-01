@@ -5,17 +5,6 @@ $root = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
 require_once $root . '/includes/bootstrap.php';
 portal_require_authentication();
 
-$user = portal_user();
-$userEmail = mb_strtolower(trim((string)($user['email'] ?? '')), 'UTF-8');
-$canUseTestMode = in_array($userEmail, [
-    'sistemas@juanpablo.com.mx',
-    'gabriel.guerra@juanpablo.com.mx',
-], true);
-
-$isPreview = str_contains(
-    (string)($_SERVER['REQUEST_URI'] ?? ''),
-    '/registro-servicios-preview/'
-);
 ?><!doctype html>
 <html lang="es-MX">
 <head>
@@ -57,13 +46,6 @@ $isPreview = str_contains(
       <p>Captura la información por etapas. Los cálculos y campos condicionales conservan la lógica actual de Parque.</p>
     </div>
     <div class="form-banner-meta">
-      <span class="preview-pill" id="modePill"><?= $isPreview ? 'Prueba · conectado a SharePoint' : 'Producción · conectado a SharePoint' ?></span>
-      <?php if ($canUseTestMode): ?>
-      <label class="test-mode-toggle" for="modoPrueba">
-        <span><strong>Modo prueba</strong><small>Solo Sistemas</small></span>
-        <input type="checkbox" id="modoPrueba" name="modoPrueba" <?= $isPreview ? 'checked' : '' ?>>
-      </label>
-      <?php endif; ?>
       <div class="step-counter">
         <span>Paso</span>
         <strong><span id="currentStepNumber">1</span> de 5</strong>
@@ -177,10 +159,6 @@ $isPreview = str_contains(
         </label>
       </div>
 
-      <div id="placaWarning" class="preview-warning hidden">
-        <strong>Regla de Nicho</strong>
-        <span>Nicho únicamente puede seleccionarse cuando el destape es Primero.</span>
-      </div>
     </section>
 
     <section class="form-section wizard-panel" data-step="2">
@@ -276,10 +254,6 @@ $isPreview = str_contains(
         </div>
       </div>
 
-      <div class="preview-warning">
-        <strong>Reglas actuales del flujo</strong>
-        <span>No liquidado + Tipo de Placa = Nicho usa Retiro de Cenizas; No liquidado con otra propiedad usa Exhumación. Requiere Reubicación activa la carta correspondiente.</span>
-      </div>
     </section>
 
     <section class="form-section wizard-panel" data-step="4">
@@ -294,18 +268,8 @@ $isPreview = str_contains(
         <div><span>Ubicación</span><strong id="summaryUbicacion">—</strong></div>
         <div><span>Tipo de placa</span><strong id="summaryPlaca">—</strong></div>
         <div><span>Liquidación</span><strong id="summaryLiquidacion">—</strong></div>
-        <div><span>Modo</span><strong id="summaryModo">Producción</strong></div>
       </div>
 
-      <div id="testModeHelp" class="preview-warning" <?= $isPreview ? '' : 'hidden' ?>>
-        <strong>Modo prueba</strong>
-        <span>El registro se enviará a Eventos Parque con ModoPrueba activado para permitir la validación controlada del flujo.</span>
-      </div>
-
-      <div class="selector-notice">
-        <strong>Después de publicar</strong>
-        <span>Calendario, tablas operativas, cartas y correo se procesan directamente desde Registro de Servicios cuando corresponda.</span>
-      </div>
     </section>
 
     <div class="wizard-actions">
