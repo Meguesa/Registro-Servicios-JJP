@@ -106,7 +106,6 @@ function rp_send_service_email(array $payload,array $attachments,bool $isTestMod
       .($isTestMode?'<div style="margin-bottom:14px;padding:10px 12px;border:1px solid #d8b45a;background:#fff8e6;"><strong>PRUEBA CONTROLADA - SERVICIOS PARQUE</strong></div>':'')
       .$line('TIPO DE SERVICIO',$type)
       .$line('SERVICIO',trim((string)($payload['servicio']??'')))
-      .$line('VELACION',trim((string)($payload['velacion']??'')))
       .$line('PREVISION/USO INMEDIATO',trim((string)($payload['previsionUsoInmediato']??'')))
       .$line('EVENTO','de '.trim((string)($payload['fechaHoraInicio']??'')).' a '.trim((string)($payload['fechaHoraFin']??'')))
       .'<br>'
