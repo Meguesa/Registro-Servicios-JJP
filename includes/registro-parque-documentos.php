@@ -365,6 +365,72 @@ function rp_doc_pdf_text(
     return $stream;
 }
 
+function rp_doc_pdf_estimated_width(string $text,float $size,float $factor=0.50): float
+{
+    $encoded=function_exists('iconv')
+        ? (@iconv('UTF-8','Windows-1252//TRANSLIT//IGNORE',$text) ?: $text)
+        : $text;
+    return max(0.0,strlen((string)$encoded)*$size*$factor);
+}
+
+/**
+ * Compone un párrafo completo con segmentos de estilo distintos.
+ * Los campos variables pueden ir en negrita/subrayado y el texto restante
+ * fluye alrededor de ellos sin depender de posiciones fijas.
+ *
+ * @param array<int,array{text:string,font?:string,underline?:bool,factor?:float}> $segments
+ */
+function rp_doc_pdf_flow_segments(
+    array $segments,
+    float $left,
+    float $topBaseline,
+    float $width,
+    float $size=9.4,
+    float $lineHeight=13.0
+): string {
+    $x=$left;
+    $y=$topBaseline;
+    $right=$left+$width;
+    $stream='';
+
+    foreach($segments as $segment){
+        $font=(string)($segment['font']??'JReg');
+        $underline=(bool)($segment['underline']??false);
+        $factor=(float)($segment['factor']??0.50);
+        $text=(string)($segment['text']??'');
+        if($text==='')continue;
+
+        $tokens=preg_split('/(\s+)/u',$text,-1,PREG_SPLIT_DELIM_CAPTURE|PREG_SPLIT_NO_EMPTY)?:[$text];
+        foreach($tokens as $token){
+            if(trim($token)===''){
+                $spaceWidth=rp_doc_pdf_estimated_width(' ',$size,$factor);
+                if($x+$spaceWidth<=$right)$x+=$spaceWidth;
+                continue;
+            }
+
+            $tokenWidth=rp_doc_pdf_estimated_width($token,$size,$factor);
+            if($x>$left && $x+$tokenWidth>$right){
+                $x=$left;
+                $y-=$lineHeight;
+            }
+
+            $stream.=rp_doc_pdf_text(
+                $font,
+                $token,
+                $x,
+                $y,
+                $size,
+                0,
+                $underline,
+                $factor
+            );
+            $x+=$tokenWidth;
+        }
+    }
+
+    return $stream;
+}
+
 function rp_doc_pdf_center_text(
     string $font,
     string $text,
@@ -554,28 +620,51 @@ function rp_doc_letter_pdf(array $payload,string $kind): array
             $stream.=rp_doc_pdf_text('JReg',$date,315,660,11,240,true,0.49);
         }
 
-        $stream.=rp_doc_pdf_white(504,432,51,15);
-        $stream.=rp_doc_pdf_white(96,401,225,19);
-        $stream.=rp_doc_pdf_white(429,401,99,19);
-        $stream.=rp_doc_pdf_white(84,386,39,18);
+        // El cuerpo original contiene valores de ejemplo embebidos.
+        // Se limpia el bloque completo y se recompone para que los campos variables
+        // formen parte natural del texto y no queden superpuestos.
+        $stream.=rp_doc_pdf_white(80,255,455,220);
 
+        $segments=[
+            ['text'=>'Por medio de la presente debido al incumplimiento de pago por mi parte en la obligación contraída con la empresa MEGUESA S.A. DE C.V. propietaria del Parque de Descanso Jardines de Juan Pablo'],
+        ];
         if($contract!==''){
-            $stream.=rp_doc_pdf_text('JBold',$contract,508,436.5,10,46,true,0.50);
+            $segments[]=['text'=>' en el contrato '];
+            $segments[]=['text'=>$contract,'font'=>'JBold','underline'=>true];
         }
+        $segments[]=['text'=>' solicito y autorizo el retiro de los restos de la persona que en vida llevó el nombre de '];
         if($deceased!==''){
-            $stream.=rp_doc_pdf_text('JBold',$deceased,97,406,11,222,true,0.49);
+            $segments[]=['text'=>'(+) '.$deceased,'font'=>'JBold','underline'=>true];
         }
         if($letterLocation!==''){
-            $stream.=rp_doc_pdf_text('JBold',$letterLocation,430,406,10,96,true,0.49);
+            $segments[]=['text'=>' el cual descansa en el lote '];
+            $segments[]=['text'=>$letterLocation,'font'=>'JBold','underline'=>true];
         }
         if($section!==''){
-            $stream.=rp_doc_pdf_text('JBold',$section,85,391,10,37,true,0.50);
+            $segments[]=['text'=>' sector '];
+            $segments[]=['text'=>$section,'font'=>'JBold','underline'=>true];
         }
+        $segments[]=['text'=>' siendo por mi cuenta cubiertos los costos de exhumación y traslado, así como el pago convencional por uso de lote y gastos administrativos de cobranza.'];
 
-        if($relationship!==''){
-            $stream.=rp_doc_pdf_white(253,263,70,29);
-            $stream.=rp_doc_pdf_center_text('JBold',$relationship,253,276,70,10,true,0.50);
+        $stream.=rp_doc_pdf_flow_segments($segments,85,454,440,9.2,12.5);
+
+        $fixed2=[
+            ['text'=>'Dicha exhumación la realizo de total conformidad pagando los costos correspondientes sin perjuicio alguno demandable para la empresa MEGUESA S.A. DE C.V. por lo tanto devuelvo y cedo el derecho de uso a perpetuidad del lote adquirido'],
+        ];
+        if($contract!==''){
+            $fixed2[]=['text'=>' según número de contrato antes mencionado'];
         }
+        $fixed2[]=['text'=>' donde sepultamos a nuestro familiar. Teniendo la empresa MEGUESA, S.A. DE C.V. nuevamente el derecho sobre uso de este lote.'];
+        $stream.=rp_doc_pdf_flow_segments($fixed2,85,352,440,9.2,12.5);
+
+        $closing=[['text'=>'Recibo de conformidad los restos de ']];
+        if($relationship!==''){
+            $closing[]=['text'=>$relationship,'font'=>'JBold','underline'=>true];
+        }else{
+            $closing[]=['text'=>'___________________'];
+        }
+        $closing[]=['text'=>' y agradezco las atenciones brindadas a la presente. Esta carta es de carácter irrevocable.'];
+        $stream.=rp_doc_pdf_flow_segments($closing,85,286,440,9.2,12.5);
 
         return [
             'name'=>'Carta_Exhumacion.pdf',
@@ -592,25 +681,39 @@ function rp_doc_letter_pdf(array $payload,string $kind): array
         $stream.=rp_doc_pdf_text('JReg',$date,397,620,10,132,true,0.49);
     }
 
-    // Sustituye la persona titular y las dos ubicaciones mostradas por el formato oficial.
+    // Encabezado de titular.
     $stream.=rp_doc_pdf_white(83,527,250,34);
     if($holder!==''){
         $stream.=rp_doc_pdf_text('JBold',"At'n.",85,542,11,40,false,0.50);
-        $stream.=rp_doc_pdf_text('JBold',$holder,119,542,11,160,true,0.49);
+        $stream.=rp_doc_pdf_text('JBold',$holder,119,542,11,180,true,0.49);
         $stream.=rp_doc_pdf_text('JBold','(Titular)',155,526,11,70,false,0.50);
     }
 
-    $stream.=rp_doc_pdf_white(128,453,65,18);
-    $stream.=rp_doc_pdf_white(118,352,62,18);
-    $stream.=rp_doc_pdf_white(305,352,64,18);
+    // Recompone los dos párrafos que contienen las ubicaciones.
+    // Esto evita que valores de diferente longitud se monten sobre el texto fijo.
+    $stream.=rp_doc_pdf_white(80,335,455,165);
 
+    $p1=[
+        ['text'=>'Por medio de la presente le informamos que debido a la necesidad de uso sobre su lote funerario '],
+    ];
     if($propertyLocation!==''){
-        $stream.=rp_doc_pdf_text('JBold',$propertyLocation,129,457,11,62,true,0.49);
-        $stream.=rp_doc_pdf_text('JBold',$propertyLocation,119,356,11,60,true,0.49);
+        $p1[]=['text'=>$propertyLocation,'font'=>'JBold','underline'=>true];
     }
+    $p1[]=['text'=>' que aún está en proceso de construcción y de acuerdo a la cláusula Primera inciso “a)” de su contrato donde se indica “Que por causa fortuita de fuerza mayor o no estuviera disponible el bien contratado en la fecha del requerimiento del cliente no se hubiese terminado su construcción, se le asignará uno con las mismas características y precio u otro previa autorización y acuerdo con el cliente”.'];
+    $stream.=rp_doc_pdf_flow_segments($p1,85,484,440,9.2,12.5);
+
+    $p2=[['text'=>'Su lote ']];
+    if($propertyLocation!==''){
+        $p2[]=['text'=>$propertyLocation,'font'=>'JBold','underline'=>true];
+    }
+    $p2[]=['text'=>' será reasignado por el lote '];
     if($newLocation!==''){
-        $stream.=rp_doc_pdf_text('JBold',$newLocation,306,356,11,61,true,0.49);
+        $p2[]=['text'=>$newLocation,'font'=>'JBold','underline'=>true];
+    }else{
+        $p2[]=['text'=>'________________','font'=>'JBold','underline'=>true];
     }
+    $p2[]=['text'=>' para poder llevar a cabo su servicio de Inhumación a su ser querido con la calidad y servicio el cual como empresa nos comprometimos con usted, quedando sin ningún cargo adicional por este concepto. Sin más por el momento quedo a sus órdenes.'];
+    $stream.=rp_doc_pdf_flow_segments($p2,85,394,440,9.2,12.5);
 
     return [
         'name'=>'Carta_Reubicacion.pdf',
