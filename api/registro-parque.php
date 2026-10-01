@@ -184,6 +184,15 @@ try{
 
     $payload=json_decode((string)($_POST['payload']??''),true);
     if(!is_array($payload))rp_json(400,['ok'=>false,'message'=>'La informacion del formulario no es valida.']);
+
+    // Regla de negocio: el Tipo de Placa se deriva del Tipo de Servicio
+    // para Inhumacion, Exhumacion y Deposito de Cenizas.
+    $tipoServicioNorm=rp_norm((string)($payload['tipoServicio']??''));
+    if(in_array($tipoServicioNorm,['inhumacion','exhumacion'],true)){
+        $payload['tipoPlaca']='Granito';
+    }elseif($tipoServicioNorm==='depositodecenizas'){
+        $payload['tipoPlaca']='Nicho';
+    }
     $draftId=trim((string)($_POST['draftId']??''));
     $storageCtx=null;
     if($draftId!==''){
@@ -283,11 +292,7 @@ try{
         rp_add_value($sp,$fieldIndex,['PlacaUrnaArchivoCorreoListo'],'No',false);
         rp_add_value($sp,$fieldIndex,['PlacaUrnaPngNombre'],'',false);
         rp_add_value($sp,$fieldIndex,['PlacaUrnaError'],'',false);
-        // Si solo se solicita urna adicional, la automatizacion actual identifica
-        // el tipo de placa a procesar mediante PlacaParqueTipo.
-        if($tipoPlacaNorm!=='nicho'){
-            rp_add_value($sp,$fieldIndex,['PlacaParqueTipo'],'Urna',false);
-        }
+        // La urna es adicional: no sustituir TipoPlaca ni PlacaParqueTipo.
     }
 
     rp_add_value($sp,$fieldIndex,['Titular'],trim((string)$payload['titular']));

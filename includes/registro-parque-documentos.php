@@ -136,6 +136,16 @@ function rp_generate_operational_tables(array $payload): array
         $attachments[]=rp_generate_nicho_plate($payload);
     }
 
+    $requiereUrnaAdicional=!empty($payload['requiereCambioUrna']);
+    if($typePlate==='urna' || $requiereUrnaAdicional){
+        $urna=rs_generate_urna_plate($payload);
+        $attachments[]=[
+            'name'=>'Placa_Urna.png',
+            'contentType'=>'image/png',
+            'bytes'=>(string)($urna['png']??''),
+        ];
+    }
+
     if($typePlate==='granito'){
         $phrase=rs_image_clean_text($payload['frase']??'');
         if($phrase==='')$phrase='NO APLICA';

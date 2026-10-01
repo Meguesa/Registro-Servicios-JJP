@@ -149,6 +149,37 @@ function syncFraseRule(){
   if(input && !allowed) input.value="";
 }
 
+const PARQUE_PLACA_POR_TIPO_SERVICIO = {
+  "Inhumación":"Granito",
+  "Exhumación":"Granito",
+  "Deposito de Cenizas":"Nicho"
+};
+
+function syncTipoPlacaPorServicio(){
+  const tipo=document.getElementById("tipoServicio")?.value||"";
+  const placa=document.getElementById("tipoPlaca");
+  if(!placa)return;
+
+  const forced=PARQUE_PLACA_POR_TIPO_SERVICIO[tipo]||"";
+  const wasAuto=placa.dataset.autoAssigned==="1";
+
+  if(forced){
+    placa.value=forced;
+    placa.disabled=true;
+    placa.dataset.autoAssigned="1";
+    placa.title="Autoasignado por Tipo de Servicio";
+  }else{
+    placa.disabled=false;
+    placa.title="";
+    if(wasAuto){
+      placa.value="";
+    }
+    placa.dataset.autoAssigned="0";
+  }
+
+  syncPropertyRules();
+}
+
 function syncPropertyRules(){
   const destape=document.getElementById("destape")?.value||"";
   const placa=document.getElementById("tipoPlaca")?.value||"";
@@ -168,6 +199,7 @@ function syncPropertyRules(){
   syncLocation();
 }
 ["destape","tipoPlaca","seccion","manzana","numLoteNicho"].forEach(id=>document.getElementById(id)?.addEventListener("input",syncPropertyRules));
+document.getElementById("tipoServicio")?.addEventListener("change",syncTipoPlacaPorServicio);
 document.getElementById("servicioParque")?.addEventListener("change",syncLocation);
 
 function syncReubicacion(){
@@ -341,6 +373,7 @@ function applyParqueDraft(p){
   setParqueField("requiereCambioUrna",!!p.requiereCambioUrna);
   setParqueField("requiereReubicacion",!!p.requiereReubicacion);
   if(document.getElementById("modoPrueba"))document.getElementById("modoPrueba").checked=!!p.modoPrueba;
+  syncTipoPlacaPorServicio();
   syncPropertyRules();
   syncReubicacion();
   syncTestModeUi();
@@ -402,6 +435,7 @@ function resetParqueForm(){
   url.searchParams.delete("draft");
   url.searchParams.set("nuevo","1");
   history.replaceState(null,"",url);
+  syncTipoPlacaPorServicio();
   syncPropertyRules();
   syncReubicacion();
   syncTestModeUi();
@@ -413,6 +447,7 @@ function resetParqueForm(){
 document.getElementById("saveDraftBtn")?.addEventListener("click",saveParqueDraft);
 document.getElementById("resetBtn")?.addEventListener("click",resetParqueForm);
 
+syncTipoPlacaPorServicio();
 syncPropertyRules();
 syncReubicacion();
 syncTestModeUi();
