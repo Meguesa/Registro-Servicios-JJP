@@ -27,7 +27,6 @@ function rp_image_service_rows(array $payload): array
         ['label'=>'Hora inicio','value'=>rs_image_time((string)($payload['fechaHoraInicio']??''))],
         ['label'=>'Fecha fin','value'=>rs_image_date((string)($payload['fechaHoraFin']??''),false)],
         ['label'=>'Hora fin','value'=>rs_image_time((string)($payload['fechaHoraFin']??''))],
-        ['label'=>'Velación','value'=>rs_image_clean_text($payload['velacion']??'')],
         ['label'=>'Previsión / Uso inmediato','value'=>rs_image_clean_text($payload['previsionUsoInmediato']??'')],
         ['label'=>'Tipo de servicio','value'=>rs_image_clean_text($payload['tipoServicio']??'')],
         ['label'=>'Servicio','value'=>rs_image_clean_text($payload['servicio']??'')],
