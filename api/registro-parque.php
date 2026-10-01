@@ -221,9 +221,29 @@ try{
         rp_json(422,['ok'=>false,'message'=>'Nombre de Familia es obligatorio para placa de Nicho.']);
     }
     if((bool)($payload['requiereReubicacion']??false)){
-        if(trim((string)($payload['ubicacionNueva']??''))==='' || trim((string)($payload['motivoReubicacion']??''))===''){
-            rp_json(422,['ok'=>false,'message'=>'Completa Ubicacion Nueva y Motivo de Reubicacion.']);
+        foreach(['seccionNueva','manzanaNueva','numLoteNichoNuevo','motivoReubicacion'] as $key){
+            if(trim((string)($payload[$key]??''))===''){
+                rp_json(422,['ok'=>false,'message'=>'Falta el campo de reubicacion: '.$key.'.']);
+            }
         }
+
+        $serviceNorm=rp_norm((string)($payload['servicio']??''));
+        $prefix=$serviceNorm==='totalservicecomplemento'
+            ? 'TSC'
+            : ($serviceNorm==='totalservice' ? 'TS' : '');
+
+        $payload['ubicacionNueva']=implode(' - ',array_values(array_filter([
+            $prefix,
+            trim((string)$payload['seccionNueva']),
+            trim((string)$payload['numLoteNichoNuevo']),
+            trim((string)$payload['manzanaNueva']),
+        ],static fn(string $v):bool=>$v!=='')));
+    }else{
+        $payload['seccionNueva']='';
+        $payload['manzanaNueva']='';
+        $payload['numLoteNichoNuevo']='';
+        $payload['ubicacionNueva']='';
+        $payload['motivoReubicacion']='';
     }
 
     $config=rs_sharepoint_config();
@@ -310,6 +330,9 @@ try{
     rp_add_value($sp,$fieldIndex,['Numero_x0020_de_x0020_Contrato','Numero de Contrato','Número de Contrato'],trim((string)($payload['numeroContrato']??'')));
 
     rp_add_value($sp,$fieldIndex,['RequiereReubicacion','Requiere Reubicacion','Requiere Reubicación'],(bool)($payload['requiereReubicacion']??false),false);
+    rp_add_value($sp,$fieldIndex,['SeccionNueva','Seccion Nueva','Sección Nueva'],trim((string)($payload['seccionNueva']??'')));
+    rp_add_value($sp,$fieldIndex,['ManzanaNueva','Manzana Nueva'],trim((string)($payload['manzanaNueva']??'')));
+    rp_add_value($sp,$fieldIndex,['NumLoteNichoNuevo','Num Lote/Nicho Nuevo','Lote/Nicho Nuevo'],trim((string)($payload['numLoteNichoNuevo']??'')));
     rp_add_value($sp,$fieldIndex,['UbicacionNueva','Ubicacion Nueva','Ubicación Nueva'],trim((string)($payload['ubicacionNueva']??'')));
     rp_add_value($sp,$fieldIndex,['MotivoReubicacion','Motivo Reubicacion','Motivo Reubicación'],trim((string)($payload['motivoReubicacion']??'')));
 
