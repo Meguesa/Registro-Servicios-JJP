@@ -30,16 +30,9 @@ function rp_normalize_emails(mixed $value,array $fallback): array
     return $out;
 }
 
-function rp_email_recipients(bool $isTestMode): array
+function rp_email_recipients(): array
 {
     $config=rp_private_config();
-
-    if($isTestMode){
-        return rp_normalize_emails(
-            $config['registro_servicios_test_email_recipients']??null,
-            ['sistemas@juanpablo.com.mx','gabriel.guerra@juanpablo.com.mx']
-        );
-    }
 
     return rp_normalize_emails(
         $config['registro_servicios_parque_email_recipients']
@@ -82,10 +75,10 @@ function rp_email_location(array $payload): string
 /**
  * @param array<int,array{name:string,contentType:string,bytes:string}> $attachments
  */
-function rp_send_service_email(array $payload,array $attachments,bool $isTestMode): array
+function rp_send_service_email(array $payload,array $attachments): array
 {
     $sender='sistemas@juanpablo.com.mx';
-    $recipients=rp_email_recipients($isTestMode);
+    $recipients=rp_email_recipients();
     if($recipients===[])throw new RuntimeException('No hay destinatarios configurados para Servicios Parque.');
 
     $location=rp_email_location($payload);
@@ -93,7 +86,7 @@ function rp_send_service_email(array $payload,array $attachments,bool $isTestMod
     $fallecido=trim((string)($payload['fallecido']??''));
 
     $subjectParts=array_values(array_filter([
-        $isTestMode?'[PRUEBA] Nuevo evento de Parque':'Nuevo evento de Parque',
+        'Nuevo evento de Parque',
         $type,
         $location,
     ],static fn(string $v):bool=>$v!==''));
@@ -106,7 +99,6 @@ function rp_send_service_email(array $payload,array $attachments,bool $isTestMod
 
     $body=''
       .'<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.4;color:#111;">'
-      .($isTestMode?'<div style="margin-bottom:14px;padding:10px 12px;border:1px solid #d8b45a;background:#fff8e6;"><strong>PRUEBA CONTROLADA - SERVICIOS PARQUE</strong></div>':'')
       .$line('TIPO DE SERVICIO',$type)
       .$line('SERVICIO',trim((string)($payload['servicio']??'')))
       .$line('PREVISION/USO INMEDIATO',trim((string)($payload['previsionUsoInmediato']??'')))
