@@ -48,6 +48,12 @@ function rp_image_property_rows(array $payload): array
         ['label'=>'Requiere placa de urna adicional','value'=>!empty($payload['requiereCambioUrna'])?'SI':'NO'],
     ];
 
+    if(!empty($payload['requiereReubicacion'])){
+        $rows[]=['label'=>'Requiere reubicación','value'=>'SI'];
+        $rows[]=['label'=>'Ubicación nueva','value'=>rs_image_clean_text($payload['ubicacionNueva']??'')];
+        $rows[]=['label'=>'Motivo de reubicación','value'=>rs_image_clean_text($payload['motivoReubicacion']??'')];
+    }
+
     $frase=rs_image_clean_text($payload['frase']??'');
     if($frase!==''){
         $rows[]=['label'=>'Frase','value'=>$frase];
@@ -64,13 +70,7 @@ function rp_image_person_rows(array $payload): array
         ['label'=>'Fecha de nacimiento','value'=>rs_image_date((string)($payload['fechaNacimiento']??''),false)],
         ['label'=>'Fecha de defunción','value'=>rs_image_date((string)($payload['fechaDefuncion']??''),false)],
         ['label'=>'Estatus de liquidación','value'=>rs_image_clean_text($payload['estatusLiquidacion']??'')],
-        ['label'=>'Requiere reubicación','value'=>!empty($payload['requiereReubicacion'])?'SI':'NO'],
     ];
-
-    if(!empty($payload['requiereReubicacion'])){
-        $rows[]=['label'=>'Ubicación nueva','value'=>rs_image_clean_text($payload['ubicacionNueva']??'')];
-        $rows[]=['label'=>'Motivo de reubicación','value'=>rs_image_clean_text($payload['motivoReubicacion']??'')];
-    }
 
     $obs=rs_image_clean_text($payload['observaciones']??'');
     if($obs!==''){
