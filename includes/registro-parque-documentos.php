@@ -811,7 +811,16 @@ function rp_doc_letter_pdf(array $payload,string $kind): array
     $holder=mb_strtoupper(trim((string)($payload['titular']??'')),'UTF-8');
     $letterLocation=rp_doc_clean_location_text(rp_doc_compact_location($payload,true));
     $propertyLocation=rp_doc_clean_location_text(rp_doc_compact_location($payload,false));
+
+    $serviceNorm=rp_doc_norm((string)($payload['servicio']??''));
+    $servicePrefix=$serviceNorm==='totalservicecomplemento'?'TSC':($serviceNorm==='totalservice'?'TS':'');
     $newLocation=rp_doc_clean_location_text((string)($payload['ubicacionNueva']??''));
+    if($newLocation!=='' && $servicePrefix!==''){
+        $newLocationNorm=rp_doc_norm($newLocation);
+        if(!str_starts_with($newLocationNorm,strtolower($servicePrefix))){
+            $newLocation=rp_doc_clean_location_text($servicePrefix.' - '.$newLocation);
+        }
+    }
 
     if($kind==='reubicacion'){
         $right=1135;
@@ -831,19 +840,19 @@ function rp_doc_letter_pdf(array $payload,string $kind): array
         $p1=[
             ['text'=>'Por medio de la presente le informamos que debido a la necesidad de uso sobre su lote funerario '],
         ];
-        if($propertyLocation!==''){
-            $p1[]=['text'=>$propertyLocation,'style'=>'bold'];
+        if($letterLocation!==''){
+            $p1[]=['text'=>$letterLocation,'style'=>'bold'];
         }
         $p1[]=['text'=>' que aún está en proceso de construcción y de acuerdo a la cláusula Primera inciso '];
         $p1[]=['text'=>'“a)” de su contrato','style'=>'italic'];
         $p1[]=['text'=>' donde se indica '];
         $p1[]=['text'=>'“Que por causa fortuita de fuerza mayor o no estuviera disponible el bien contratado en la fecha del requerimiento del cliente no se hubiese terminado su construcción, se le asignará uno con las mismas características y precio u otro previa autorización y acuerdo con el cliente”.','style'=>'italic'];
 
-        $result=rp_doc_image_flow($image,$p1,$left,$baseline,$bodyWidth,20,31,$black);
-        $baseline=$result['baseline']+42;
+        $result=rp_doc_image_flow($image,$p1,$left,$baseline,$bodyWidth,20,36,$black);
+        $baseline=$result['baseline']+50;
 
         $p2=[['text'=>'Su lote ']];
-        if($propertyLocation!=='')$p2[]=['text'=>$propertyLocation];
+        if($letterLocation!=='')$p2[]=['text'=>$letterLocation];
         $p2[]=['text'=>' será reasignado por el lote '];
         if($newLocation!==''){
             $p2[]=['text'=>$newLocation,'style'=>'bold'];
@@ -852,8 +861,8 @@ function rp_doc_letter_pdf(array $payload,string $kind): array
         }
         $p2[]=['text'=>' para poder llevar a cabo su servicio de Inhumación a su ser querido con la calidad y servicio el cual como empresa nos comprometimos con usted, quedando sin ningún cargo adicional por este concepto.'];
 
-        $result=rp_doc_image_flow($image,$p2,$left,$baseline,$bodyWidth,20,31,$black);
-        $baseline=$result['baseline']+58;
+        $result=rp_doc_image_flow($image,$p2,$left,$baseline,$bodyWidth,20,36,$black);
+        $baseline=$result['baseline']+68;
 
         rp_doc_image_text($image,'Sin más por el momento quedo a sus órdenes.',$left,$baseline,20,$black,'regular',false);
         rp_doc_image_right($image,'MEGUESA, S.A. DE C.V',$right,1240,20,$black,'bold',false);
@@ -914,8 +923,8 @@ function rp_doc_letter_pdf(array $payload,string $kind): array
         : ' siendo por mi cuenta cubiertos los costos de exhumación y traslado, así como el pago convencional por uso de lote y gastos administrativos de cobranza.'
     ];
 
-    $result=rp_doc_image_flow($image,$first,$left,$baseline,$bodyWidth,18.5,28,$black);
-    $baseline=$result['baseline']+44;
+    $result=rp_doc_image_flow($image,$first,$left,$baseline,$bodyWidth,18.5,34,$black);
+    $baseline=$result['baseline']+52;
 
     $secondText=$isRetiro
         ? 'Dicho retiro lo realizo de total conformidad pagando los costos correspondientes sin perjuicio alguno demandable para la empresa MEGUESA S.A. DE C.V. por lo tanto devuelvo y cedo el derecho de uso a perpetuidad del nicho adquirido'
@@ -931,9 +940,9 @@ function rp_doc_letter_pdf(array $payload,string $kind): array
     $result=rp_doc_image_flow(
         $image,
         [['text'=>$secondText]],
-        $left,$baseline,$bodyWidth,18.5,28,$black
+        $left,$baseline,$bodyWidth,18.5,34,$black
     );
-    $baseline=$result['baseline']+38;
+    $baseline=$result['baseline']+46;
 
     $thirdText=$isRetiro
         ? 'Teniendo la empresa MEGUESA, S.A. DE C.V. nuevamente el derecho sobre uso de este nicho.'
@@ -941,9 +950,9 @@ function rp_doc_letter_pdf(array $payload,string $kind): array
     $result=rp_doc_image_flow(
         $image,
         [['text'=>$thirdText]],
-        $left,$baseline,$bodyWidth,18.5,28,$black
+        $left,$baseline,$bodyWidth,18.5,34,$black
     );
-    $baseline=$result['baseline']+38;
+    $baseline=$result['baseline']+46;
 
     $closing=[
         ['text'=>$isRetiro?'Recibo de conformidad las cenizas de ':'Recibo de conformidad los restos de '],
@@ -955,7 +964,7 @@ function rp_doc_letter_pdf(array $payload,string $kind): array
     }
     $closing[]=['text'=>' y agradezco las atenciones brindadas a la presente. Esta carta es de carácter irrevocable.'];
 
-    $result=rp_doc_image_flow($image,$closing,$left,$baseline,$bodyWidth,18.5,28,$black);
+    $result=rp_doc_image_flow($image,$closing,$left,$baseline,$bodyWidth,18.5,34,$black);
     $baseline=$result['baseline'];
 
     // Identificador visual del campo de parentesco, como en los Word oficiales.
@@ -969,7 +978,15 @@ function rp_doc_letter_pdf(array $payload,string $kind): array
     imageline($image,815,$signatureY,1060,$signatureY,$black);
 
     rp_doc_image_center($image,'NOMBRE Y FIRMA',332,$signatureY+34,16,$black,'bold');
-    rp_doc_image_center($image,'TITULAR DEL CONTRATO',332,$signatureY+60,16,$black,'bold');
+    rp_doc_image_center(
+        $image,
+        $holder!==''?$holder:'TITULAR DEL CONTRATO',
+        332,
+        $signatureY+60,
+        16,
+        $black,
+        'bold'
+    );
     rp_doc_image_center($image,'NOMBRE Y TEL/CEL',938,$signatureY+34,16,$black,'bold');
     rp_doc_image_center($image,'AVAL Y/O BENEFICIARIO',938,$signatureY+60,16,$black,'bold');
 
