@@ -260,7 +260,7 @@ $isPreview = str_contains(
 
       <div class="preview-warning">
         <strong>Reglas actuales del flujo</strong>
-        <span>No liquidado + sección SPN/PLN usa la rama de Retiro de Cenizas; otras secciones usan Exhumación. Requiere Reubicación activa la carta correspondiente.</span>
+        <span>No liquidado + Tipo de Placa = Nicho usa Retiro de Cenizas; No liquidado con otra propiedad usa Exhumación. Requiere Reubicación activa la carta correspondiente.</span>
       </div>
     </section>
 
@@ -286,7 +286,7 @@ $isPreview = str_contains(
 
       <div class="selector-notice">
         <strong>Después de publicar</strong>
-        <span>Calendario ya se procesa directamente desde Registro de Servicios. Placas, cartas y correo se migraran en las siguientes fases.</span>
+        <span>Calendario, tablas operativas, cartas y correo se procesan directamente desde Registro de Servicios cuando corresponda.</span>
       </div>
     </section>
 
