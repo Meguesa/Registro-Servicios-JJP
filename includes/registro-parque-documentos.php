@@ -200,23 +200,23 @@ function rp_doc_letter_pdf(array $payload,string $kind): array
         if($location!=='')$intro.=', QUIEN DESCANSA EN '.$location;
         if($section!=='')$intro.=', SECTOR '.$section;
         $intro.='.';
-        $y=rp_doc_paragraph($image,$intro,145,$y,985,$black,$font);
-        $y+=30;
+        $y=rp_doc_paragraph($image,$intro,145,$y,985,$black,$font,18.0,38);
+        $y+=34;
 
         $y=rp_doc_paragraph($image,
             'SIENDO POR MI CUENTA CUBIERTOS LOS COSTOS DE EXHUMACIÓN Y TRASLADO, ASÍ COMO EL PAGO CONVENCIONAL POR USO DE LOTE Y GASTOS ADMINISTRATIVOS DE COBRANZA.',
-            145,$y,985,$black,$font,18.0,31);
-        $y+=24;
+            145,$y,985,$black,$font,18.0,38);
+        $y+=30;
 
         $y=rp_doc_paragraph($image,
             'DICHA EXHUMACIÓN LA REALIZO DE TOTAL CONFORMIDAD, PAGANDO LOS COSTOS CORRESPONDIENTES, SIN PERJUICIO ALGUNO DEMANDABLE PARA MEGUESA, S.A. DE C.V.; POR LO TANTO, DEVUELVO Y CEDO EL DERECHO DE USO A PERPETUIDAD DEL LOTE ADQUIRIDO'.($contract!==''?' SEGÚN EL NÚMERO DE CONTRATO ANTES MENCIONADO':'').'.',
-            145,$y,985,$black,$font,18.0,31);
-        $y+=24;
+            145,$y,985,$black,$font,18.0,38);
+        $y+=30;
 
         $closing='RECIBO DE CONFORMIDAD LOS RESTOS';
         if($relationship!=='')$closing.=' DE MI '.$relationship;
         $closing.=' Y AGRADEZCO LAS ATENCIONES BRINDADAS A LA PRESENTE. ESTA CARTA ES DE CARÁCTER IRREVOCABLE.';
-        $y=rp_doc_paragraph($image,$closing,145,$y,985,$black,$font,18.0,31);
+        $y=rp_doc_paragraph($image,$closing,145,$y,985,$black,$font,18.0,38);
 
     }else{
         $filename='Carta_Reubicacion.pdf';
@@ -228,31 +228,41 @@ function rp_doc_letter_pdf(array $payload,string $kind): array
 
         $y=rp_doc_paragraph($image,
             'POR MEDIO DE LA PRESENTE LE INFORMAMOS QUE, DEBIDO A LA NECESIDAD DE USO SOBRE SU LOTE QUE AÚN ESTÁ EN PROCESO DE CONSTRUCCIÓN Y DE ACUERDO CON LAS CONDICIONES DE SU CONTRATO, SE LE ASIGNARÁ UNO CON LAS MISMAS CARACTERÍSTICAS Y PRECIO U OTRO, PREVIA AUTORIZACIÓN Y ACUERDO CON EL CLIENTE.',
-            145,$y,985,$black,$font,18.0,31);
-        $y+=24;
+            145,$y,985,$black,$font,18.0,39);
+        $y+=32;
 
         $move=[];
         if($location!=='')$move[]='SU UBICACIÓN ACTUAL '.$location;
         if($newLocation!=='')$move[]='SERÁ REASIGNADA A '.$newLocation;
         if($deceased!=='')$move[]='PARA PODER LLEVAR A CABO EL SERVICIO DE INHUMACIÓN DE '.$deceased;
         if($move!==[]){
-            $y=rp_doc_paragraph($image,implode(' ',$move).'.',145,$y,985,$black,$font,18.0,31);
-            $y+=24;
+            $y=rp_doc_paragraph($image,implode(' ',$move).'.',145,$y,985,$black,$font,18.0,39);
+            $y+=32;
         }
 
         $y=rp_doc_paragraph($image,
             'LA REASIGNACIÓN QUEDA SIN NINGÚN CARGO ADICIONAL POR ESTE CONCEPTO. SIN MÁS POR EL MOMENTO, QUEDAMOS A SUS ÓRDENES.',
-            145,$y,985,$black,$font,18.0,31);
+            145,$y,985,$black,$font,18.0,39);
     }
 
-    // Firmas: sólo se imprime información que realmente exista.
-    $leftLabel=$holder!==''?$holder:'NOMBRE Y FIRMA';
-    $rightLabel=$beneficiary!==''?$beneficiary:'NOMBRE Y FIRMA';
+    // Firmas: nombre real debajo de "NOMBRE Y FIRMA" cuando existe.
+    imageline($image,190,1470,520,1470,$gray);
+    imageline($image,755,1470,1085,1470,$gray);
 
-    imageline($image,190,1490,520,1490,$gray);
-    imageline($image,755,1490,1085,1490,$gray);
-    rs_carta_center($image,355,1530,$leftLabel,$black,$font,15.0,false);
-    rs_carta_center($image,920,1530,$rightLabel,$black,$font,15.0,false);
+    rs_carta_center($image,355,1507,'NOMBRE Y FIRMA',$black,$font,14.0,false);
+    rs_carta_center($image,920,1507,'NOMBRE Y FIRMA',$black,$font,14.0,false);
+
+    if($holder!==''){
+        rs_carta_center($image,355,1540,$holder,$black,$font,14.0,true);
+    }else{
+        rs_carta_center($image,355,1540,'TITULAR DEL CONTRATO',$black,$font,13.0,false);
+    }
+
+    if($beneficiary!==''){
+        rs_carta_center($image,920,1540,$beneficiary,$black,$font,14.0,true);
+    }else{
+        rs_carta_center($image,920,1540,'AVAL Y/O BENEFICIARIO DEL CONTRATO',$black,$font,12.5,false);
+    }
 
     ob_start();
     imagejpeg($image,null,92);
@@ -279,7 +289,7 @@ function rp_generate_letter_attachments(array $payload): array
 {
     $attachments=[];
     $liquidation=rp_doc_norm((string)($payload['estatusLiquidacion']??''));
-    $section=mb_strtoupper(trim((string)($payload['seccion']??'')),'UTF-8');
+    $plateType=rp_doc_norm((string)($payload['tipoPlaca']??''));
 
     if(!empty($payload['requiereReubicacion'])){
         $attachments[]=rp_doc_letter_pdf($payload,'reubicacion');
