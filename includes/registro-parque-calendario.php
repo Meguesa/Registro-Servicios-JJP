@@ -139,9 +139,6 @@ function rp_calendar_create_event(array $payload): array
         $ubicacion,
     ], static fn(string $v): bool => $v !== '')));
 
-    if (!empty($payload['_previewMode'])) {
-        $subject = '(PRUEBA) ' . $subject;
-    }
 
     $esc = static fn(string $v): string => htmlspecialchars($v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $rows = [
