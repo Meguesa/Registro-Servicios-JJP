@@ -559,167 +559,424 @@ function rp_doc_pdf_overlay(string $pdf,string $content,int $pageObject=3): stri
     return $pdf.$append;
 }
 
+
+function rp_doc_letter_font(string $style='regular'): ?string
+{
+    static $cache=[];
+
+    if(isset($cache[$style]))return $cache[$style];
+
+    if($style==='bold'){
+        return $cache[$style]=rs_image_bold_font_path();
+    }
+    if($style==='regular'){
+        return $cache[$style]=rs_image_font_path();
+    }
+
+    $filename=$style==='bolditalic'?'Carlito-BoldItalic.ttf':'Carlito-Italic.ttf';
+    $local=[
+        dirname(__DIR__).'/assets/fonts/'.$filename,
+        dirname(__DIR__).'/fonts/'.$filename,
+    ];
+    foreach($local as $candidate){
+        if(function_exists('rs_image_valid_font_file') && rs_image_valid_font_file($candidate)){
+            return $cache[$style]=$candidate;
+        }
+    }
+
+    if(function_exists('rs_image_download_font')){
+        foreach([
+            'https://raw.githubusercontent.com/googlefonts/carlito/main/fonts/ttf/'.$filename,
+            'https://raw.githubusercontent.com/google/fonts/main/ofl/carlito/'.$filename,
+        ] as $url){
+            $downloaded=rs_image_download_font($url,$filename);
+            if($downloaded!==null)return $cache[$style]=$downloaded;
+        }
+    }
+
+    return $cache[$style]=($style==='bolditalic'
+        ? (rs_image_bold_font_path() ?: rs_image_font_path())
+        : rs_image_font_path());
+}
+
+function rp_doc_image_width(string $text,?string $font,float $size): int
+{
+    if($text==='' || $font===null)return 0;
+    $box=@imagettfbbox($size,0,$font,$text);
+    if(!is_array($box))return 0;
+    return abs((int)$box[2]-(int)$box[0]);
+}
+
+function rp_doc_image_text(
+    GdImage $image,
+    string $text,
+    int $x,
+    int $baseline,
+    float $size,
+    int $color,
+    string $style='regular',
+    bool $underline=false
+): int {
+    $font=rp_doc_letter_font($style);
+    if($font===null || $text==='')return 0;
+
+    @imagettftext($image,$size,0,$x,$baseline,$color,$font,$text);
+    $width=rp_doc_image_width($text,$font,$size);
+
+    if($underline && $width>0){
+        $lineY=$baseline+3;
+        imageline($image,$x,$lineY,$x+$width,$lineY,$color);
+    }
+    return $width;
+}
+
+/**
+ * @param array<int,array{text:string,style?:string,underline?:bool}> $segments
+ * @return array{baseline:int,lines:int}
+ */
+function rp_doc_image_flow(
+    GdImage $image,
+    array $segments,
+    int $left,
+    int $baseline,
+    int $maxWidth,
+    float $size,
+    int $lineHeight,
+    int $color
+): array {
+    $x=$left;
+    $right=$left+$maxWidth;
+    $lines=1;
+    $pendingSpace=false;
+
+    foreach($segments as $segment){
+        $text=(string)($segment['text']??'');
+        if($text==='')continue;
+
+        $style=(string)($segment['style']??'regular');
+        $underline=(bool)($segment['underline']??false);
+        $font=rp_doc_letter_font($style);
+        if($font===null)continue;
+
+        $tokens=preg_split('/(\n|\s+)/u',$text,-1,PREG_SPLIT_DELIM_CAPTURE|PREG_SPLIT_NO_EMPTY)?:[$text];
+
+        foreach($tokens as $token){
+            if(str_contains($token,"\n")){
+                $newLines=substr_count($token,"\n");
+                for($i=0;$i<$newLines;$i++){
+                    $x=$left;
+                    $baseline+=$lineHeight;
+                    $lines++;
+                }
+                $pendingSpace=false;
+                continue;
+            }
+
+            if(trim($token)===''){
+                $pendingSpace=true;
+                continue;
+            }
+
+            $wordWidth=rp_doc_image_width($token,$font,$size);
+            $spaceWidth=$pendingSpace
+                ? rp_doc_image_width(' ',rp_doc_letter_font('regular'),$size)
+                : 0;
+
+            if($x>$left && $x+$spaceWidth+$wordWidth>$right){
+                $x=$left;
+                $baseline+=$lineHeight;
+                $lines++;
+                $spaceWidth=0;
+            }
+
+            $x+=$spaceWidth;
+            $x+=rp_doc_image_text(
+                $image,$token,$x,$baseline,$size,$color,$style,$underline
+            );
+            $pendingSpace=false;
+        }
+    }
+
+    return ['baseline'=>$baseline,'lines'=>$lines];
+}
+
+function rp_doc_image_right(
+    GdImage $image,
+    string $text,
+    int $right,
+    int $baseline,
+    float $size,
+    int $color,
+    string $style='regular',
+    bool $underline=false
+): void {
+    $font=rp_doc_letter_font($style);
+    $width=rp_doc_image_width($text,$font,$size);
+    rp_doc_image_text($image,$text,$right-$width,$baseline,$size,$color,$style,$underline);
+}
+
+function rp_doc_image_center(
+    GdImage $image,
+    string $text,
+    int $center,
+    int $baseline,
+    float $size,
+    int $color,
+    string $style='regular'
+): void {
+    $font=rp_doc_letter_font($style);
+    $width=rp_doc_image_width($text,$font,$size);
+    rp_doc_image_text($image,$text,(int)round($center-$width/2),$baseline,$size,$color,$style,false);
+}
+
+function rp_doc_image_to_pdf(GdImage $image,int $width,int $height,string $filename): array
+{
+    ob_start();
+    imagejpeg($image,null,92);
+    $jpeg=(string)ob_get_clean();
+    imagedestroy($image);
+
+    if($jpeg===''){
+        throw new RuntimeException('No fue posible codificar la carta de Parque.');
+    }
+
+    return [
+        'name'=>$filename,
+        'contentType'=>'application/pdf',
+        'bytes'=>rs_carta_jpeg_to_pdf($jpeg,$width,$height),
+    ];
+}
+
+function rp_doc_clean_location_text(string $value): string
+{
+    $value=mb_strtoupper(trim($value),'UTF-8');
+    $value=preg_replace('/\s*-\s*/u','-',$value)??$value;
+    return preg_replace('/\s+/u',' ',$value)??$value;
+}
+
+function rp_doc_relocation_date_value(array $payload): string
+{
+    $raw=trim((string)($payload['fechaHoraInicio']??''));
+    if($raw==='')return '';
+
+    $timezone=new DateTimeZone('America/Monterrey');
+    $date=null;
+    foreach([
+        'd/m/Y H:i','d/m/Y H:i:s','d/m/Y',
+        'Y-m-d H:i','Y-m-d H:i:s','Y-m-d',
+        'Y-m-d\TH:i','Y-m-d\TH:i:s'
+    ] as $format){
+        $candidate=DateTimeImmutable::createFromFormat('!'.$format,$raw,$timezone);
+        if($candidate instanceof DateTimeImmutable){
+            $date=$candidate;
+            break;
+        }
+    }
+    if(!$date instanceof DateTimeImmutable){
+        try{$date=new DateTimeImmutable($raw,$timezone);}
+        catch(Throwable){return '';}
+    }
+
+    $months=[
+        1=>'Enero',2=>'Febrero',3=>'Marzo',4=>'Abril',
+        5=>'Mayo',6=>'Junio',7=>'Julio',8=>'Agosto',
+        9=>'Septiembre',10=>'Octubre',11=>'Noviembre',12=>'Diciembre',
+    ];
+
+    return 'Monterrey, Nuevo León '.$date->format('j').' '.$months[(int)$date->format('n')].' del '.$date->format('Y');
+}
+
 function rp_doc_letter_pdf(array $payload,string $kind): array
 {
+    rs_image_require_gd();
+
+    // Las cartas se construyen completas siguiendo los Word oficiales.
+    // No se escribe texto encima de un PDF con valores de ejemplo.
+    $width=1275;
+    $height=1650;
+    $image=imagecreatetruecolor($width,$height);
+    if(!$image instanceof GdImage){
+        throw new RuntimeException('No fue posible crear la carta de Parque.');
+    }
+
+    $white=imagecolorallocate($image,255,255,255);
+    $black=imagecolorallocate($image,18,18,18);
+    imagefilledrectangle($image,0,0,$width,$height,$white);
+
     $date=rp_doc_long_date_value($payload);
     $contract=mb_strtoupper(trim((string)($payload['numeroContrato']??'')),'UTF-8');
     $deceased=mb_strtoupper(trim((string)($payload['fallecido']??'')),'UTF-8');
     $relationship=mb_strtoupper(trim((string)($payload['parentescoTitular']??'')),'UTF-8');
     $section=mb_strtoupper(trim((string)($payload['seccion']??'')),'UTF-8');
     $holder=mb_strtoupper(trim((string)($payload['titular']??'')),'UTF-8');
-    $letterLocation=rp_doc_compact_location($payload,true);
-    $propertyLocation=rp_doc_compact_location($payload,false);
-    $newLocation=mb_strtoupper(trim((string)($payload['ubicacionNueva']??'')),'UTF-8');
+    $letterLocation=rp_doc_clean_location_text(rp_doc_compact_location($payload,true));
+    $propertyLocation=rp_doc_clean_location_text(rp_doc_compact_location($payload,false));
+    $newLocation=rp_doc_clean_location_text((string)($payload['ubicacionNueva']??''));
 
-    if($kind==='retiro'){
-        $pdf=rp_doc_template_pdf('CARTA RETIRO DE CENIZAS.pdf');
-        $stream='';
+    if($kind==='reubicacion'){
+        $right=1135;
+        $left=180;
+        $bodyWidth=965;
 
-        if($date!==''){
-            $stream.=rp_doc_pdf_white(315,657,240,16);
-            $stream.=rp_doc_pdf_text('JReg',$date,315,660,11,240,true,0.49);
+        $relocationDate=rp_doc_relocation_date_value($payload);
+        if($relocationDate!==''){
+            rp_doc_image_right($image,$relocationDate,$right,300,20,$black,'regular',false);
         }
 
-        // Elimina exclusivamente los valores de ejemplo impresos en el PDF maestro.
-        $stream.=rp_doc_pdf_white(477,432,45,15);
-        $stream.=rp_doc_pdf_white(97,401,177,19);
-        $stream.=rp_doc_pdf_white(388,401,70,19);
-        $stream.=rp_doc_pdf_white(484,401,38,19);
+        $attention=$holder!==''?"At´n. ".$holder:"At´n.";
+        rp_doc_image_text($image,$attention,$left,440,22,$black,'bold',false);
+        rp_doc_image_text($image,'(Titular)',$left,472,22,$black,'bold',false);
 
-        if($contract!==''){
-            $stream.=rp_doc_pdf_text('JBold',$contract,479,436.5,10,42,true,0.50);
-        }
-        if($deceased!==''){
-            $stream.=rp_doc_pdf_text('JBoldItalic',$deceased,98,406,12,174,true,0.49);
-        }
-        if($letterLocation!==''){
-            $stream.=rp_doc_pdf_text('JBold',$letterLocation,389,406,11,68,true,0.49);
-        }
-        if($section!==''){
-            $stream.=rp_doc_pdf_text('JBold',$section,485,406,10,36,true,0.50);
-        }
-
-        if($relationship!==''){
-            $stream.=rp_doc_pdf_white(250,263,86,29);
-            $stream.=rp_doc_pdf_center_text('JBold',$relationship,250,276,86,10,true,0.50);
-        }
-
-        return [
-            'name'=>'Carta_Retiro_Cenizas.pdf',
-            'contentType'=>'application/pdf',
-            'bytes'=>rp_doc_pdf_overlay($pdf,$stream,3),
+        $baseline=575;
+        $p1=[
+            ['text'=>'Por medio de la presente le informamos que debido a la necesidad de uso sobre su lote funerario '],
         ];
-    }
-
-    if($kind==='exhumacion'){
-        $pdf=rp_doc_template_pdf('CARTA EXHUMACION.pdf');
-        $stream='';
-
-        if($date!==''){
-            $stream.=rp_doc_pdf_white(315,657,240,16);
-            $stream.=rp_doc_pdf_text('JReg',$date,315,660,11,240,true,0.49);
+        if($propertyLocation!==''){
+            $p1[]=['text'=>$propertyLocation,'style'=>'bold'];
         }
+        $p1[]=['text'=>' que aún está en proceso de construcción y de acuerdo a la cláusula Primera inciso '];
+        $p1[]=['text'=>'“a)” de su contrato','style'=>'italic'];
+        $p1[]=['text'=>' donde se indica '];
+        $p1[]=['text'=>'“Que por causa fortuita de fuerza mayor o no estuviera disponible el bien contratado en la fecha del requerimiento del cliente no se hubiese terminado su construcción, se le asignará uno con las mismas características y precio u otro previa autorización y acuerdo con el cliente”.','style'=>'italic'];
 
-        // El cuerpo original contiene valores de ejemplo embebidos.
-        // Se limpia el bloque completo y se recompone para que los campos variables
-        // formen parte natural del texto y no queden superpuestos.
-        $stream.=rp_doc_pdf_white(80,255,455,220);
+        $result=rp_doc_image_flow($image,$p1,$left,$baseline,$bodyWidth,20,31,$black);
+        $baseline=$result['baseline']+42;
 
-        $segments=[
-            ['text'=>'Por medio de la presente debido al incumplimiento de pago por mi parte en la obligación contraída con la empresa MEGUESA S.A. DE C.V. propietaria del Parque de Descanso Jardines de Juan Pablo'],
-        ];
-        if($contract!==''){
-            $segments[]=['text'=>' en el contrato '];
-            $segments[]=['text'=>$contract,'font'=>'JBold','underline'=>true];
-        }
-        $segments[]=['text'=>' solicito y autorizo el retiro de los restos de la persona que en vida llevó el nombre de '];
-        if($deceased!==''){
-            $segments[]=['text'=>'(+) '.$deceased,'font'=>'JBold','underline'=>true];
-        }
-        if($letterLocation!==''){
-            $segments[]=['text'=>' el cual descansa en el lote '];
-            $segments[]=['text'=>$letterLocation,'font'=>'JBold','underline'=>true];
-        }
-        if($section!==''){
-            $segments[]=['text'=>' sector '];
-            $segments[]=['text'=>$section,'font'=>'JBold','underline'=>true];
-        }
-        $segments[]=['text'=>' siendo por mi cuenta cubiertos los costos de exhumación y traslado, así como el pago convencional por uso de lote y gastos administrativos de cobranza.'];
-
-        $stream.=rp_doc_pdf_flow_segments($segments,85,454,440,9.2,12.5);
-
-        $fixed2=[
-            ['text'=>'Dicha exhumación la realizo de total conformidad pagando los costos correspondientes sin perjuicio alguno demandable para la empresa MEGUESA S.A. DE C.V. por lo tanto devuelvo y cedo el derecho de uso a perpetuidad del lote adquirido'],
-        ];
-        if($contract!==''){
-            $fixed2[]=['text'=>' según número de contrato antes mencionado'];
-        }
-        $fixed2[]=['text'=>' donde sepultamos a nuestro familiar. Teniendo la empresa MEGUESA, S.A. DE C.V. nuevamente el derecho sobre uso de este lote.'];
-        $stream.=rp_doc_pdf_flow_segments($fixed2,85,352,440,9.2,12.5);
-
-        $closing=[['text'=>'Recibo de conformidad los restos de ']];
-        if($relationship!==''){
-            $closing[]=['text'=>$relationship,'font'=>'JBold','underline'=>true];
+        $p2=[['text'=>'Su lote ']];
+        if($propertyLocation!=='')$p2[]=['text'=>$propertyLocation];
+        $p2[]=['text'=>' será reasignado por el lote '];
+        if($newLocation!==''){
+            $p2[]=['text'=>$newLocation,'style'=>'bold'];
         }else{
-            $closing[]=['text'=>'___________________'];
+            $p2[]=['text'=>'________________','style'=>'bold','underline'=>true];
         }
-        $closing[]=['text'=>' y agradezco las atenciones brindadas a la presente. Esta carta es de carácter irrevocable.'];
-        $stream.=rp_doc_pdf_flow_segments($closing,85,286,440,9.2,12.5);
+        $p2[]=['text'=>' para poder llevar a cabo su servicio de Inhumación a su ser querido con la calidad y servicio el cual como empresa nos comprometimos con usted, quedando sin ningún cargo adicional por este concepto.'];
 
-        return [
-            'name'=>'Carta_Exhumacion.pdf',
-            'contentType'=>'application/pdf',
-            'bytes'=>rp_doc_pdf_overlay($pdf,$stream,3),
-        ];
+        $result=rp_doc_image_flow($image,$p2,$left,$baseline,$bodyWidth,20,31,$black);
+        $baseline=$result['baseline']+58;
+
+        rp_doc_image_text($image,'Sin más por el momento quedo a sus órdenes.',$left,$baseline,20,$black,'regular',false);
+        rp_doc_image_right($image,'MEGUESA, S.A. DE C.V',$right,1240,20,$black,'bold',false);
+
+        return rp_doc_image_to_pdf($image,$width,$height,'Carta_Reubicacion.pdf');
     }
 
-    $pdf=rp_doc_template_pdf('CARTA REUBICACION.pdf');
-    $stream='';
+    $left=175;
+    $right=1150;
+    $bodyWidth=975;
 
     if($date!==''){
-        $stream.=rp_doc_pdf_white(395,616,137,17);
-        $stream.=rp_doc_pdf_text('JReg',$date,397,620,10,132,true,0.49);
-    }
-
-    // Encabezado de titular.
-    $stream.=rp_doc_pdf_white(83,527,250,34);
-    if($holder!==''){
-        $stream.=rp_doc_pdf_text('JBold',"At'n.",85,542,11,40,false,0.50);
-        $stream.=rp_doc_pdf_text('JBold',$holder,119,542,11,180,true,0.49);
-        $stream.=rp_doc_pdf_text('JBold','(Titular)',155,526,11,70,false,0.50);
-    }
-
-    // Recompone los dos párrafos que contienen las ubicaciones.
-    // Esto evita que valores de diferente longitud se monten sobre el texto fijo.
-    $stream.=rp_doc_pdf_white(80,335,455,165);
-
-    $p1=[
-        ['text'=>'Por medio de la presente le informamos que debido a la necesidad de uso sobre su lote funerario '],
-    ];
-    if($propertyLocation!==''){
-        $p1[]=['text'=>$propertyLocation,'font'=>'JBold','underline'=>true];
-    }
-    $p1[]=['text'=>' que aún está en proceso de construcción y de acuerdo a la cláusula Primera inciso “a)” de su contrato donde se indica “Que por causa fortuita de fuerza mayor o no estuviera disponible el bien contratado en la fecha del requerimiento del cliente no se hubiese terminado su construcción, se le asignará uno con las mismas características y precio u otro previa autorización y acuerdo con el cliente”.'];
-    $stream.=rp_doc_pdf_flow_segments($p1,85,484,440,9.2,12.5);
-
-    $p2=[['text'=>'Su lote ']];
-    if($propertyLocation!==''){
-        $p2[]=['text'=>$propertyLocation,'font'=>'JBold','underline'=>true];
-    }
-    $p2[]=['text'=>' será reasignado por el lote '];
-    if($newLocation!==''){
-        $p2[]=['text'=>$newLocation,'font'=>'JBold','underline'=>true];
+        rp_doc_image_right($image,'MONTERREY N.L. '.$date,$right,240,20,$black,'regular',true);
     }else{
-        $p2[]=['text'=>'________________','font'=>'JBold','underline'=>true];
+        rp_doc_image_right($image,'MONTERREY N.L.',$right,240,20,$black,'regular',false);
     }
-    $p2[]=['text'=>' para poder llevar a cabo su servicio de Inhumación a su ser querido con la calidad y servicio el cual como empresa nos comprometimos con usted, quedando sin ningún cargo adicional por este concepto. Sin más por el momento quedo a sus órdenes.'];
-    $stream.=rp_doc_pdf_flow_segments($p2,85,394,440,9.2,12.5);
 
-    return [
-        'name'=>'Carta_Reubicacion.pdf',
-        'contentType'=>'application/pdf',
-        'bytes'=>rp_doc_pdf_overlay($pdf,$stream,3),
+    rp_doc_image_text($image,'Atención.-',$left,335,24,$black,'bold',false);
+    rp_doc_image_text($image,'MEGUESA S.A. DE C.V. /',$left,390,24,$black,'bold',false);
+    rp_doc_image_text($image,'PARQUE DE DESCANSO JARDINES DE JUAN PABLO',$left,425,24,$black,'bold',false);
+    rp_doc_image_text($image,'A quien corresponda',$left,505,20,$black,'regular',false);
+
+    $isRetiro=$kind==='retiro';
+    $subject=$isRetiro?'RETIRO DE CENIZAS.':'EXHUMACIÓN DE RESTOS.';
+    rp_doc_image_text($image,'Asunto:',$left,555,20,$black,'regular',false);
+    rp_doc_image_text($image,$subject,$left+88,555,20,$black,'bold',false);
+
+    $baseline=655;
+    $first=[
+        ['text'=>'Por medio de la presente debido al incumplimiento de pago por mi parte en la obligación contraída con la empresa MEGUESA S.A. DE C.V. propietaria del Parque de Descanso Jardines de Juan Pablo'],
     ];
+    if($contract!==''){
+        $first[]=['text'=>' en el contrato '];
+        $first[]=['text'=>$contract,'style'=>'bold','underline'=>true];
+    }
+
+    if($isRetiro){
+        $first[]=['text'=>' solicito y autorizo el retiro de cenizas de la persona que en vida llevó el nombre de'."\n"];
+    }else{
+        $first[]=['text'=>' solicito y autorizo el retiro de los restos de la persona que en vida llevó el nombre de'."\n"];
+    }
+
+    $first[]=['text'=>'(+) '];
+    if($deceased!==''){
+        $first[]=['text'=>$deceased,'style'=>'bold','underline'=>true];
+    }
+
+    $first[]=['text'=>$isRetiro?' el cual descansa en el nicho ':' el cual descansa en el lote '];
+    if($letterLocation!==''){
+        $first[]=['text'=>$letterLocation,'style'=>'bold','underline'=>true];
+    }
+    if($section!==''){
+        $first[]=['text'=>' sector '.$section];
+    }
+
+    $first[]=['text'=>$isRetiro
+        ? ', siendo por mi cuenta cubiertos los costos de traslado, así como el pago convencional por uso de nicho y gastos administrativos de cobranza.'
+        : ' siendo por mi cuenta cubiertos los costos de exhumación y traslado, así como el pago convencional por uso de lote y gastos administrativos de cobranza.'
+    ];
+
+    $result=rp_doc_image_flow($image,$first,$left,$baseline,$bodyWidth,18.5,28,$black);
+    $baseline=$result['baseline']+44;
+
+    $secondText=$isRetiro
+        ? 'Dicho retiro lo realizo de total conformidad pagando los costos correspondientes sin perjuicio alguno demandable para la empresa MEGUESA S.A. DE C.V. por lo tanto devuelvo y cedo el derecho de uso a perpetuidad del nicho adquirido'
+        : 'Dicha exhumación la realizo de total conformidad pagando los costos correspondientes sin perjuicio alguno demandable para la empresa MEGUESA S.A. DE C.V. por lo tanto devuelvo y cedo el derecho de uso a perpetuidad del lote adquirido';
+
+    if($contract!==''){
+        $secondText.=' según número de contrato antes mencionado';
+    }
+    $secondText.=$isRetiro
+        ? ' donde esta nuestro familiar.'
+        : ' donde sepultamos a nuestro familiar.';
+
+    $result=rp_doc_image_flow(
+        $image,
+        [['text'=>$secondText]],
+        $left,$baseline,$bodyWidth,18.5,28,$black
+    );
+    $baseline=$result['baseline']+38;
+
+    $thirdText=$isRetiro
+        ? 'Teniendo la empresa MEGUESA, S.A. DE C.V. nuevamente el derecho sobre uso de este nicho.'
+        : 'Teniendo la empresa MEGUESA, S.A. DE C.V. nuevamente el derecho sobre uso de este lote.';
+    $result=rp_doc_image_flow(
+        $image,
+        [['text'=>$thirdText]],
+        $left,$baseline,$bodyWidth,18.5,28,$black
+    );
+    $baseline=$result['baseline']+38;
+
+    $closing=[
+        ['text'=>$isRetiro?'Recibo de conformidad las cenizas de ':'Recibo de conformidad los restos de '],
+    ];
+    if($relationship!==''){
+        $closing[]=['text'=>$relationship,'style'=>'bold','underline'=>true];
+    }else{
+        $closing[]=['text'=>'___________________','underline'=>true];
+    }
+    $closing[]=['text'=>' y agradezco las atenciones brindadas a la presente. Esta carta es de carácter irrevocable.'];
+
+    $result=rp_doc_image_flow($image,$closing,$left,$baseline,$bodyWidth,18.5,28,$black);
+    $baseline=$result['baseline'];
+
+    // Identificador visual del campo de parentesco, como en los Word oficiales.
+    rp_doc_image_center($image,'(Parentesco)',640,$baseline+27,14,$black,'regular');
+
+    $atteY=max(1260,$baseline+105);
+    rp_doc_image_text($image,'ATTE.',$left,$atteY,20,$black,'regular',false);
+
+    $signatureY=1460;
+    imageline($image,210,$signatureY,455,$signatureY,$black);
+    imageline($image,815,$signatureY,1060,$signatureY,$black);
+
+    rp_doc_image_center($image,'NOMBRE Y FIRMA',332,$signatureY+34,16,$black,'bold');
+    rp_doc_image_center($image,'TITULAR DEL CONTRATO',332,$signatureY+60,16,$black,'bold');
+    rp_doc_image_center($image,'NOMBRE Y TEL/CEL',938,$signatureY+34,16,$black,'bold');
+    rp_doc_image_center($image,'AVAL Y/O BENEFICIARIO',938,$signatureY+60,16,$black,'bold');
+
+    return rp_doc_image_to_pdf(
+        $image,$width,$height,
+        $isRetiro?'Carta_Retiro_Cenizas.pdf':'Carta_Exhumacion.pdf'
+    );
 }
 
 /**
