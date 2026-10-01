@@ -243,12 +243,30 @@ $isPreview = str_contains(
       <div id="reubicacionFields" class="conditional-card hidden">
         <div class="subsection-title">
           <strong>Reubicación</strong>
-          <span>Estos datos se enviarán a Eventos Parque únicamente cuando aplique.</span>
+          <span>Captura la nueva propiedad con el mismo formato de la ubicación anterior.</span>
         </div>
-        <div class="form-grid grid-2">
-          <label>Ubicación Nueva
-            <input name="ubicacionNueva" id="ubicacionNueva" placeholder="Ej. POR CONFIRMAR">
+
+        <div class="form-grid grid-3">
+          <label>Sección Nueva
+            <select name="seccionNueva" id="seccionNueva"></select>
           </label>
+          <label>Manzana Nueva
+            <select name="manzanaNueva" id="manzanaNueva"></select>
+          </label>
+          <label>Lote / Nicho Nuevo
+            <input type="number" min="0" step="1" name="numLoteNichoNuevo" id="numLoteNichoNuevo" placeholder="Ej. 236">
+          </label>
+        </div>
+
+        <div class="reference-summary">
+          <div class="span-2">
+            <span>Ubicación nueva</span>
+            <strong id="ubicacionNuevaPreview">—</strong>
+          </div>
+        </div>
+        <input type="hidden" name="ubicacionNueva" id="ubicacionNueva" value="">
+
+        <div class="form-grid grid-2">
           <label>Motivo de Reubicación
             <select name="motivoReubicacion" id="motivoReubicacion">
               <option value="">Seleccionar</option>
