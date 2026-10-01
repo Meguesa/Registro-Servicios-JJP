@@ -54,6 +54,11 @@ function rp_image_property_rows(array $payload): array
     if($hasRelocation){
         $rows[]=['label'=>'Requiere reubicación','value'=>'SI'];
         $rows[]=['label'=>'Ubicación nueva','value'=>rs_image_clean_text($payload['ubicacionNueva']??'')];
+
+        $reason=rs_image_clean_text($payload['motivoReubicacion']??'');
+        if($reason!==''){
+            $rows[]=['label'=>'Motivo de reubicación','value'=>$reason];
+        }
     }
 
     $frase=rs_image_clean_text($payload['frase']??'');
@@ -73,10 +78,6 @@ function rp_image_person_rows(array $payload): array
         ['label'=>'Fecha de defunción','value'=>rs_image_date((string)($payload['fechaDefuncion']??''),false)],
         ['label'=>'Estatus de liquidación','value'=>rs_image_clean_text($payload['estatusLiquidacion']??'')],
     ];
-
-    if(!empty($payload['requiereReubicacion'])){
-        $rows[]=['label'=>'Motivo de reubicación','value'=>rs_image_clean_text($payload['motivoReubicacion']??'')];
-    }
 
     $obs=rs_image_clean_text($payload['observaciones']??'');
     if($obs!==''){
