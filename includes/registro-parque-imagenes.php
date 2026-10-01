@@ -22,14 +22,25 @@ function rp_image_location(array $payload): string
 
 function rp_image_service_rows(array $payload): array
 {
+    $startDate=rs_image_date((string)($payload['fechaHoraInicio']??''),false);
+    $startTime=rs_image_time((string)($payload['fechaHoraInicio']??''));
+    $endDate=rs_image_date((string)($payload['fechaHoraFin']??''),false);
+    $endTime=rs_image_time((string)($payload['fechaHoraFin']??''));
+
+    $start=trim($startDate.' '.$startTime);
+    $end=trim($endDate.' '.$endTime);
+    $event='';
+    if($start!=='' && $end!==''){
+        $event=$start.' a '.$end;
+    }elseif($start!==''){
+        $event=$start;
+    }elseif($end!==''){
+        $event=$end;
+    }
+
     return [
-        ['label'=>'Fecha inicio','value'=>rs_image_date((string)($payload['fechaHoraInicio']??''),false)],
-        ['label'=>'Hora inicio','value'=>rs_image_time((string)($payload['fechaHoraInicio']??''))],
-        ['label'=>'Fecha fin','value'=>rs_image_date((string)($payload['fechaHoraFin']??''),false)],
-        ['label'=>'Hora fin','value'=>rs_image_time((string)($payload['fechaHoraFin']??''))],
+        ['label'=>'Evento','value'=>$event],
         ['label'=>'Previsión / Uso inmediato','value'=>rs_image_clean_text($payload['previsionUsoInmediato']??'')],
-        ['label'=>'Tipo de servicio','value'=>rs_image_clean_text($payload['tipoServicio']??'')],
-        ['label'=>'Servicio','value'=>rs_image_clean_text($payload['servicio']??'')],
         ['label'=>'Asistente funerario','value'=>rs_image_clean_text($payload['asistenteFunerarioTexto']??'')],
         ['label'=>'Número de contrato','value'=>rs_image_clean_text($payload['numeroContrato']??'')],
     ];
@@ -41,6 +52,8 @@ function rp_image_property_rows(array $payload): array
     $locationLabel=$hasRelocation?'Ubicación anterior':'Ubicación';
 
     $rows=[
+        ['label'=>'Tipo de servicio','value'=>rs_image_clean_text($payload['tipoServicio']??'')],
+        ['label'=>'Servicio','value'=>rs_image_clean_text($payload['servicio']??'')],
         ['label'=>'Sección','value'=>rs_image_clean_text($payload['seccion']??'')],
         ['label'=>'Manzana','value'=>rs_image_clean_text($payload['manzana']??'')],
         ['label'=>'Lote / Nicho','value'=>rs_image_clean_text($payload['numLoteNicho']??'')],
