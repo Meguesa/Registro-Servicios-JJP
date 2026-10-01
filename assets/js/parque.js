@@ -259,14 +259,6 @@ document.getElementById("requiereReubicacion")?.addEventListener("change",syncRe
   document.getElementById(id)?.addEventListener("change",syncNewLocation);
 });
 
-function syncTestModeUi(){
-  const active=document.getElementById("modoPrueba")?.checked===true;
-  const pill=document.getElementById("modePill");
-  const help=document.getElementById("testModeHelp");
-  if(pill)pill.textContent=active?"Prueba · conectado a SharePoint":"Producción · conectado a SharePoint";
-  if(help)help.hidden=!active;
-}
-document.getElementById("modoPrueba")?.addEventListener("change",syncTestModeUi);
 
 function servicePrefix(){
   const service=document.getElementById("servicioParque")?.value||"";
@@ -340,7 +332,7 @@ function payload(){
     ubicacionNueva:fieldValue("ubicacionNueva"),
     motivoReubicacion:fieldValue("motivoReubicacion"),
     observaciones:fieldValue("observaciones"),
-    modoPrueba:document.getElementById("modoPrueba")?.checked===true
+    modoPrueba:false
   };
 }
 
@@ -352,7 +344,6 @@ function syncSummary(){
   set("summaryUbicacion",document.getElementById("ubicacionPreview")?.textContent||"—");
   set("summaryPlaca",p.tipoPlaca+(p.tipoPlaca==="Nicho"&&p.nombreFamilia?" · "+p.nombreFamilia:""));
   set("summaryLiquidacion",p.estatusLiquidacion);
-  set("summaryModo",p.modoPrueba?"PRUEBA":"PRODUCCIÓN");
 }
 
 form.addEventListener("submit",async e=>{
@@ -383,7 +374,6 @@ form.addEventListener("submit",async e=>{
       "Servicio Parque registrado correctamente.",
       "ID: "+result.itemId,
       "Lista: Eventos Parque",
-      result.modoPrueba?"Modo: PRUEBA":"Modo: PRODUCCIÓN",
       result.calendar?.created ? "Calendario: CREADO DIRECTAMENTE" : ("Calendario: "+(result.calendar?.error||"NO CREADO")),
       result.email?.sent ? "Correo: ENVIADO" : ("Correo: "+(result.email?.error||"NO ENVIADO"))
     ];
@@ -422,11 +412,9 @@ function applyParqueDraft(p){
   ].forEach(k=>setParqueField(k,p[k]??""));
   setParqueField("requiereCambioUrna",!!p.requiereCambioUrna);
   setParqueField("requiereReubicacion",!!p.requiereReubicacion);
-  if(document.getElementById("modoPrueba"))document.getElementById("modoPrueba").checked=!!p.modoPrueba;
   syncTipoPlacaPorServicio();
   syncPropertyRules();
   syncReubicacion();
-  syncTestModeUi();
   syncSummary();
 }
 
@@ -488,7 +476,6 @@ function resetParqueForm(){
   syncTipoPlacaPorServicio();
   syncPropertyRules();
   syncReubicacion();
-  syncTestModeUi();
   showStep(0);
   const status=document.getElementById("status");
   if(status)status.textContent="Listo para registrar en SharePoint.";
