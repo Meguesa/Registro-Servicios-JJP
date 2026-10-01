@@ -65,7 +65,10 @@ function rp_email_location(array $payload): string
     $seccion=trim((string)($payload['seccion']??''));
     $manzana=trim((string)($payload['manzana']??''));
     $lote=trim((string)($payload['numLoteNicho']??''));
-    $serviceNorm=strtolower((string)preg_replace('/[^a-z0-9]+/','',@iconv('UTF-8','ASCII//TRANSLIT//IGNORE',(string)($payload['servicio']??''))?:''));
+    $serviceRaw=(string)($payload['servicio']??'');
+    $serviceAscii=@iconv('UTF-8','ASCII//TRANSLIT//IGNORE',$serviceRaw);
+    if(!is_string($serviceAscii))$serviceAscii=$serviceRaw;
+    $serviceNorm=preg_replace('/[^a-z0-9]+/','',strtolower($serviceAscii))??'';
     $prefix=$serviceNorm==='totalservicecomplemento'?'TSC':($serviceNorm==='totalservice'?'TS':'');
 
     return implode(' - ',array_values(array_filter([
