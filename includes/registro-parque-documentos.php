@@ -173,14 +173,65 @@ function rp_generate_operational_tables(array $payload): array
 function rp_doc_template_pdf(string $filename): string
 {
     $path=dirname(__DIR__).'/assets/templates/parque/'.$filename;
-    if(!is_file($path) || !is_readable($path)){
-        throw new RuntimeException('No se encontro la plantilla oficial de Parque: '.$filename);
+
+    if(is_file($path) && is_readable($path)){
+        $pdf=@file_get_contents($path);
+        if(is_string($pdf) && str_starts_with($pdf,'%PDF-')){
+            return $pdf;
+        }
     }
 
-    $pdf=@file_get_contents($path);
-    if(!is_string($pdf) || !str_starts_with($pdf,'%PDF-')){
-        throw new RuntimeException('La plantilla oficial de Parque no es un PDF valido: '.$filename);
+    // En cPanel los workflows existentes publican el codigo de Registro de Servicios,
+    // pero no necesariamente los binarios nuevos. Si la plantilla no esta local,
+    // obtenerla directamente del mismo repo Registro-Servicios-JJP y usarla en memoria.
+    $allowed=[
+        'CARTA EXHUMACION.pdf',
+        'CARTA RETIRO DE CENIZAS.pdf',
+        'CARTA REUBICACION.pdf',
+    ];
+    if(!in_array($filename,$allowed,true)){
+        throw new RuntimeException('Plantilla de Parque no permitida: '.$filename);
     }
+
+    $url='https://raw.githubusercontent.com/Meguesa/Registro-Servicios-JJP/main/assets/templates/parque/'
+        .rawurlencode($filename);
+
+    $curl=curl_init($url);
+    if($curl===false){
+        throw new RuntimeException('No fue posible inicializar la descarga de la plantilla de Parque: '.$filename);
+    }
+
+    curl_setopt_array($curl,[
+        CURLOPT_RETURNTRANSFER=>true,
+        CURLOPT_FOLLOWLOCATION=>true,
+        CURLOPT_CONNECTTIMEOUT=>8,
+        CURLOPT_TIMEOUT=>20,
+        CURLOPT_SSL_VERIFYPEER=>true,
+        CURLOPT_SSL_VERIFYHOST=>2,
+        CURLOPT_HTTPHEADER=>['Accept: application/pdf'],
+        CURLOPT_USERAGENT=>'Registro-Servicios-JJP',
+    ]);
+
+    $pdf=curl_exec($curl);
+    $status=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE);
+    $error=curl_error($curl);
+    curl_close($curl);
+
+    if(!is_string($pdf) || $status<200 || $status>=300 || !str_starts_with($pdf,'%PDF-')){
+        $detail=$error!==''?' '.$error:'';
+        throw new RuntimeException(
+            'No fue posible cargar la plantilla oficial de Parque: '.$filename
+            .' (HTTP '.$status.').'.$detail
+        );
+    }
+
+    // Cache opcional local. Si cPanel no permite escritura, la plantilla ya queda
+    // disponible en memoria y el flujo continua sin depender del cache.
+    $cacheDir=dirname(__DIR__).'/.registro-servicios-data/templates/parque';
+    if((is_dir($cacheDir) || @mkdir($cacheDir,0750,true)) && is_writable($cacheDir)){
+        @file_put_contents($cacheDir.'/'.$filename,$pdf,LOCK_EX);
+    }
+
     return $pdf;
 }
 
