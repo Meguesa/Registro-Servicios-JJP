@@ -191,7 +191,10 @@ function syncPropertyRules(){
   const invalid=placa==="Nicho" && destape!=="" && destape!=="Primero";
   nicho?.classList.toggle("hidden",placa!=="Nicho");
   warning?.classList.toggle("hidden",!invalid);
-  if(familia)familia.required=placa==="Nicho";
+  if(familia){
+    familia.required=placa==="Nicho";
+    if(placa!=="Nicho")familia.value="";
+  }
   if(invalid){
     document.getElementById("tipoPlaca").setCustomValidity("Nicho solo aplica cuando Destape = Primero.");
   }else{
