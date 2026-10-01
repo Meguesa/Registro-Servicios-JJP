@@ -24,17 +24,24 @@ Portal Interno JJP
 El flujo anterior de Power Automate de Eventos Capillas debe permanecer desactivado para evitar duplicidad de registros, correos y automatizaciones.
 
 ### Parque
-Visible en el selector como **En desarrollo**. No tiene captura productiva habilitada todavía.
+Producción activa.
 
-## Modo normal y modo prueba
+Flujo principal:
 
-- Producción es el modo predeterminado.
-- `ModoPrueba = No` en registros normales.
-- Solo `sistemas@juanpablo.com.mx` y `gabriel.guerra@juanpablo.com.mx` pueden activar el modo prueba desde el formulario.
-- En modo prueba:
-  - `ModoPrueba = Sí`
-  - correo y calendario quedan identificados como prueba
-  - TellMeBye usa el modo de prueba configurado
+```text
+Portal Interno JJP
+  -> Registro de Servicios
+      -> Parque
+          -> Formulario web
+          -> SharePoint: Eventos Parque
+          -> Calendario
+          -> Correo operativo
+          -> Imágenes informativas
+          -> Flores / placas según reglas
+          -> Cartas de Reubicación, Exhumación o Retiro de Cenizas cuando corresponda
+```
+
+Parque opera únicamente en modo productivo desde la ruta oficial `/registro-servicios/`. El flujo de preview fue retirado.
 
 ## Destinatarios
 
@@ -57,11 +64,16 @@ Registro-Servicios-JJP/
 ├── mis-servicios.php
 ├── api/
 │   ├── registro-servicio.php
+│   ├── registro-parque.php
 │   ├── guardar-borrador.php
 │   └── mis-servicios-api.php
 ├── includes/
 │   ├── registro-sharepoint.php
 │   ├── registro-calendario.php
+│   ├── registro-parque-calendario.php
+│   ├── registro-parque-correo.php
+│   ├── registro-parque-documentos.php
+│   ├── registro-parque-imagenes.php
 │   ├── registro-imagenes.php
 │   ├── registro-esquela.php
 │   ├── registro-placa.php
@@ -72,6 +84,7 @@ Registro-Servicios-JJP/
 ├── assets/
 │   ├── css/
 │   ├── js/
+│   ├── templates/parque/
 │   └── esquelas/
 └── docs/
 ```
