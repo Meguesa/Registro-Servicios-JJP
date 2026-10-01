@@ -19,6 +19,7 @@ function rp_doc_location(array $payload): string
 function rp_doc_flower_arrangement(array $payload): string
 {
     $section=mb_strtoupper(trim((string)($payload['seccion']??'')),'UTF-8');
+    $plateType=rp_doc_norm((string)($payload['tipoPlaca']??''));
     if(str_starts_with($section,'ORO')) return '34 Rosas Blancas y 2 arreglos de exterior';
     if($section==='PLATA') return '18 Rosas Blancas y 2 arreglos de exterior';
     if($section==='BRONCE') return '12 Rosas Blancas y 2 arreglos de exterior';
@@ -269,8 +270,8 @@ function rp_doc_letter_pdf(array $payload,string $kind): array
 /**
  * Reglas del flujo actual de Parque:
  * - Reubicacion: genera Carta Reubicacion.
- * - No liquidado + SPN/PLN: Carta Retiro de Cenizas.
- * - No liquidado + otra seccion: Carta Exhumacion.
+ * - No liquidado + TipoPlaca=Nicho: Carta Retiro de Cenizas.
+ * - No liquidado + cualquier otra placa/propiedad: Carta Exhumacion.
  *
  * @return array<int,array{name:string,contentType:string,bytes:string}>
  */
@@ -285,7 +286,7 @@ function rp_generate_letter_attachments(array $payload): array
     }
 
     if($liquidation==='noliquidado'){
-        if(in_array($section,['SPN','PLN'],true)){
+        if($plateType==='nicho'){
             $attachments[]=rp_doc_letter_pdf($payload,'retiro');
         }else{
             $attachments[]=rp_doc_letter_pdf($payload,'exhumacion');
