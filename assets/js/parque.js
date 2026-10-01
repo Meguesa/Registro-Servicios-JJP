@@ -331,8 +331,7 @@ function payload(){
     numLoteNichoNuevo:fieldValue("numLoteNichoNuevo"),
     ubicacionNueva:fieldValue("ubicacionNueva"),
     motivoReubicacion:fieldValue("motivoReubicacion"),
-    observaciones:fieldValue("observaciones"),
-    modoPrueba:false
+    observaciones:fieldValue("observaciones")
   };
 }
 
