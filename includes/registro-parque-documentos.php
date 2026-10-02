@@ -65,6 +65,36 @@ function rp_nicho_template_png(): string
     return $bytes;
 }
 
+function rp_nicho_logo_image(): ?GdImage
+{
+    $path=dirname(__DIR__).'/assets/esquelas/logo_jjp.b64';
+    if(!is_file($path) || !is_readable($path))return null;
+
+    $encoded=@file_get_contents($path);
+    if(!is_string($encoded) || trim($encoded)==='')return null;
+
+    $bytes=base64_decode(preg_replace('/\\s+/','',$encoded)??'',true);
+    if(!is_string($bytes) || $bytes==='')return null;
+
+    $image=@imagecreatefromstring($bytes);
+    return $image instanceof GdImage?$image:null;
+}
+
+function rp_nicho_center_text(
+    GdImage $image,
+    string $text,
+    string $font,
+    float $size,
+    int $baseline,
+    int $color
+): void {
+    $box=@imagettfbbox($size,0,$font,$text);
+    if(!is_array($box))return;
+    $width=abs((int)$box[2]-(int)$box[0]);
+    $x=(int)round((imagesx($image)-$width)/2);
+    @imagettftext($image,$size,0,max(10,$x),$baseline,$color,$font,$text);
+}
+
 function rp_generate_nicho_plate(array $payload): array
 {
     rs_image_require_gd();
@@ -74,45 +104,63 @@ function rp_generate_nicho_plate(array $payload): array
         throw new RuntimeException('La placa de nicho requiere Nombre de Familia.');
     }
 
-    // La plantilla ya contiene "FAMILIA" y el logotipo inferior.
-    // Evitar duplicar la palabra cuando el usuario captura "FAMILIA ...".
-    $family=preg_replace('/^FAMILIA\s+/u','',$family)??$family;
+    // El formato oficial ya muestra la palabra FAMILIA por separado.
+    $family=preg_replace('/^FAMILIA\\s+/u','',$family)??$family;
     $family=trim($family);
     if($family===''){
         throw new RuntimeException('La placa de nicho requiere el nombre de la familia.');
     }
 
-    $image=@imagecreatefromstring(rp_nicho_template_png());
+    // Generar la placa directamente evita depender de un PNG base externo.
+    // Formato oficial: FAMILIA + nombre familiar + emblema JdJP inferior.
+    $width=2048;
+    $height=1024;
+    $image=imagecreatetruecolor($width,$height);
     if(!$image instanceof GdImage){
-        throw new RuntimeException('No fue posible abrir la plantilla correcta de placa de nicho.');
+        throw new RuntimeException('No fue posible crear la placa de nicho.');
     }
 
+    $white=imagecolorallocate($image,255,255,255);
+    $black=imagecolorallocate($image,0,0,0);
+    imagefilledrectangle($image,0,0,$width,$height,$white);
+
     try{
-        $font=rs_image_font_path();
-        if($font===null){
+        $familyFont=function_exists('rs_plate_pagella_font_path')
+            ? rs_plate_pagella_font_path()
+            : rs_image_font_path();
+        $titleFont=rs_image_bold_font_path() ?: $familyFont;
+
+        if(!is_string($familyFont) || $familyFont===''){
             throw new RuntimeException('No fue posible resolver la tipografia de la placa de nicho.');
         }
+        if(!is_string($titleFont) || $titleFont==='')$titleFont=$familyFont;
 
-        $black=imagecolorallocate($image,0,0,0);
-        $width=imagesx($image);
+        rp_nicho_center_text($image,'FAMILIA',$titleFont,112.0,485,$black);
 
-        // El formato oficial usa el apellido/nombre familiar centrado debajo de
-        // la palabra FAMILIA. Reducir la fuente solo cuando el texto sea largo.
-        $maxWidth=(int)round($width*0.68);
-        $size=116.0;
-        while($size>54.0){
-            $box=@imagettfbbox($size,0,$font,$family);
+        $maxWidth=(int)round($width*0.72);
+        $size=112.0;
+        while($size>48.0){
+            $box=@imagettfbbox($size,0,$familyFont,$family);
             $textWidth=is_array($box)?abs((int)$box[2]-(int)$box[0]):0;
             if($textWidth<=$maxWidth)break;
             $size-=3.0;
         }
+        rp_nicho_center_text($image,$family,$familyFont,$size,650,$black);
 
-        $box=@imagettfbbox($size,0,$font,$family);
-        $textWidth=is_array($box)?abs((int)$box[2]-(int)$box[0]):0;
-        $x=max(20,(int)round(($width-$textWidth)/2));
-
-        // Baseline calibrada contra el formato correcto entregado por Operaciones.
-        imagettftext($image,$size,0,$x,565,$black,$font,$family);
+        $logo=rp_nicho_logo_image();
+        if($logo instanceof GdImage){
+            $sw=imagesx($logo);
+            $sh=imagesy($logo);
+            $maxW=300;
+            $maxH=250;
+            $scale=min($maxW/max(1,$sw),$maxH/max(1,$sh));
+            $dw=max(1,(int)round($sw*$scale));
+            $dh=max(1,(int)round($sh*$scale));
+            $x=(int)round(($width-$dw)/2);
+            $y=715;
+            imagecopyresampled($image,$logo,$x,$y,0,0,$dw,$dh,$sw,$sh);
+            imagedestroy($logo);
+        }
 
         ob_start();
         imagepng($image,null,6);
