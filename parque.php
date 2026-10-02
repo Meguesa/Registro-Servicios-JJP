@@ -5,6 +5,35 @@ $root = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
 require_once $root . '/includes/bootstrap.php';
 portal_require_authentication();
 
+$initialDraftId = '';
+$initialDraftPayload = null;
+$draftError = '';
+
+$requestedDraft = trim((string)($_GET['draft'] ?? ''));
+if ($requestedDraft !== '') {
+    try {
+        require_once __DIR__ . '/includes/registro-storage.php';
+        $storageCtx = rs_storage_bootstrap();
+        $initialDraftId = rs_safe_id($requestedDraft);
+        $draft = rs_read_draft($storageCtx, $initialDraftId);
+        if (is_array($draft) && is_array($draft['payload'] ?? null)) {
+            $initialDraftPayload = $draft['payload'];
+        } else {
+            $draftError = 'No se encontro la informacion del borrador.';
+        }
+    } catch (Throwable $draftLoadError) {
+        $draftError = $draftLoadError->getMessage();
+        error_log('Registro Servicios Parque carga borrador: ' . $draftLoadError->getMessage());
+    }
+}
+
+$cssVersion = is_file(__DIR__ . '/assets/css/styles.css')
+    ? (string)filemtime(__DIR__ . '/assets/css/styles.css')
+    : '1';
+$jsVersion = is_file(__DIR__ . '/assets/js/parque.js')
+    ? (string)filemtime(__DIR__ . '/assets/js/parque.js')
+    : '1';
+
 ?><!doctype html>
 <html lang="es-MX">
 <head>
@@ -12,7 +41,7 @@ portal_require_authentication();
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Servicios Parque | Registro de Servicios JdJP</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="stylesheet" href="assets/css/styles.css?v=<?= htmlspecialchars($cssVersion, ENT_QUOTES, 'UTF-8') ?>">
 </head>
 <body>
 <header class="solicitud-topbar">
@@ -290,6 +319,13 @@ portal_require_authentication();
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
-<script src="assets/js/parque.js"></script>
+<script>
+window.JDJP_PARQUE_INITIAL_DRAFT = <?= json_encode([
+    'id'=>$initialDraftId,
+    'payload'=>$initialDraftPayload,
+    'error'=>$draftError,
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+</script>
+<script src="assets/js/parque.js?v=<?= htmlspecialchars($jsVersion, ENT_QUOTES, 'UTF-8') ?>"></script>
 </body>
 </html>
