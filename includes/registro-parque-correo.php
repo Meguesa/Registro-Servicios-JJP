@@ -45,11 +45,11 @@ function rp_email_recipients(): array
             'cobranza2@juanpablo.com.mx',
             'cobranza3@juanpablo.com.mx',
             'cobranza4@juanpablo.com.mx',
-            'administracion@juanpablo.com.mx',
             'administracion2@juanpablo.com.mx',
             'ventas.us@juanpablo.com.mx',
             'rh.comercial@juanpablo.com.mx',
             'direccion@juanpablo.com.mx',
+            'jose.santana@juanpablo.com.mx',
             'capillas@juanpablo.com.mx',
             'gustavorv@juanpablo.com.mx',
             'rene.perez@juanpablo.com.mx',
@@ -60,8 +60,8 @@ function rp_email_recipients(): array
             'it@juanpablo.com.mx',
             'gerencia.operacion@juanpablo.com.mx',
             'diseno@juanpablo.com.mx',
-            'angel.delacruz@juanpablo.com.mx',
-            'jhonatan.montalvo@juanpablo.com.mx',
+            'parque.descanso@juanpablo.com.mx',
+            'capillasaguafria@juanpablo.com.mx',
         ]
     );
 }
