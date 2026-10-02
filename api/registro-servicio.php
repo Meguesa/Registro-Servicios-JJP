@@ -629,6 +629,16 @@ try {
         rs_json(405, ['ok' => false, 'message' => 'Metodo no permitido.']);
     }
 
+    // Protección contra submits implicitos/intermedios del wizard.
+    // Solo el boton final "Registrar servicio" envia esta intención.
+    $submissionIntent = trim((string) ($_POST['submissionIntent'] ?? ''));
+    if ($submissionIntent !== 'final') {
+        rs_json(409, [
+            'ok' => false,
+            'message' => 'El servicio no esta listo para publicarse. Completa todos los pasos y usa Registrar servicio.'
+        ]);
+    }
+
     $payloadRaw = (string) ($_POST['payload'] ?? '');
     $payload = json_decode($payloadRaw, true);
     if (!is_array($payload)) {
@@ -642,10 +652,51 @@ try {
     $isTestMode = $requestedTestMode && rs_user_can_test_mode($currentUserEmail);
     $payload['modoPrueba'] = $isTestMode;
 
-    $required = ['numeroReferencia', 'servicio', 'ubicacion', 'prevision', 'numeroServicio', 'titular', 'fallecido'];
+    $required = [
+        'numeroReferencia','servicio','ubicacion','prevision','numeroServicio',
+        'titular','fallecido','fechaNacimiento','fechaDefuncion','destinoFinal',
+        'embalsamador','rescate1','ubicacionRescate','motivo'
+    ];
     foreach ($required as $key) {
         if (trim((string) ($payload[$key] ?? '')) === '') {
             rs_json(422, ['ok' => false, 'message' => 'Falta el campo obligatorio: ' . $key . '.']);
+        }
+    }
+
+    if (!array_key_exists('precioVenta', $payload) || $payload['precioVenta'] === null || $payload['precioVenta'] === '' || !is_numeric($payload['precioVenta'])) {
+        rs_json(422, ['ok' => false, 'message' => 'Falta el campo obligatorio: precioVenta.']);
+    }
+
+    $service = trim((string) ($payload['servicio'] ?? ''));
+    $sinVelacion = $service === 'Cremación Directa (sin velación)';
+    $rentaCapillas = $service === 'Renta de Capillas';
+    $esCremacion = in_array($service, [
+        'Cremación',
+        'Cremación Directa (con velación)',
+        'Cremación Directa (sin velación)',
+    ], true);
+
+    if (!$sinVelacion) {
+        foreach (['sala','inicio','termino','tiempoCapillas'] as $key) {
+            if (trim((string) ($payload[$key] ?? '')) === '') {
+                rs_json(422, ['ok' => false, 'message' => 'Falta el campo obligatorio: ' . $key . '.']);
+            }
+        }
+    }
+
+    if (!$rentaCapillas && trim((string) ($payload['tipoAtaud'] ?? '')) === '') {
+        rs_json(422, ['ok' => false, 'message' => 'Falta el campo obligatorio: tipoAtaud.']);
+    }
+
+    if (!$sinVelacion && (bool)($payload['llevaExequia'] ?? false) && trim((string) ($payload['horaExequia'] ?? '')) === '') {
+        rs_json(422, ['ok' => false, 'message' => 'Falta el campo obligatorio: horaExequia.']);
+    }
+
+    if ($esCremacion) {
+        foreach (['referenciaCrematorio','inicioCrematorio','personalCrematorio'] as $key) {
+            if (trim((string) ($payload[$key] ?? '')) === '') {
+                rs_json(422, ['ok' => false, 'message' => 'Falta el campo obligatorio de crematorio: ' . $key . '.']);
+            }
         }
     }
 
