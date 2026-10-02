@@ -92,6 +92,7 @@ function rs_email_recipients(bool $isTestMode, bool $plate = false): array
             'ventas.us@juanpablo.com.mx',
             'rh.comercial@juanpablo.com.mx',
             'direccion@juanpablo.com.mx',
+            'jose.santana@juanpablo.com.mx',
             'capillas@juanpablo.com.mx',
             'gustavorv@juanpablo.com.mx',
             'rene.perez@juanpablo.com.mx',
