@@ -460,9 +460,24 @@ async function saveParqueDraft(){
 }
 
 async function loadParqueDraft(){
+  const status=document.getElementById("status");
+  const boot=window.JDJP_PARQUE_INITIAL_DRAFT||null;
+
+  if(boot && boot.id){
+    document.getElementById("draftId").value=boot.id;
+    if(boot.payload && typeof boot.payload==="object"){
+      applyParqueDraft(boot.payload);
+      if(status)status.textContent="Borrador cargado. Continúa la captura o publícalo cuando esté completo.";
+      return;
+    }
+    if(boot.error && status){
+      status.textContent="No fue posible cargar el borrador: "+boot.error;
+    }
+  }
+
   const id=new URLSearchParams(location.search).get("draft");
   if(!id)return;
-  const status=document.getElementById("status");
+
   try{
     if(status)status.textContent="Cargando borrador...";
     const response=await fetch("api/guardar-borrador.php?id="+encodeURIComponent(id),{cache:"no-store",credentials:"same-origin"});
