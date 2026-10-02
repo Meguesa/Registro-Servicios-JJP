@@ -391,6 +391,7 @@ try{
         'attachmentNames'=>[],
         'error'=>null,
     ];
+    $operationalAttachments=[];
     try{
         $infoAttachments=rp_generate_information_images($payload);
         $operationalAttachments=rp_generate_operational_tables($payload);
@@ -409,6 +410,40 @@ try{
         error_log('Registro Servicios Parque Correo item '.$itemId.': '.$emailError->getMessage());
     }
 
+    // Las solicitudes de Placa de Urna y Placa de Nicho se envian tambien
+    // como correos independientes, sin sustituir el correo operativo principal.
+    $plateEmails=[];
+    foreach($operationalAttachments as $attachment){
+        if(!is_array($attachment))continue;
+        $name=mb_strtolower(trim((string)($attachment['name']??'')),'UTF-8');
+        $kind=null;
+        if($name==='placa_urna.png')$kind='urna';
+        if($name==='placa_nicho.png')$kind='nicho';
+        if($kind===null)continue;
+
+        $result=[
+            'enabled'=>true,
+            'sent'=>false,
+            'kind'=>$kind,
+            'recipients'=>[],
+            'attachmentNames'=>[],
+            'error'=>null,
+        ];
+        try{
+            $result=array_merge(
+                $result,
+                rp_send_plate_email($payload,$attachment,$kind)
+            );
+        }catch(Throwable $plateEmailError){
+            $result['error']=$plateEmailError->getMessage();
+            error_log(
+                'Registro Servicios Parque Correo Placa '.strtoupper($kind)
+                .' item '.$itemId.': '.$plateEmailError->getMessage()
+            );
+        }
+        $plateEmails[]=$result;
+    }
+
     if(is_array($storageCtx) && $draftId!==''){
         rs_remove_tree(rs_draft_dir($storageCtx,$draftId));
     }
@@ -420,6 +455,7 @@ try{
         'message'=>'Servicio Parque registrado correctamente en SharePoint.',
         'calendar'=>$calendarResult,
         'email'=>$emailResult,
+        'plateEmails'=>$plateEmails,
         'automationSource'=>'RegistroServicios',
     ]);
 }catch(Throwable $e){
