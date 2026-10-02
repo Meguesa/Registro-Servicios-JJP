@@ -498,6 +498,5 @@ document.getElementById("resetBtn")?.addEventListener("click",resetParqueForm);
 syncTipoPlacaPorServicio();
 syncPropertyRules();
 syncReubicacion();
-syncTestModeUi();
 showStep(0);
 loadParqueDraft();
