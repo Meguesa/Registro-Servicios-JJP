@@ -48,6 +48,162 @@ function rp_email_recipients(): array
     );
 }
 
+function rp_plate_email_recipients(): array
+{
+    return [
+        'sistemas@juanpablo.com.mx',
+        'gabriel.guerra@juanpablo.com.mx',
+        'it@juanpablo.com.mx',
+    ];
+}
+
+/**
+ * Correo independiente para Placa de Urna o Placa de Nicho.
+ *
+ * @param array{name:string,contentType:string,bytes:string} $attachment
+ */
+function rp_send_plate_email(array $payload,array $attachment,string $kind): array
+{
+    $name=trim((string)($attachment['name']??''));
+    $bytes=(string)($attachment['bytes']??'');
+    $contentType=trim((string)($attachment['contentType']??'image/png'));
+
+    if($name==='' || $bytes===''){
+        return [
+            'enabled'=>true,
+            'sent'=>false,
+            'recipients'=>[],
+            'attachmentNames'=>[],
+            'error'=>'No se recibio una placa valida para enviar.',
+        ];
+    }
+
+    $kindNorm=rp_email_plate_norm($kind);
+    if(!in_array($kindNorm,['urna','nicho'],true)){
+        return [
+            'enabled'=>false,
+            'sent'=>false,
+            'recipients'=>[],
+            'attachmentNames'=>[],
+            'error'=>null,
+        ];
+    }
+
+    $sender='sistemas@juanpablo.com.mx';
+    $recipients=rp_plate_email_recipients();
+    $location=rp_email_location($payload);
+    $fallecido=trim((string)($payload['fallecido']??''));
+    $familia=trim((string)($payload['nombreFamilia']??''));
+    $fechaNacimiento=trim((string)($payload['fechaNacimiento']??''));
+    $fechaDefuncion=trim((string)($payload['fechaDefuncion']??''));
+    $fechaServicio=trim((string)($payload['fechaHoraInicio']??''));
+
+    $label=$kindNorm==='nicho'?'Nicho':'Urna';
+    $subject='Solicitud de Placa '.$label.' Parque: '.($location!==''?$location:'Sin ubicacion');
+
+    $fmt=static function(string $value):string{
+        $value=trim($value);
+        if($value==='')return '';
+        foreach(['Y-m-d\\TH:i:s','Y-m-d\\TH:i','Y-m-d','d/m/Y H:i:s','d/m/Y H:i','d/m/Y'] as $format){
+            $dt=DateTimeImmutable::createFromFormat($format,$value,new DateTimeZone('America/Monterrey'));
+            if($dt instanceof DateTimeImmutable){
+                return $dt->format(in_array($format,['Y-m-d','d/m/Y'],true)?'d/m/Y':'d/m/Y H:i');
+            }
+        }
+        return $value;
+    };
+
+    $body=''
+      .'<div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.45;color:#111;">'
+      .'<p><strong>Tipo de placa:</strong> '.rp_email_escape($label).'</p>'
+      .'<p><strong>Ubicacion:</strong> '.rp_email_escape($location).'</p>'
+      .($kindNorm==='nicho'
+          ? '<p><strong>Nombre de familia:</strong> '.rp_email_escape($familia).'</p>'
+          : '<p><strong>Nombre de fallecido:</strong> '.rp_email_escape($fallecido).'</p>'
+        )
+      .'<p><strong>Fecha nacimiento:</strong> '.rp_email_escape($fmt($fechaNacimiento)).'<br>'
+      .'<strong>Fecha defuncion:</strong> '.rp_email_escape($fmt($fechaDefuncion)).'</p>'
+      .'<p style="color:#c00000;font-style:italic;"><strong>***Tenerla lista para antes de:</strong> '
+      .rp_email_escape($fmt($fechaServicio))
+      .'<strong>***</strong></p>'
+      .'</div>';
+
+    $request=[
+        'message'=>[
+            'subject'=>$subject,
+            'importance'=>'high',
+            'body'=>['contentType'=>'HTML','content'=>$body],
+            'toRecipients'=>array_map(
+                static fn(string $address):array=>['emailAddress'=>['address'=>$address]],
+                $recipients
+            ),
+            'attachments'=>[[
+                '@odata.type'=>'#microsoft.graph.fileAttachment',
+                'name'=>$name,
+                'contentType'=>$contentType!==''?$contentType:'image/png',
+                'contentBytes'=>base64_encode($bytes),
+            ]],
+        ],
+        'saveToSentItems'=>true,
+    ];
+
+    $token=rs_graph_token();
+    $url='https://graph.microsoft.com/v1.0/users/'.rawurlencode($sender).'/sendMail';
+    $curl=curl_init($url);
+    if($curl===false)throw new RuntimeException('No fue posible inicializar el correo de placa de Parque.');
+
+    $json=json_encode($request,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+    if(!is_string($json))throw new RuntimeException('No fue posible preparar el correo de placa de Parque.');
+
+    curl_setopt_array($curl,[
+        CURLOPT_RETURNTRANSFER=>true,
+        CURLOPT_FOLLOWLOCATION=>true,
+        CURLOPT_CONNECTTIMEOUT=>10,
+        CURLOPT_TIMEOUT=>60,
+        CURLOPT_POST=>true,
+        CURLOPT_POSTFIELDS=>$json,
+        CURLOPT_HTTPHEADER=>[
+            'Authorization: Bearer '.$token,
+            'Accept: application/json',
+            'Content-Type: application/json',
+        ],
+        CURLOPT_SSL_VERIFYPEER=>true,
+        CURLOPT_SSL_VERIFYHOST=>2,
+    ]);
+
+    $response=curl_exec($curl);
+    $status=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE);
+    $error=curl_error($curl);
+    curl_close($curl);
+
+    if($response===false)throw new RuntimeException('El envio del correo de placa de Parque fallo: '.$error);
+    if($status<200||$status>=300){
+        $decoded=json_decode((string)$response,true);
+        $detail=is_array($decoded)?trim((string)($decoded['error']['message']??'')):'';
+        if($detail==='')$detail=mb_substr(trim((string)$response),0,1200);
+        throw new RuntimeException(
+            'Microsoft Graph correo placa Parque respondio HTTP '.$status.($detail!==''?': '.$detail:'.')
+        );
+    }
+
+    return [
+        'enabled'=>true,
+        'sent'=>true,
+        'sender'=>$sender,
+        'recipients'=>$recipients,
+        'attachmentNames'=>[$name],
+        'kind'=>$kindNorm,
+        'error'=>null,
+    ];
+}
+
+function rp_email_plate_norm(string $value): string
+{
+    $ascii=@iconv('UTF-8','ASCII//TRANSLIT//IGNORE',$value);
+    if(is_string($ascii) && $ascii!=='')$value=$ascii;
+    return preg_replace('/[^a-z0-9]+/','',strtolower(trim($value)))??'';
+}
+
 function rp_email_escape(string $value): string
 {
     return htmlspecialchars(mb_strtoupper(trim($value),'UTF-8'),ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
