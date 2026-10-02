@@ -174,7 +174,14 @@ document.getElementById("resetBtn").addEventListener("click",()=>{
   updateRules();
   updateExtras();
 });
-form.addEventListener("submit",e=>e.preventDefault());
+form.addEventListener("keydown",e=>{
+  if(e.key!=="Enter")return;
+  const target=e.target;
+  if(target instanceof HTMLTextAreaElement)return;
+  if(target instanceof HTMLButtonElement)return;
+  // Evita que Enter en un campo dispare el submit nativo del formulario.
+  e.preventDefault();
+});
 
 updateRules();
 updateExtras();
@@ -204,6 +211,20 @@ function validateCurrentVisualStep(){
   const required=Array.from(panel.querySelectorAll("[required]")).filter(el=>!el.closest(".hidden"));
   for(const el of required){
     if(!el.checkValidity()){el.reportValidity();return false;}
+  }
+  return true;
+}
+
+function validateEntireForm(){
+  const panels=wizardPanels();
+  const required=Array.from(form.querySelectorAll("[required]")).filter(el=>!el.closest(".hidden"));
+  for(const el of required){
+    if(el.checkValidity())continue;
+    const panel=el.closest(".wizard-panel");
+    const index=panel?panels.indexOf(panel):-1;
+    if(index>=0)showWizardStep(index);
+    el.reportValidity();
+    return false;
   }
   return true;
 }
@@ -514,7 +535,7 @@ function createJdjpSplitDateTime(original){
   const timeInput=document.createElement("input");
   timeInput.type="time";
   timeInput.className="split-time-input";
-  timeInput.step="300";
+  timeInput.step="60";
   timeInput.value=existing.time;
 
   dateWrap.append(dateLabel,dateInput);
@@ -789,6 +810,7 @@ async function rsSubmitToSharePoint(){
   try{
     const body=new FormData();
     const payload=rsPayload();
+    body.append("submissionIntent","final");
     body.append("payload",JSON.stringify(payload));
     const draftId=document.getElementById("draftId")?.value||"";
     if(draftId) body.append("draftId",draftId);
@@ -914,7 +936,20 @@ async function rsSubmitToSharePoint(){
 
 form.addEventListener("submit",async e=>{
   e.preventDefault();
-  if(!validateCurrentVisualStep()) return;
+
+  const submitButton=document.getElementById("submitBtn");
+  const finalStep=wizardPanels().length-1;
+
+  // Un servicio solo puede publicarse desde el ultimo paso y mediante
+  // el boton explicito "Registrar servicio". Enter o cualquier submit
+  // implicito durante los pasos 1-4 queda bloqueado.
+  if(currentWizardStep!==finalStep || e.submitter!==submitButton){
+    const status=document.getElementById("status");
+    if(status)status.textContent="El servicio aun no se ha registrado. Completa los pasos y usa Registrar servicio al final.";
+    return;
+  }
+
+  if(!validateEntireForm())return;
   await rsSubmitToSharePoint();
 });
 
