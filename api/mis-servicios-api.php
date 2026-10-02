@@ -73,13 +73,13 @@ function rs_sharepoint_value(mixed $value): string
 }
 
 /**
- * En PREVIEW, SharePoint es la fuente de verdad para "Servicios publicados".
- * Esto evita depender de published.json y hace que altas/bajas se reflejen
- * inmediatamente. Solo incluye registros con ModoPrueba = Sí.
+ * SharePoint es la fuente de verdad para "Servicios publicados".
+ * Incluye registros productivos (ModoPrueba = No o sin valor) y excluye
+ * únicamente los registros marcados explícitamente como prueba.
  *
  * @return array<int,array<string,string>>
  */
-function rs_preview_publications_from_sharepoint(string $area): array
+function rs_publications_from_sharepoint(string $area): array
 {
     $config = rs_sharepoint_config();
     $host = 'meguesajdjp.sharepoint.com';
@@ -97,7 +97,6 @@ function rs_preview_publications_from_sharepoint(string $area): array
 
     $query = http_build_query([
         '$select' => $select,
-        '$filter' => 'ModoPrueba eq 1',
         '$orderby' => 'Created desc',
         '$top' => '5000',
     ], '', '&', PHP_QUERY_RFC3986);
@@ -139,6 +138,16 @@ function rs_preview_publications_from_sharepoint(string $area): array
     $rows = [];
     foreach (($decoded['value'] ?? []) as $item) {
         if (!is_array($item)) continue;
+
+        // No mostrar registros creados en modo de prueba.
+        $modoPrueba = $item['ModoPrueba'] ?? false;
+        $isTest = $modoPrueba === true
+            || $modoPrueba === 1
+            || $modoPrueba === '1'
+            || mb_strtolower(trim((string)$modoPrueba),'UTF-8') === 'si'
+            || mb_strtolower(trim((string)$modoPrueba),'UTF-8') === 'sí'
+            || mb_strtolower(trim((string)$modoPrueba),'UTF-8') === 'true';
+        if ($isTest) continue;
 
         $itemId = trim((string)($item['Id'] ?? $item['ID'] ?? ''));
         if ($itemId === '') continue;
@@ -203,13 +212,13 @@ try {
     }
     usort($drafts, static fn($a,$b)=>strcmp((string)$b['updatedAt'], (string)$a['updatedAt']));
 
-    // PREVIEW: cargar directamente desde Eventos Capillas.
-    // SharePoint es la fuente de verdad: si un registro se elimina de la lista,
-    // deja de aparecer aquí sin necesidad de limpiar archivos locales.
+    // SharePoint es la fuente de verdad para Servicios publicados.
+    // Si un registro se elimina de la lista, deja de aparecer aquí sin
+    // necesidad de limpiar archivos locales.
     $published = [];
     $sync = ['ok'=>false, 'removed'=>0, 'source'=>'sharepoint'];
     try {
-        $published = rs_preview_publications_from_sharepoint($area);
+        $published = rs_publications_from_sharepoint($area);
         $sync = ['ok'=>true, 'removed'=>0, 'source'=>'sharepoint'];
     } catch (Throwable $syncError) {
         // Fallback defensivo al índice local para no dejar el módulo inutilizable
