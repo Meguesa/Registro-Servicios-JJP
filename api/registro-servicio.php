@@ -117,6 +117,18 @@ function rs_user_can_test_mode(string $email): bool
     ], true);
 }
 
+function rs_plate_email_recipients(): array
+{
+    // Destinatarios exclusivos para solicitudes de placa de urna.
+    // No dependen de la lista general ni del modo prueba.
+    return [
+        'sistemas@juanpablo.com.mx',
+        'gabriel.guerra@juanpablo.com.mx',
+        'it@juanpablo.com.mx',
+    ];
+}
+
+
 function rs_email_escape(string $value): string
 {
     return htmlspecialchars(
@@ -462,7 +474,7 @@ function rs_send_plate_email(array $payload, array $plateAttachment, bool $isTes
     }
 
     $sender = 'sistemas@juanpablo.com.mx';
-    $recipients = rs_email_recipients($isTestMode, true);
+    $recipients = rs_plate_email_recipients();
 
     $numeroServicio = (string)rs_uppercase_export($payload['numeroServicio'] ?? '');
     $fallecido = (string)rs_uppercase_export($payload['fallecido'] ?? '');
