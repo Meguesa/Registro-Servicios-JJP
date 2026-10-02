@@ -32,17 +32,36 @@ function rp_doc_flower_arrangement(array $payload): string
 
 function rp_nicho_logo_image(): ?GdImage
 {
-    $path=dirname(__DIR__).'/assets/esquelas/logo_jjp.b64';
-    if(!is_file($path) || !is_readable($path))return null;
+    // Usar exactamente el mismo emblema blanco y negro que ya forma parte
+    // de la plantilla oficial de Placa Urna.
+    if(!function_exists('rs_plate_background_png'))return null;
 
-    $encoded=@file_get_contents($path);
-    if(!is_string($encoded) || trim($encoded)==='')return null;
+    $background=rs_plate_background_png();
+    $source=@imagecreatefromstring($background);
+    if(!$source instanceof GdImage)return null;
 
-    $bytes=base64_decode(preg_replace('/\\s+/','',$encoded)??'',true);
-    if(!is_string($bytes) || $bytes==='')return null;
+    $sw=imagesx($source);
+    $sh=imagesy($source);
 
-    $image=@imagecreatefromstring($bytes);
-    return $image instanceof GdImage?$image:null;
+    // La plantilla Urna mide aproximadamente 2048 x 1019.
+    // El emblema negro se encuentra en el cuadrante inferior izquierdo.
+    $cropW=max(1,(int)round($sw*0.14));
+    $cropH=max(1,(int)round($sh*0.28));
+    $cropX=0;
+    $cropY=max(0,$sh-$cropH);
+
+    $logo=imagecreatetruecolor($cropW,$cropH);
+    if(!$logo instanceof GdImage){
+        imagedestroy($source);
+        return null;
+    }
+
+    $white=imagecolorallocate($logo,255,255,255);
+    imagefilledrectangle($logo,0,0,$cropW,$cropH,$white);
+    imagecopy($logo,$source,0,0,$cropX,$cropY,$cropW,$cropH);
+    imagedestroy($source);
+
+    return $logo;
 }
 
 function rp_nicho_center_text(
