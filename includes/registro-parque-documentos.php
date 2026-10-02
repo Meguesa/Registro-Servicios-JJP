@@ -30,41 +30,6 @@ function rp_doc_flower_arrangement(array $payload): string
 }
 
 
-function rp_nicho_template_png(): string
-{
-    $local=dirname(__DIR__).'/assets/templates/parque/plantilla_placa_nicho_correcta.png';
-    if(is_file($local) && is_readable($local)){
-        $bytes=@file_get_contents($local);
-        if(is_string($bytes) && str_starts_with($bytes,"\x89PNG\r\n\x1a\n")){
-            return $bytes;
-        }
-    }
-
-    $url='https://raw.githubusercontent.com/Meguesa/Registro-Servicios-JJP/main/assets/templates/parque/plantilla_placa_nicho_correcta.png';
-    $curl=curl_init($url);
-    if($curl===false){
-        throw new RuntimeException('No fue posible inicializar la plantilla de placa de nicho.');
-    }
-    curl_setopt_array($curl,[
-        CURLOPT_RETURNTRANSFER=>true,
-        CURLOPT_FOLLOWLOCATION=>true,
-        CURLOPT_CONNECTTIMEOUT=>8,
-        CURLOPT_TIMEOUT=>20,
-        CURLOPT_SSL_VERIFYPEER=>true,
-        CURLOPT_SSL_VERIFYHOST=>2,
-        CURLOPT_USERAGENT=>'Registro-Servicios-JJP',
-        CURLOPT_HTTPHEADER=>['Accept: image/png'],
-    ]);
-    $bytes=curl_exec($curl);
-    $status=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE);
-    curl_close($curl);
-
-    if(!is_string($bytes) || $status<200 || $status>=300 || !str_starts_with($bytes,"\x89PNG\r\n\x1a\n")){
-        throw new RuntimeException('No fue posible cargar la plantilla correcta de placa de nicho.');
-    }
-    return $bytes;
-}
-
 function rp_nicho_logo_image(): ?GdImage
 {
     $path=dirname(__DIR__).'/assets/esquelas/logo_jjp.b64';
