@@ -374,8 +374,20 @@ form.addEventListener("submit",async e=>{
       "ID: "+result.itemId,
       "Lista: Eventos Parque",
       result.calendar?.created ? "Calendario: CREADO DIRECTAMENTE" : ("Calendario: "+(result.calendar?.error||"NO CREADO")),
-      result.email?.sent ? "Correo: ENVIADO" : ("Correo: "+(result.email?.error||"NO ENVIADO"))
+      result.email?.sent ? "Correo operativo: ENVIADO" : ("Correo operativo: "+(result.email?.error||"NO ENVIADO"))
     ];
+
+    if(Array.isArray(result.plateEmails)){
+      result.plateEmails.forEach(plate=>{
+        const label=String(plate?.kind||"placa").toUpperCase();
+        lines.push(
+          plate?.sent
+            ? "Correo Placa "+label+": ENVIADO"
+            : "Correo Placa "+label+": "+(plate?.error||"NO ENVIADO")
+        );
+      });
+    }
+
     if(status)status.textContent=lines.join(" | ");
     alert(lines.join("\n"));
     if(button)button.textContent="Registrado";
