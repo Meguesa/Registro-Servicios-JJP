@@ -249,7 +249,7 @@ function rp_email_location(array $payload): string
 /**
  * @param array<int,array{name:string,contentType:string,bytes:string}> $attachments
  */
-function rp_send_service_email(array $payload,array $attachments): array
+function rp_send_service_email(array $payload,array $attachments,bool $isModified=false): array
 {
     $sender='sistemas@juanpablo.com.mx';
     $recipients=rp_email_recipients();
@@ -260,7 +260,7 @@ function rp_send_service_email(array $payload,array $attachments): array
     $fallecido=trim((string)($payload['fallecido']??''));
 
     $subjectParts=array_values(array_filter([
-        'Nuevo evento de Parque',
+        ($isModified?'MODIFICADO - ':'').'Nuevo evento de Parque',
         $type,
         $location,
     ],static fn(string $v):bool=>$v!==''));
