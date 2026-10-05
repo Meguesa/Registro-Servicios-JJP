@@ -16,7 +16,7 @@ const PARQUE_VELACION = [
 ];
 const PARQUE_PREVISION = ["Prevision","Uso Inmediato","No Aplica"];
 const PARQUE_DESTAPE = ["Primero","Segundo","Tercero","Cuarto","No Aplica"];
-const PARQUE_PLACAS = ["Nicho","Urna","Granito"];
+const PARQUE_PLACAS = ["Nicho","Urna","Granito","No Aplica"];
 const PARQUE_LIQUIDACION = ["Liquidado","No liquidado"];
 const PARQUE_PARENTESCO = ["Esposa","Esposo","Familiar","Hermana","Hermano","Hija","Hijo","Madre","Otro","Padre"];
 const PARQUE_SECCIONES = ["ORO - RBR","PLN","ORO","SPN","SPV","SAB","PLATINO","PLATA","SJV","SMV"];
@@ -153,23 +153,27 @@ function syncFraseRule(){
 
 const PARQUE_PLACA_POR_TIPO_SERVICIO = {
   "Inhumación":"Granito",
-  "Exhumación":"Granito",
-  "Deposito de Cenizas":"Nicho"
+  "Exhumación":"Granito"
 };
 
 function syncTipoPlacaPorServicio(){
   const tipo=document.getElementById("tipoServicio")?.value||"";
+  const destape=document.getElementById("destape")?.value||"";
   const placa=document.getElementById("tipoPlaca");
   if(!placa)return;
 
-  const forced=PARQUE_PLACA_POR_TIPO_SERVICIO[tipo]||"";
+  let forced=PARQUE_PLACA_POR_TIPO_SERVICIO[tipo]||"";
+  if(tipo==="Deposito de Cenizas"){
+    forced=destape==="Primero"?"Nicho":"No Aplica";
+  }
+
   const wasAuto=placa.dataset.autoAssigned==="1";
 
   if(forced){
     placa.value=forced;
     placa.disabled=true;
     placa.dataset.autoAssigned="1";
-    placa.title="Autoasignado por Tipo de Servicio";
+    placa.title="Autoasignado por Tipo de Servicio y Destape";
   }else{
     placa.disabled=false;
     placa.title="";
@@ -204,7 +208,8 @@ function syncPropertyRules(){
   syncLocation();
   syncNewLocation();
 }
-["destape","tipoPlaca","seccion","manzana","numLoteNicho"].forEach(id=>document.getElementById(id)?.addEventListener("input",syncPropertyRules));
+document.getElementById("destape")?.addEventListener("input",()=>{syncTipoPlacaPorServicio();syncPropertyRules();});
+["tipoPlaca","seccion","manzana","numLoteNicho"].forEach(id=>document.getElementById(id)?.addEventListener("input",syncPropertyRules));
 document.getElementById("tipoServicio")?.addEventListener("change",syncTipoPlacaPorServicio);
 document.getElementById("servicioParque")?.addEventListener("change",()=>{
   syncLocation();
