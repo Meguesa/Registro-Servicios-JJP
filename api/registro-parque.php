@@ -199,7 +199,11 @@ try{
     if(in_array($tipoServicioNorm,['inhumacion','exhumacion'],true)){
         $payload['tipoPlaca']='Granito';
     }elseif($tipoServicioNorm==='depositodecenizas'){
-        $payload['tipoPlaca']='Nicho';
+        $destapeNormInicial=rp_norm((string)($payload['destape']??''));
+        $payload['tipoPlaca']=$destapeNormInicial==='primero'?'Nicho':'No Aplica';
+        if($destapeNormInicial!=='primero'){
+            $payload['nombreFamilia']='';
+        }
     }
     $draftId=trim((string)($_POST['draftId']??''));
     $storageCtx=null;
