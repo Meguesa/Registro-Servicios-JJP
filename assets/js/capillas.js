@@ -894,7 +894,7 @@ async function rsSubmitToSharePoint(){
     }
 
     if(calendar?.skipped===true){
-      lines.push("Calendario: OMITIDO (prueba controlada)");
+      lines.push("Calendario: "+(calendar?.reason||"OMITIDO"));
     }else if(calendar?.created===true){
       lines.push("Calendario: CREADO");
     }else if(calendar?.enabled===false){
