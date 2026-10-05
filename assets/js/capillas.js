@@ -48,6 +48,8 @@ const numeroServicio=document.getElementById("numeroServicio");
 const extrasSelect=document.getElementById("serviciosExtra");
 const precioVenta=document.getElementById("precioVenta");
 const extrasMontos=document.getElementById("extrasMontos");
+const prevision=document.getElementById("prevision");
+const previsionViOpcionCremacion=document.getElementById("previsionViOpcionCremacion");
 
 EXTRAS.filter(x=>x!=="No Aplica").forEach(x=>{
   const wrap=document.createElement("label");
@@ -131,7 +133,13 @@ function updateRules(){
 
   toggle("inhumacionSection",svc==="Inhumación");
 
-  const cod=CODIGO_SERVICIO[svc]||"";
+  const viEligible=prevision?.value==="Previsión" && ["Inhumación","Cremación"].includes(svc);
+  toggle("wrapPrevisionViCremacion",viEligible);
+  if(!viEligible && previsionViOpcionCremacion)previsionViOpcionCremacion.checked=false;
+
+  const cod=(viEligible && previsionViOpcionCremacion?.checked===true)
+    ? "VI"
+    : (CODIGO_SERVICIO[svc]||"");
   const ata=renta?"":(CODIGO_ATAUD[tipoAtaud.value]||"");
   document.getElementById("codigoServicio").textContent=cod||"—";
   document.getElementById("codigoAtaud").textContent=ata||"—";
@@ -159,6 +167,8 @@ function updateTotal(){
 }
 
 servicio.addEventListener("change",updateRules);
+prevision?.addEventListener("change",updateRules);
+previsionViOpcionCremacion?.addEventListener("change",updateRules);
 exequia.addEventListener("change",updateRules);
 tipoAtaud.addEventListener("change",updateRules);
 numeroServicio.addEventListener("input",updateRules);
@@ -670,6 +680,7 @@ function rsPayload(){
     tiempoCapillas:sinVelacion?"":String(data.get("tiempoCapillas")||"").trim(),
     horaExequia:sinVelacion?"":String(document.getElementById("horaExequia")?.value||""),
     prevision:String(data.get("prevision")||"").trim(),
+    previsionViOpcionCremacion:previsionViOpcionCremacion?.checked===true,
     tipoAtaud:String(data.get("tipoAtaud")||"").trim(),
     numeroServicio:String(data.get("numeroServicio")||"").trim(),
     codigoServicio:String(document.getElementById("codigoServicio")?.textContent||"").replace("—","").trim(),
@@ -1036,6 +1047,7 @@ function rsApplyDraftPayload(p){
   simple.forEach(k=>rsSetNamed(k,p[k]??""));
   document.getElementById("llevaExequia").checked=!!p.llevaExequia;
   document.getElementById("requierePlaca").checked=!!p.requierePlaca;
+  if(previsionViOpcionCremacion)previsionViOpcionCremacion.checked=!!p.previsionViOpcionCremacion;
 
   ["inicio","termino","horaExequia","fechaDefuncion","inicioCrematorio","fechaHoraInhumacion"].forEach(k=>rsSetDateTime(k,p[k]||""));
   const nacimiento=document.getElementById("fechaNacimiento");
