@@ -50,9 +50,43 @@ function pe_internal(array $index,array $aliases): ?string {
 }
 
 function pe_value(array $item,array $index,array $aliases,mixed $default=''): mixed {
+    // 1) Intentar primero contra las claves reales devueltas por SharePoint.
+    // Esto cubre aliases que ya son InternalName (field_1, FechaHoraInicio, etc.).
+    foreach($aliases as $alias){
+        $alias=(string)$alias;
+        if($alias!=='' && array_key_exists($alias,$item)){
+            return $item[$alias];
+        }
+    }
+
+    // 2) Comparar de forma normalizada las claves del elemento. Asi soportamos
+    // InternalName codificados (_x0020_, _x00f3_, etc.) sin depender del titulo.
+    $itemByNorm=[];
+    foreach($item as $key=>$value){
+        $norm=pe_norm((string)$key);
+        if($norm!=='' && !array_key_exists($norm,$itemByNorm)){
+            $itemByNorm[$norm]=$value;
+        }
+    }
+    foreach($aliases as $alias){
+        $norm=pe_norm((string)$alias);
+        if($norm!=='' && array_key_exists($norm,$itemByNorm)){
+            return $itemByNorm[$norm];
+        }
+    }
+
+    // 3) Resolver por el catalogo de columnas para aliases que son nombres
+    // visibles (Title) y no InternalName.
     $internal=pe_internal($index,$aliases);
-    if($internal===null)return $default;
-    return array_key_exists($internal,$item)?$item[$internal]:$default;
+    if($internal!==null){
+        if(array_key_exists($internal,$item))return $item[$internal];
+        $norm=pe_norm($internal);
+        if($norm!=='' && array_key_exists($norm,$itemByNorm)){
+            return $itemByNorm[$norm];
+        }
+    }
+
+    return $default;
 }
 
 function pe_text(mixed $value): string {
@@ -260,6 +294,15 @@ try{
         $siteUrl."/_api/web/lists/getbytitle('".$listEsc."')/items(".$itemId.")?$select=*",
         $token
     );
+
+    // SharePoint normalmente responde el elemento directamente con
+    // odata=nometadata, pero algunas respuestas pueden venir dentro de "d".
+    // Desempaquetarlo evita que el formulario de Modificar reciba un payload vacio.
+    if(isset($item['d']) && is_array($item['d'])){
+        $item=$item['d'];
+    }elseif(isset($item['value']) && is_array($item['value']) && isset($item['value'][0]) && is_array($item['value'][0])){
+        $item=$item['value'][0];
+    }
 
     $modoPrueba=pe_bool(pe_value($item,$index,['ModoPrueba','Modo Prueba'],false));
     if($modoPrueba)pe_json(409,['ok'=>false,'message'=>'Los registros de prueba no se editan desde la lista productiva.']);
