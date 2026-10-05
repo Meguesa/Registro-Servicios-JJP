@@ -167,7 +167,7 @@ function rs_uppercase_export(mixed $value): mixed
  *
  * @param array<int,array{name:string,contentType:string,bytes:string}> $attachments
  */
-function rs_send_controlled_test_email(array $payload, array $attachments, bool $isTestMode): array
+function rs_send_controlled_test_email(array $payload, array $attachments, bool $isTestMode, bool $isModified = false): array
 {
     $sender = 'sistemas@juanpablo.com.mx';
     $recipients = rs_email_recipients($isTestMode, false);
@@ -316,6 +316,7 @@ function rs_send_controlled_test_email(array $payload, array $attachments, bool 
         : 'NO APLICA';
 
     $subject = ($isTestMode ? '[PRUEBA CONTROLADA] ' : '')
+        . ($isModified ? 'MODIFICADO - ' : '')
         . 'Nuevo evento de Capillas: '
         . ($ubicacion !== '' ? $ubicacion : 'Sin ubicación')
         . ($sala !== '' ? ', ' . $sala : '')
@@ -657,6 +658,9 @@ try {
     if (!is_array($payload)) {
         rs_json(400, ['ok' => false, 'message' => 'La informacion del formulario no es valida.']);
     }
+
+    $editItemId = (int)($_POST['editItemId'] ?? 0);
+    $isEdit = $editItemId > 0;
 
     $requestedTestMode = rs_is_preview_mode() || (bool)($payload['modoPrueba'] ?? false);
     if ($requestedTestMode && !rs_user_can_test_mode($currentUserEmail)) {
@@ -1047,18 +1051,33 @@ try {
     $digest = trim((string) ($digestData['FormDigestValue'] ?? ''));
     if ($digest === '') throw new RuntimeException('SharePoint no devolvio un FormDigest valido.');
 
-    $createUrl = $siteUrl . "/_api/web/lists/getbytitle('" . $listEsc . "')/items";
-    try {
-        $created = rs_request('POST', $createUrl, $token, (string) json_encode($sp, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), [
-        'Content-Type: application/json;odata=nometadata',
-        'X-RequestDigest: ' . $digest,
-    ])['json'];
-    } catch (Throwable $e) {
-        throw new RuntimeException('Etapa CREAR ELEMENTO: ' . $e->getMessage(), 0, $e);
-    }
+    if ($isEdit) {
+        $itemId = $editItemId;
+        $updateUrl = $siteUrl . "/_api/web/lists/getbytitle('" . $listEsc . "')/items(" . $itemId . ")";
+        try {
+            rs_request('POST', $updateUrl, $token, (string) json_encode($sp, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), [
+                'Content-Type: application/json;odata=nometadata',
+                'X-RequestDigest: ' . $digest,
+                'X-HTTP-Method: MERGE',
+                'IF-MATCH: *',
+            ]);
+        } catch (Throwable $e) {
+            throw new RuntimeException('Etapa MODIFICAR ELEMENTO: ' . $e->getMessage(), 0, $e);
+        }
+    } else {
+        $createUrl = $siteUrl . "/_api/web/lists/getbytitle('" . $listEsc . "')/items";
+        try {
+            $created = rs_request('POST', $createUrl, $token, (string) json_encode($sp, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), [
+                'Content-Type: application/json;odata=nometadata',
+                'X-RequestDigest: ' . $digest,
+            ])['json'];
+        } catch (Throwable $e) {
+            throw new RuntimeException('Etapa CREAR ELEMENTO: ' . $e->getMessage(), 0, $e);
+        }
 
-    $itemId = (int) ($created['Id'] ?? $created['ID'] ?? 0);
-    if ($itemId <= 0) throw new RuntimeException('SharePoint creo el registro, pero no devolvio un ID utilizable.');
+        $itemId = (int) ($created['Id'] ?? $created['ID'] ?? 0);
+        if ($itemId <= 0) throw new RuntimeException('SharePoint creo el registro, pero no devolvio un ID utilizable.');
+    }
 
     // Archivos que formaran parte del correo controlado de Preview.
     $emailAttachments = [];
@@ -1166,12 +1185,13 @@ try {
             . "/_api/web/lists/getbytitle('" . $listEsc . "')/items(" . $itemId . ")"
             . "/AttachmentFiles/add(FileName='" . rawurlencode($safeLetterName) . "')";
 
-        rs_request('POST', $letterAttachmentUrl, $token, $letterBytes, [
-            'Content-Type: application/pdf',
-            'X-RequestDigest: ' . $digest,
-        ]);
-
-        $letterResult['attachedToItem'] = true;
+        if (!$isEdit) {
+            rs_request('POST', $letterAttachmentUrl, $token, $letterBytes, [
+                'Content-Type: application/pdf',
+                'X-RequestDigest: ' . $digest,
+            ]);
+            $letterResult['attachedToItem'] = true;
+        }
     } catch (Throwable $letterError) {
         // Igual que la placa: el servicio ya fue creado. Un fallo al generar
         // la carta no debe provocar que el usuario duplique el registro.
@@ -1339,33 +1359,45 @@ try {
         }
         $safeName = preg_replace('/[^A-Za-z0-9._() -]+/u', '_', $file['name']) ?: 'archivo';
         $safeName = str_replace("'", "''", $safeName);
-        $attachmentUrl = $siteUrl . "/_api/web/lists/getbytitle('" . $listEsc . "')/items(" . $itemId . ")/AttachmentFiles/add(FileName='" . rawurlencode($safeName) . "')";
-        try {
-            rs_request('POST', $attachmentUrl, $token, $bytes, [
-            'Content-Type: application/octet-stream',
-            'X-RequestDigest: ' . $digest,
-            ]);
-        } catch (Throwable $e) {
-            throw new RuntimeException('Etapa ADJUNTAR ARCHIVO ' . $safeName . ': ' . $e->getMessage(), 0, $e);
+        if (!$isEdit) {
+            $attachmentUrl = $siteUrl . "/_api/web/lists/getbytitle('" . $listEsc . "')/items(" . $itemId . ")/AttachmentFiles/add(FileName='" . rawurlencode($safeName) . "')";
+            try {
+                rs_request('POST', $attachmentUrl, $token, $bytes, [
+                'Content-Type: application/octet-stream',
+                'X-RequestDigest: ' . $digest,
+                ]);
+            } catch (Throwable $e) {
+                throw new RuntimeException('Etapa ADJUNTAR ARCHIVO ' . $safeName . ': ' . $e->getMessage(), 0, $e);
+            }
+            $uploadedNames[] = $safeName;
         }
-        $uploadedNames[] = $safeName;
     }
 
     // Crear evento de calendario tambien en Preview para validar el flujo completo.
     // El modulo de calendario agrega "(PRUEBA)" al titulo cuando _previewMode=true.
-    try {
-        $calendarPayload = rs_uppercase_export($payload);
-        $calendarPayload['_previewMode'] = $isTestMode;
-        $calendarResult = rs_calendar_create_event($calendarPayload, $config);
-    } catch (Throwable $calendarError) {
-        // El registro ya existe en SharePoint. Informar el error de calendario
-        // sin provocar que el usuario duplique el servicio.
+    if ($isEdit) {
         $calendarResult = [
             'enabled' => true,
             'created' => false,
-            'error' => $calendarError->getMessage(),
+            'skipped' => true,
+            'reason' => 'Registro modificado: no se crea un evento de calendario duplicado.',
+            'error' => null,
         ];
-        error_log('Registro Servicios Calendario item ' . $itemId . ': ' . $calendarError->getMessage());
+    } else {
+        try {
+            $calendarPayload = rs_uppercase_export($payload);
+            $calendarPayload['_previewMode'] = $isTestMode;
+            $calendarResult = rs_calendar_create_event($calendarPayload, $config);
+        } catch (Throwable $calendarError) {
+            // El registro ya existe en SharePoint. Informar el error de calendario
+            // sin provocar que el usuario duplique el servicio.
+            $calendarResult = [
+                'enabled' => true,
+                'created' => false,
+                'error' => $calendarError->getMessage(),
+            ];
+            error_log('Registro Servicios Calendario item ' . $itemId . ': ' . $calendarError->getMessage());
+        }
     }
 
     // Correo CONTROLADO del Preview. Un fallo de correo no debe provocar
@@ -1380,7 +1412,7 @@ try {
     try {
         $emailResult = array_merge(
             $emailResult,
-            rs_send_controlled_test_email(rs_uppercase_export($payload), $emailAttachments, $isTestMode)
+            rs_send_controlled_test_email(rs_uppercase_export($payload), $emailAttachments, $isTestMode, $isEdit)
         );
     } catch (Throwable $emailError) {
         $emailResult['error'] = $emailError->getMessage();
@@ -1394,7 +1426,7 @@ try {
         'attachmentNames' => [],
         'error' => null,
     ];
-    if (is_array($plateEmailAttachment)) {
+    if (is_array($plateEmailAttachment) && !$isEdit) {
         try {
             $plateEmailResult = array_merge(
                 $plateEmailResult,
@@ -1414,28 +1446,32 @@ try {
         'mode' => null,
         'error' => null,
     ];
-    try {
-        $tellmebyeResult = array_merge(
-            $tellmebyeResult,
-            rs_trigger_tellmebye($itemId, $isTestMode)
-        );
-    } catch (Throwable $tellmebyeError) {
-        $tellmebyeResult['enabled'] = true;
-        $tellmebyeResult['error'] = $tellmebyeError->getMessage();
-        error_log('Registro Servicios TellMeBye item ' . $itemId . ': ' . $tellmebyeError->getMessage());
+    if (!$isEdit) {
+        try {
+            $tellmebyeResult = array_merge(
+                $tellmebyeResult,
+                rs_trigger_tellmebye($itemId, $isTestMode)
+            );
+        } catch (Throwable $tellmebyeError) {
+            $tellmebyeResult['enabled'] = true;
+            $tellmebyeResult['error'] = $tellmebyeError->getMessage();
+            error_log('Registro Servicios TellMeBye item ' . $itemId . ': ' . $tellmebyeError->getMessage());
+        }
     }
 
-    rs_add_publication($storageCtx, [
-        'itemId'=>(string)$itemId,
-        'status'=>'PUBLICADO',
-        'numeroReferencia'=>trim((string)($payload['numeroReferencia'] ?? '')),
-        'referencia'=>trim((string)($payload['referencia'] ?? '')),
-        'fallecido'=>trim((string)($payload['fallecido'] ?? '')),
-        'servicio'=>trim((string)($payload['servicio'] ?? '')),
-        'ubicacion'=>trim((string)($payload['ubicacion'] ?? '')),
-        'fechaServicio'=>trim((string)($payload['inicio'] ?? '')),
-        'publishedAt'=>gmdate('c'),
-    ]);
+    if (!$isEdit) {
+        rs_add_publication($storageCtx, [
+            'itemId'=>(string)$itemId,
+            'status'=>'PUBLICADO',
+            'numeroReferencia'=>trim((string)($payload['numeroReferencia'] ?? '')),
+            'referencia'=>trim((string)($payload['referencia'] ?? '')),
+            'fallecido'=>trim((string)($payload['fallecido'] ?? '')),
+            'servicio'=>trim((string)($payload['servicio'] ?? '')),
+            'ubicacion'=>trim((string)($payload['ubicacion'] ?? '')),
+            'fechaServicio'=>trim((string)($payload['inicio'] ?? '')),
+            'publishedAt'=>gmdate('c'),
+        ]);
+    }
     if ($draftId !== '') {
         rs_remove_tree(rs_draft_dir($storageCtx, $draftId));
     }
@@ -1443,7 +1479,8 @@ try {
     rs_json(201, [
         'ok' => true,
         'itemId' => $itemId,
-        'message' => 'Servicio registrado correctamente en SharePoint.',
+        'message' => $isEdit ? 'Servicio modificado correctamente en SharePoint.' : 'Servicio registrado correctamente en SharePoint.',
+        'modified' => $isEdit,
         'attachments' => $uploadedNames,
         'calendar' => $calendarResult ?? ['enabled' => false, 'created' => false],
         'plate' => $plateResult,
