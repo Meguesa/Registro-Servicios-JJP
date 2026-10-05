@@ -28,7 +28,7 @@ const PARQUE_MANZANAS = (()=> {
       values.push(String.fromCharCode(65+first)+String.fromCharCode(65+second));
     }
   }
-  ["CX","DX","EX","FX"].forEach(v=>{ if(!values.includes(v)) values.push(v); });
+  ["CX","DX","EX","FX","JP"].forEach(v=>{ if(!values.includes(v)) values.push(v); });
   return values;
 })();
 
