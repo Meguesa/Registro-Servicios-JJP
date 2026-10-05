@@ -30,39 +30,26 @@ function rp_doc_flower_arrangement(array $payload): string
 }
 
 
-function rp_nicho_logo_image(): ?GdImage
+function rp_nicho_template_image(): GdImage
 {
-    // Usar exactamente el mismo emblema blanco y negro que ya forma parte
-    // de la plantilla oficial de Placa Urna.
-    if(!function_exists('rs_plate_background_png'))return null;
-
-    $background=rs_plate_background_png();
-    $source=@imagecreatefromstring($background);
-    if(!$source instanceof GdImage)return null;
-
-    $sw=imagesx($source);
-    $sh=imagesy($source);
-
-    // La plantilla Urna mide aproximadamente 2048 x 1019.
-    // El emblema negro se encuentra en el cuadrante inferior izquierdo.
-    $cropW=max(1,(int)round($sw*0.14));
-    $cropH=max(1,(int)round($sh*0.28));
-    $cropX=0;
-    $cropY=max(0,$sh-$cropH);
-
-    $logo=imagecreatetruecolor($cropW,$cropH);
-    if(!$logo instanceof GdImage){
-        imagedestroy($source);
-        return null;
+    $path=dirname(__DIR__).'/assets/templates/parque/plantilla_placa_nicho_correcta.png';
+    if(!is_file($path) || !is_readable($path)){
+        throw new RuntimeException('No se encontro la plantilla correcta de placa de nicho.');
     }
 
-    $white=imagecolorallocate($logo,255,255,255);
-    imagefilledrectangle($logo,0,0,$cropW,$cropH,$white);
-    imagecopy($logo,$source,0,0,$cropX,$cropY,$cropW,$cropH);
-    imagedestroy($source);
+    $bytes=@file_get_contents($path);
+    if(!is_string($bytes) || $bytes===''){
+        throw new RuntimeException('No fue posible leer la plantilla correcta de placa de nicho.');
+    }
 
-    return $logo;
+    $image=@imagecreatefromstring($bytes);
+    if(!$image instanceof GdImage){
+        throw new RuntimeException('La plantilla correcta de placa de nicho no es una imagen valida.');
+    }
+
+    return $image;
 }
+
 
 function rp_nicho_center_text(
     GdImage $image,
@@ -88,19 +75,20 @@ function rp_generate_nicho_plate(array $payload): array
         throw new RuntimeException('La placa de nicho requiere Nombre de Familia.');
     }
 
-    // El formato oficial ya muestra la palabra FAMILIA por separado.
+    // La plantilla oficial ya incluye la composicion correcta y el emblema
+    // negro de Jardines de Juan Pablo. Solo sustituimos el texto de familia.
     $family=preg_replace('/^FAMILIA\\s+/u','',$family)??$family;
     $family=trim($family);
     if($family===''){
         throw new RuntimeException('La placa de nicho requiere el nombre de la familia.');
     }
 
-    // Generar la placa directamente evita depender de un PNG base externo.
-    // Formato oficial: FAMILIA + nombre familiar + emblema JdJP inferior.
+    $source=rp_nicho_template_image();
     $width=2048;
     $height=1024;
     $image=imagecreatetruecolor($width,$height);
     if(!$image instanceof GdImage){
+        imagedestroy($source);
         throw new RuntimeException('No fue posible crear la placa de nicho.');
     }
 
@@ -109,47 +97,44 @@ function rp_generate_nicho_plate(array $payload): array
     imagefilledrectangle($image,0,0,$width,$height,$white);
 
     try{
+        // Escalar la plantilla oficial al tamano estandar que usa el correo.
+        imagecopyresampled(
+            $image,$source,
+            0,0,0,0,
+            $width,$height,
+            imagesx($source),imagesy($source)
+        );
+        imagedestroy($source);
+        $source=null;
+
+        // La imagen oficial contiene texto de ejemplo. Se limpia unicamente
+        // esa zona y se conserva intacto el emblema negro de la plantilla.
+        imagefilledrectangle($image,0,0,$width,625,$white);
+
         $familyFont=function_exists('rs_plate_pagella_font_path')
             ? rs_plate_pagella_font_path()
             : rs_image_font_path();
-        $titleFont=rs_image_bold_font_path() ?: $familyFont;
-
         if(!is_string($familyFont) || $familyFont===''){
             throw new RuntimeException('No fue posible resolver la tipografia de la placa de nicho.');
         }
-        if(!is_string($titleFont) || $titleFont==='')$titleFont=$familyFont;
 
-        rp_nicho_center_text($image,'FAMILIA',$titleFont,112.0,485,$black);
+        rp_nicho_center_text($image,'FAMILIA',$familyFont,105.0,335,$black);
 
-        $maxWidth=(int)round($width*0.72);
+        $maxWidth=(int)round($width*0.90);
         $size=112.0;
-        while($size>48.0){
+        while($size>52.0){
             $box=@imagettfbbox($size,0,$familyFont,$family);
             $textWidth=is_array($box)?abs((int)$box[2]-(int)$box[0]):0;
             if($textWidth<=$maxWidth)break;
             $size-=3.0;
         }
-        rp_nicho_center_text($image,$family,$familyFont,$size,650,$black);
-
-        $logo=rp_nicho_logo_image();
-        if($logo instanceof GdImage){
-            $sw=imagesx($logo);
-            $sh=imagesy($logo);
-            $maxW=300;
-            $maxH=250;
-            $scale=min($maxW/max(1,$sw),$maxH/max(1,$sh));
-            $dw=max(1,(int)round($sw*$scale));
-            $dh=max(1,(int)round($sh*$scale));
-            $x=(int)round(($width-$dw)/2);
-            $y=715;
-            imagecopyresampled($image,$logo,$x,$y,0,0,$dw,$dh,$sw,$sh);
-            imagedestroy($logo);
-        }
+        rp_nicho_center_text($image,$family,$familyFont,$size,530,$black);
 
         ob_start();
         imagepng($image,null,6);
         $png=(string)ob_get_clean();
     }finally{
+        if(isset($source) && $source instanceof GdImage)imagedestroy($source);
         imagedestroy($image);
     }
 
