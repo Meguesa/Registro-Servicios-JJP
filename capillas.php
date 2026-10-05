@@ -96,6 +96,13 @@ $isPreview = str_contains(
         <label id="wrapTiempo">Tiempo de Capillas<select name="tiempoCapillas" id="tiempoCapillas"></select></label>
         <label>Previsión/Uso Inmediato<select name="prevision" id="prevision" required></select></label>
         <label id="wrapTipoAtaud">Tipo de Ataúd/Urna<select name="tipoAtaud" id="tipoAtaud"></select></label>
+        <label id="wrapPrevisionViCremacion" class="switch-card span-2 hidden">
+          <div>
+            <strong>Contrato VI con opción a cremación</strong>
+            <small>Conserva Código de Servicio = VI aunque el servicio otorgado sea Cremación.</small>
+          </div>
+          <input type="checkbox" name="previsionViOpcionCremacion" id="previsionViOpcionCremacion">
+        </label>
         <label>Número de Servicio<input name="numeroServicio" id="numeroServicio" placeholder="Ej. 4225, 15783AF" required></label>
       </div>
       <div class="option-row">
