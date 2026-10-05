@@ -375,7 +375,9 @@ form.addEventListener("submit",async e=>{
       result.modified===true?"Servicio Parque modificado correctamente.":"Servicio Parque registrado correctamente.",
       "ID: "+result.itemId,
       "Lista: Eventos Parque",
-      result.calendar?.created ? "Calendario: CREADO DIRECTAMENTE" : ("Calendario: "+(result.calendar?.error||"NO CREADO")),
+      result.calendar?.created
+        ? "Calendario: CREADO DIRECTAMENTE"
+        : (result.calendar?.skipped ? "Calendario: "+(result.calendar?.reason||"OMITIDO") : ("Calendario: "+(result.calendar?.error||"NO CREADO"))),
       result.email?.sent ? "Correo operativo: ENVIADO" : ("Correo operativo: "+(result.email?.error||"NO ENVIADO"))
     ];
 
