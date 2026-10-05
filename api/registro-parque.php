@@ -185,6 +185,9 @@ try{
     $payload=json_decode((string)($_POST['payload']??''),true);
     if(!is_array($payload))rp_json(400,['ok'=>false,'message'=>'La informacion del formulario no es valida.']);
 
+    $editItemId=(int)($_POST['editItemId']??0);
+    $isEdit=$editItemId>0;
+
     // Regla de negocio: el Tipo de Placa se deriva del Tipo de Servicio
     // para Inhumacion, Exhumacion y Deposito de Cenizas.
     $tipoServicioNorm=rp_norm((string)($payload['tipoServicio']??''));
@@ -352,15 +355,27 @@ try{
     ])['json']['FormDigestValue']??''));
     if($digest==='')throw new RuntimeException('SharePoint no devolvio un FormDigest valido.');
 
-    $createUrl=$siteUrl."/ _api/web/lists/getbytitle('".$listEsc."')/items";
-    $createUrl=str_replace('/ _api/','/_api/',$createUrl);
-    $created=rp_request('POST',$createUrl,$token,(string)json_encode($sp,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),[
-        'Content-Type: application/json;odata=nometadata',
-        'X-RequestDigest: '.$digest,
-    ])['json'];
+    if($isEdit){
+        $itemId=$editItemId;
+        $updateUrl=$siteUrl."/ _api/web/lists/getbytitle('".$listEsc."')/items(".$itemId.")";
+        $updateUrl=str_replace('/ _api/','/_api/',$updateUrl);
+        rp_request('POST',$updateUrl,$token,(string)json_encode($sp,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),[
+            'Content-Type: application/json;odata=nometadata',
+            'X-RequestDigest: '.$digest,
+            'X-HTTP-Method: MERGE',
+            'IF-MATCH: *',
+        ]);
+    }else{
+        $createUrl=$siteUrl."/ _api/web/lists/getbytitle('".$listEsc."')/items";
+        $createUrl=str_replace('/ _api/','/_api/',$createUrl);
+        $created=rp_request('POST',$createUrl,$token,(string)json_encode($sp,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),[
+            'Content-Type: application/json;odata=nometadata',
+            'X-RequestDigest: '.$digest,
+        ])['json'];
 
-    $itemId=(int)($created['Id']??$created['ID']??0);
-    if($itemId<=0)throw new RuntimeException('SharePoint creo el registro, pero no devolvio un ID utilizable.');
+        $itemId=(int)($created['Id']??$created['ID']??0);
+        if($itemId<=0)throw new RuntimeException('SharePoint creo el registro, pero no devolvio un ID utilizable.');
+    }
 
     // Crear directamente el evento oficial de Parque desde Registro de Servicios.
     $calendarResult=[
@@ -368,17 +383,27 @@ try{
         'created'=>false,
         'error'=>null,
     ];
-    try{
-        $calendarResult=array_merge(
-            $calendarResult,
-            rp_calendar_create_event($payload)
-        );
-    }catch(Throwable $calendarError){
-        // El elemento ya existe en SharePoint; no pedir al usuario repetir
-        // el registro por un fallo aislado del calendario.
-        $calendarResult['enabled']=true;
-        $calendarResult['error']=$calendarError->getMessage();
-        error_log('Registro Servicios Parque Calendario item '.$itemId.': '.$calendarError->getMessage());
+    if($isEdit){
+        $calendarResult=[
+            'enabled'=>true,
+            'created'=>false,
+            'skipped'=>true,
+            'reason'=>'Registro modificado: no se crea un evento de calendario duplicado.',
+            'error'=>null,
+        ];
+    }else{
+        try{
+            $calendarResult=array_merge(
+                $calendarResult,
+                rp_calendar_create_event($payload)
+            );
+        }catch(Throwable $calendarError){
+            // El elemento ya existe en SharePoint; no pedir al usuario repetir
+            // el registro por un fallo aislado del calendario.
+            $calendarResult['enabled']=true;
+            $calendarResult['error']=$calendarError->getMessage();
+            error_log('Registro Servicios Parque Calendario item '.$itemId.': '.$calendarError->getMessage());
+        }
     }
 
 
@@ -403,7 +428,7 @@ try{
         );
         $emailResult=array_merge(
             $emailResult,
-            rp_send_service_email($payload,$allAttachments)
+            rp_send_service_email($payload,$allAttachments,$isEdit)
         );
     }catch(Throwable $emailError){
         $emailResult['error']=$emailError->getMessage();
@@ -413,7 +438,7 @@ try{
     // Las solicitudes de Placa de Urna y Placa de Nicho se envian tambien
     // como correos independientes, sin sustituir el correo operativo principal.
     $plateEmails=[];
-    foreach($operationalAttachments as $attachment){
+    if(!$isEdit)foreach($operationalAttachments as $attachment){
         if(!is_array($attachment))continue;
         $name=mb_strtolower(trim((string)($attachment['name']??'')),'UTF-8');
         $kind=null;
@@ -452,7 +477,8 @@ try{
         'ok'=>true,
         'itemId'=>$itemId,
         'list'=>$listTitle,
-        'message'=>'Servicio Parque registrado correctamente en SharePoint.',
+        'message'=>$isEdit?'Servicio Parque modificado correctamente en SharePoint.':'Servicio Parque registrado correctamente en SharePoint.',
+        'modified'=>$isEdit,
         'calendar'=>$calendarResult,
         'email'=>$emailResult,
         'plateEmails'=>$plateEmails,
