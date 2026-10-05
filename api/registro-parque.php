@@ -101,7 +101,8 @@ function rp_add_value(array &$target, array $fieldIndex, array $aliases, mixed $
 {
     $field=rp_find_field($fieldIndex,$aliases);
     if($field===null)return;
-    if($skipBlank && ($value===null || $value==='' || $value===[]))return;
+    $editMode=!empty($GLOBALS['RP_EDIT_MODE']);
+    if($skipBlank && !$editMode && ($value===null || $value==='' || $value===[]))return;
 
     $internal=(string)($field['InternalName']??'');
     if($internal==='')return;
@@ -118,7 +119,10 @@ function rp_add_value(array &$target, array $fieldIndex, array $aliases, mixed $
         return;
     }
     if(in_array($type,['number','currency'],true)){
-        if($value===''||$value===null)return;
+        if($value===''||$value===null){
+            if($editMode)$target[$internal]=null;
+            return;
+        }
         $target[$internal]=(float)$value;
         return;
     }
@@ -187,6 +191,7 @@ try{
 
     $editItemId=(int)($_POST['editItemId']??0);
     $isEdit=$editItemId>0;
+    $GLOBALS['RP_EDIT_MODE']=$isEdit;
 
     // Regla de negocio: el Tipo de Placa se deriva del Tipo de Servicio
     // para Inhumacion, Exhumacion y Deposito de Cenizas.
