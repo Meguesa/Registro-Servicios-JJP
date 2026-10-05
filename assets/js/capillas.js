@@ -1120,7 +1120,7 @@ async function rsLoadDraftFromUrl(){
   const status=document.getElementById("status");
   try{
     if(status)status.textContent="Cargando borrador...";
-    const response=await fetch("guardar-borrador.php?id="+encodeURIComponent(id),{cache:"no-store",credentials:"same-origin"});
+    const response=await fetch("api/guardar-borrador.php?id="+encodeURIComponent(id),{cache:"no-store",credentials:"same-origin",headers:{"Accept":"application/json"}});
     const result=await response.json().catch(()=>null);
     if(!response.ok||!result?.ok)throw new Error(result?.message||("HTTP "+response.status));
     document.getElementById("draftId").value=id;
