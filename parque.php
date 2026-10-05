@@ -313,6 +313,7 @@ $jsVersion = is_file(__DIR__ . '/assets/js/parque.js')
       </div>
     </div>
     <input type="hidden" id="draftId" name="draftId" value="">
+    <input type="hidden" id="editItemId" name="editItemId" value="">
     <p id="status" class="status">Listo para registrar en SharePoint.</p>
   </form>
 </main>
