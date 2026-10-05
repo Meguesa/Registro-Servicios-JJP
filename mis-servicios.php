@@ -10,6 +10,8 @@ $areaRaw = mb_strtolower(trim((string)($_GET['area'] ?? 'capillas')), 'UTF-8');
 $area = $areaRaw === 'parque' ? 'parque' : 'capillas';
 $areaLabel = $area === 'parque' ? 'PARQUE' : 'CAPILLAS';
 $newServiceHref = $area === 'parque' ? 'parque.php?nuevo=1' : 'capillas.php?nuevo=1';
+$servicesCssVersion = is_file(__DIR__ . '/assets/css/mis-servicios.css') ? (string)filemtime(__DIR__ . '/assets/css/mis-servicios.css') : '1';
+$servicesJsVersion = is_file(__DIR__ . '/assets/js/mis-servicios.js') ? (string)filemtime(__DIR__ . '/assets/js/mis-servicios.js') : '1';
 ?><!doctype html>
 <html lang="es-MX">
 <head>
@@ -17,7 +19,7 @@ $newServiceHref = $area === 'parque' ? 'parque.php?nuevo=1' : 'capillas.php?nuev
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mis Servicios | Jardines de Juan Pablo</title>
 <link rel="stylesheet" href="assets/css/styles.css">
-<link rel="stylesheet" href="assets/css/mis-servicios.css">
+<link rel="stylesheet" href="assets/css/mis-servicios.css?v=<?= htmlspecialchars($servicesCssVersion, ENT_QUOTES, 'UTF-8') ?>">
 </head>
 <body>
 <header class="solicitud-topbar">
@@ -55,6 +57,6 @@ $newServiceHref = $area === 'parque' ? 'parque.php?nuevo=1' : 'capillas.php?nuev
   </section>
 </main>
 <script>window.JDJP_SERVICES_AREA = <?= json_encode($area, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;</script>
-<script src="assets/js/mis-servicios.js"></script>
+<script src="assets/js/mis-servicios.js?v=<?= htmlspecialchars($servicesJsVersion, ENT_QUOTES, 'UTF-8') ?>"></script>
 </body>
 </html>
