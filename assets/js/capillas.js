@@ -1017,6 +1017,9 @@ async function rsSaveDraft(){
 }
 document.getElementById("saveDraftBtn")?.addEventListener("click",rsSaveDraft);
 
+function rsComparable(value){
+  return String(value??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase();
+}
 function rsSetNamed(name,value){
   const el=form.elements.namedItem(name);
   if(!el)return;
@@ -1026,6 +1029,11 @@ function rsSetNamed(name,value){
   }
   if(el.type==="checkbox"){
     el.checked=!!value;
+  }else if(el instanceof HTMLSelectElement && !el.multiple){
+    const wanted=rsComparable(value);
+    const match=Array.from(el.options).find(o=>rsComparable(o.value)===wanted || rsComparable(o.textContent)===wanted);
+    el.value=match?match.value:(value??"");
+    el.dispatchEvent(new Event("change",{bubbles:true}));
   }else{
     el.value=value??"";
     el.dispatchEvent(new Event("change",{bubbles:true}));
