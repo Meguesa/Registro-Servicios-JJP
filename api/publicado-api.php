@@ -74,9 +74,14 @@ function pe_dt(mixed $value,bool $dateOnly=false): string {
     $raw=trim((string)$value);
     if($raw==='')return '';
     try{
+        if($dateOnly){
+            $datePart=substr($raw,0,10);
+            $dt=DateTimeImmutable::createFromFormat('Y-m-d',$datePart,new DateTimeZone('UTC'));
+            return $dt instanceof DateTimeImmutable?$dt->format('d/m/Y'):$raw;
+        }
         $dt=new DateTimeImmutable($raw,new DateTimeZone('UTC'));
         $dt=$dt->setTimezone(new DateTimeZone('America/Monterrey'));
-        return $dt->format($dateOnly?'d/m/Y':'d/m/Y H:i');
+        return $dt->format('d/m/Y H:i');
     }catch(Throwable){
         return $raw;
     }
