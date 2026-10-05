@@ -686,6 +686,21 @@ try {
     }
 
     $service = trim((string) ($payload['servicio'] ?? ''));
+
+    // Excepción de negocio: contratos de Previsión adquiridos como VI
+    // pueden otorgarse como Inhumación o Cremación conservando Código = VI.
+    $viOption = (bool)($payload['previsionViOpcionCremacion'] ?? false);
+    $isPrevision = rs_norm((string)($payload['prevision'] ?? '')) === 'prevision';
+    if ($viOption && $isPrevision && in_array($service, ['Inhumación','Cremación'], true)) {
+        $payload['codigoServicio'] = 'VI';
+        $num = trim((string)($payload['numeroServicio'] ?? ''));
+        $ata = trim((string)($payload['codigoAtaud'] ?? ''));
+        $payload['referencia'] = implode(' - ', array_values(array_filter(
+            ['VI', $ata, $num],
+            static fn(string $value): bool => $value !== ''
+        )));
+    }
+
     $sinVelacion = $service === 'Cremación Directa (sin velación)';
     $rentaCapillas = $service === 'Renta de Capillas';
     $esCremacion = in_array($service, [
