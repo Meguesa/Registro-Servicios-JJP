@@ -661,6 +661,7 @@ try {
 
     $editItemId = (int)($_POST['editItemId'] ?? 0);
     $isEdit = $editItemId > 0;
+    $GLOBALS['RS_EDIT_MODE'] = $isEdit;
 
     $requestedTestMode = rs_is_preview_mode() || (bool)($payload['modoPrueba'] ?? false);
     if ($requestedTestMode && !rs_user_can_test_mode($currentUserEmail)) {
@@ -868,7 +869,8 @@ try {
     {
         $field = rs_find_field($fieldIndex, $aliases);
         if ($field === null) return;
-        if ($skipBlank && ($value === null || $value === '' || $value === [])) return;
+        $editMode = !empty($GLOBALS['RS_EDIT_MODE']);
+        if ($skipBlank && !$editMode && ($value === null || $value === '' || $value === [])) return;
 
         // Todo texto exportado a SharePoint se guarda en MAYUSCULAS.
         $value = rs_uppercase_export($value);
@@ -894,7 +896,10 @@ try {
             return;
         }
         if (in_array($type, ['number', 'currency'], true)) {
-            if ($value === '' || $value === null) return;
+            if ($value === '' || $value === null) {
+                if ($editMode) $fieldsPayload[$internal] = null;
+                return;
+            }
             $fieldsPayload[$internal] = (float) $value;
             return;
         }
