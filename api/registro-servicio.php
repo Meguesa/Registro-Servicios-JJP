@@ -15,6 +15,31 @@ function rs_json(int $status, array $payload): never
 }
 
 
+function rs_norm(string $value): string
+{
+    $value = trim($value);
+
+    // SharePoint codifica espacios y caracteres especiales en InternalName
+    // con secuencias como _x0020_. Decodificarlas permite comparar de forma
+    // confiable tanto Title como InternalName.
+    $value = preg_replace_callback(
+        '/_x([0-9a-fA-F]{4})_/',
+        static function (array $m): string {
+            $code = hexdec($m[1]);
+            if ($code <= 0x7F) return chr($code);
+            return html_entity_decode('&#' . $code . ';', ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        },
+        $value
+    ) ?? $value;
+
+    $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+    if (is_string($ascii) && $ascii !== '') $value = $ascii;
+    $value = strtolower($value);
+    return preg_replace('/[^a-z0-9]+/', '', $value) ?? '';
+}
+
+/** @return array<string,array<string,mixed>> */
+
 function rs_is_preview_mode(): bool
 {
     return str_contains(
@@ -806,30 +831,6 @@ try {
         return ['status' => $status, 'body' => (string) $response, 'json' => is_array($decoded) ? $decoded : []];
     }
 
-    function rs_norm(string $value): string
-    {
-        $value = trim($value);
-
-        // SharePoint codifica espacios y caracteres especiales en InternalName
-        // con secuencias como _x0020_. Decodificarlas permite comparar de forma
-        // confiable tanto Title como InternalName.
-        $value = preg_replace_callback(
-            '/_x([0-9a-fA-F]{4})_/',
-            static function (array $m): string {
-                $code = hexdec($m[1]);
-                if ($code <= 0x7F) return chr($code);
-                return html_entity_decode('&#' . $code . ';', ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            },
-            $value
-        ) ?? $value;
-
-        $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
-        if (is_string($ascii) && $ascii !== '') $value = $ascii;
-        $value = strtolower($value);
-        return preg_replace('/[^a-z0-9]+/', '', $value) ?? '';
-    }
-
-    /** @return array<string,array<string,mixed>> */
     function rs_fields_by_norm(array $rows): array
     {
         $out = [];
