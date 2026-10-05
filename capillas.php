@@ -244,6 +244,7 @@ $isPreview = str_contains(
       </div>
     </div>
     <input type="hidden" id="draftId" name="draftId" value="">
+    <input type="hidden" id="editItemId" name="editItemId" value="">
     <p id="status" class="status">Listo para registrar en SharePoint.</p>
   </form>
 </main>
