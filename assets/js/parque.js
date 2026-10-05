@@ -400,6 +400,9 @@ form.addEventListener("submit",async e=>{
 });
 
 
+function parqueComparable(value){
+  return String(value??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase();
+}
 function setParqueField(name,value){
   const el=form.elements.namedItem(name);
   if(!el)return;
@@ -409,7 +412,13 @@ function setParqueField(name,value){
     el.dispatchEvent(new Event("change",{bubbles:true}));
     return;
   }
-  el.value=value??"";
+  if(el instanceof HTMLSelectElement && !el.multiple){
+    const wanted=parqueComparable(value);
+    const match=Array.from(el.options).find(o=>parqueComparable(o.value)===wanted || parqueComparable(o.textContent)===wanted);
+    el.value=match?match.value:(value??"");
+  }else{
+    el.value=value??"";
+  }
   el.dispatchEvent(new Event("change",{bubbles:true}));
   el.dispatchEvent(new Event("input",{bubbles:true}));
 }
