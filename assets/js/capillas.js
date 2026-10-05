@@ -825,6 +825,8 @@ async function rsSubmitToSharePoint(){
     body.append("payload",JSON.stringify(payload));
     const draftId=document.getElementById("draftId")?.value||"";
     if(draftId) body.append("draftId",draftId);
+    const editItemId=document.getElementById("editItemId")?.value||"";
+    if(editItemId) body.append("editItemId",editItemId);
 
     const cropped=await rsCroppedFile();
     if(cropped) body.append("esquelaProcesadaFile",cropped,cropped.name);
@@ -861,7 +863,9 @@ async function rsSubmitToSharePoint(){
     const calendar=result?.calendar||null;
 
     const lines=[
-      "Servicio registrado correctamente en SharePoint.",
+      result.modified===true
+        ? "Servicio modificado correctamente en SharePoint."
+        : "Servicio registrado correctamente en SharePoint.",
       "ID: "+result.itemId
     ];
 
@@ -935,7 +939,7 @@ async function rsSubmitToSharePoint(){
     if(status) status.textContent=lines.join(" | ");
     alert(finalMessage);
 
-    button.textContent="Registrado";
+    button.textContent=result.modified===true?"Modificado":"Registrado";
   }catch(error){
     console.error("Registro SharePoint:",error);
     if(status) status.textContent="No fue posible registrar: "+(error?.message||error);
@@ -1064,6 +1068,43 @@ function rsApplyDraftPayload(p){
   updateRules();updateExtras();updateTotal();calcAge();syncOperationEmpty();
 }
 
+async function rsLoadPublishedEditFromUrl(){
+  const params=new URLSearchParams(location.search);
+  const id=params.get("edit");
+  if(!id)return false;
+
+  const status=document.getElementById("status");
+  try{
+    if(status)status.textContent="Cargando servicio publicado...";
+    const response=await fetch("api/publicado-api.php?area=capillas&id="+encodeURIComponent(id),{
+      cache:"no-store",
+      credentials:"same-origin",
+      headers:{"Accept":"application/json"}
+    });
+    const result=await response.json().catch(()=>null);
+    if(!response.ok||!result?.ok)throw new Error(result?.message||("HTTP "+response.status));
+
+    document.getElementById("editItemId").value=String(result.itemId||id);
+    document.getElementById("draftId").value="";
+    rsApplyDraftPayload(result.payload||{});
+
+    const bannerTitle=document.querySelector(".form-banner h1");
+    if(bannerTitle)bannerTitle.textContent="Modificar servicio";
+    const bannerCopy=document.querySelector(".form-banner p");
+    if(bannerCopy)bannerCopy.textContent="Actualiza la información del registro publicado. Al guardar, se modificará el mismo elemento de SharePoint.";
+    const submit=document.getElementById("submitBtn");
+    if(submit)submit.textContent="Guardar modificación";
+    const draftButton=document.getElementById("saveDraftBtn");
+    if(draftButton)draftButton.hidden=true;
+    if(status)status.textContent="Servicio publicado cargado. Los cambios actualizarán el registro existente y reenviarán el correo como MODIFICADO.";
+    return true;
+  }catch(error){
+    console.error("Cargar servicio publicado:",error);
+    if(status)status.textContent="No fue posible cargar el servicio publicado: "+(error?.message||error);
+    return true;
+  }
+}
+
 async function rsLoadDraftFromUrl(){
   const params=new URLSearchParams(location.search);
   const id=params.get("draft");
@@ -1093,4 +1134,7 @@ async function rsLoadDraftFromUrl(){
     if(status)status.textContent="No fue posible cargar el borrador: "+(error?.message||error);
   }
 }
-rsLoadDraftFromUrl();
+(async()=>{
+  const editing=await rsLoadPublishedEditFromUrl();
+  if(!editing)await rsLoadDraftFromUrl();
+})();
