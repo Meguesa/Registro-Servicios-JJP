@@ -360,6 +360,8 @@ form.addEventListener("submit",async e=>{
     body.append("payload",JSON.stringify(payload()));
     const draftId=document.getElementById("draftId")?.value||"";
     if(draftId)body.append("draftId",draftId);
+    const editItemId=document.getElementById("editItemId")?.value||"";
+    if(editItemId)body.append("editItemId",editItemId);
     const response=await fetch("api/registro-parque.php",{
       method:"POST",
       body,
@@ -370,7 +372,7 @@ form.addEventListener("submit",async e=>{
     if(!response.ok||!result?.ok)throw new Error(result?.message||("HTTP "+response.status));
 
     const lines=[
-      "Servicio Parque registrado correctamente.",
+      result.modified===true?"Servicio Parque modificado correctamente.":"Servicio Parque registrado correctamente.",
       "ID: "+result.itemId,
       "Lista: Eventos Parque",
       result.calendar?.created ? "Calendario: CREADO DIRECTAMENTE" : ("Calendario: "+(result.calendar?.error||"NO CREADO")),
@@ -459,6 +461,41 @@ async function saveParqueDraft(){
   }
 }
 
+async function loadParquePublishedEdit(){
+  const id=new URLSearchParams(location.search).get("edit");
+  if(!id)return false;
+
+  const status=document.getElementById("status");
+  try{
+    if(status)status.textContent="Cargando servicio publicado...";
+    const response=await fetch("api/publicado-api.php?area=parque&id="+encodeURIComponent(id),{
+      cache:"no-store",
+      credentials:"same-origin",
+      headers:{"Accept":"application/json"}
+    });
+    const result=await response.json().catch(()=>null);
+    if(!response.ok||!result?.ok)throw new Error(result?.message||("HTTP "+response.status));
+
+    document.getElementById("editItemId").value=String(result.itemId||id);
+    document.getElementById("draftId").value="";
+    applyParqueDraft(result.payload||{});
+
+    const bannerTitle=document.querySelector(".form-banner h1");
+    if(bannerTitle)bannerTitle.textContent="Modificar servicio";
+    const bannerCopy=document.querySelector(".form-banner p");
+    if(bannerCopy)bannerCopy.textContent="Actualiza la información del registro publicado. Al guardar, se modificará el mismo elemento de SharePoint.";
+    const submit=document.getElementById("submitBtn");
+    if(submit)submit.textContent="Guardar modificación";
+    const draftButton=document.getElementById("saveDraftBtn");
+    if(draftButton)draftButton.hidden=true;
+    if(status)status.textContent="Servicio publicado cargado. Los cambios actualizarán el registro existente y reenviarán el correo como MODIFICADO.";
+    return true;
+  }catch(error){
+    if(status)status.textContent="No fue posible cargar el servicio publicado: "+(error?.message||error);
+    return true;
+  }
+}
+
 async function loadParqueDraft(){
   const status=document.getElementById("status");
   const boot=window.JDJP_PARQUE_INITIAL_DRAFT||null;
@@ -495,8 +532,10 @@ function resetParqueForm(){
   if(!confirm("¿Deseas limpiar toda la captura?"))return;
   form.reset();
   document.getElementById("draftId").value="";
+  document.getElementById("editItemId").value="";
   const url=new URL(location.href);
   url.searchParams.delete("draft");
+  url.searchParams.delete("edit");
   url.searchParams.set("nuevo","1");
   history.replaceState(null,"",url);
   syncTipoPlacaPorServicio();
@@ -514,4 +553,7 @@ syncTipoPlacaPorServicio();
 syncPropertyRules();
 syncReubicacion();
 showStep(0);
-loadParqueDraft();
+(async()=>{
+  const editing=await loadParquePublishedEdit();
+  if(!editing)await loadParqueDraft();
+})();
