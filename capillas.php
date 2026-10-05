@@ -16,6 +16,8 @@ $isPreview = str_contains(
     (string)($_SERVER['REQUEST_URI'] ?? ''),
     '/registro-servicios-preview/'
 );
+$capillasCssVersion = is_file(__DIR__ . '/assets/css/styles.css') ? (string)filemtime(__DIR__ . '/assets/css/styles.css') : '1';
+$capillasJsVersion = is_file(__DIR__ . '/assets/js/capillas.js') ? (string)filemtime(__DIR__ . '/assets/js/capillas.js') : '1';
 ?><!doctype html>
 <html lang="es-MX">
 <head>
@@ -24,7 +26,7 @@ $isPreview = str_contains(
   <title>Registro de Servicios | Jardines de Juan Pablo</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
-  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="stylesheet" href="assets/css/styles.css?v=<?= htmlspecialchars($capillasCssVersion, ENT_QUOTES, 'UTF-8') ?>">
 </head>
 <body>
 <header class="solicitud-topbar">
@@ -253,6 +255,6 @@ $isPreview = str_contains(
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="assets/js/capillas.js"></script>
+<script src="assets/js/capillas.js?v=<?= htmlspecialchars($capillasJsVersion, ENT_QUOTES, 'UTF-8') ?>"></script>
 </body>
 </html>
