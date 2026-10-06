@@ -1467,12 +1467,41 @@ try {
         'mode' => null,
         'error' => null,
     ];
-    if (!$isEdit) {
+
+    if (!$isEdit && $sinVelacion) {
+        // Cremacion Directa sin velacion no debe crear obituario en TellMeBye.
+        $tellmebyeResult = [
+            'enabled' => true,
+            'triggered' => false,
+            'skipped' => true,
+            'mode' => null,
+            'error' => null,
+            'reason' => 'Cremacion Directa (sin velacion): TellMeBye no aplica.',
+        ];
+    } elseif (!$isEdit) {
         try {
+            $tellmebyeImageName = '';
+            foreach ($filesToAttach as $tellmebyeFile) {
+                if ((string)($tellmebyeFile['key'] ?? '') !== 'esquela') continue;
+
+                $tellmebyeImageName = rs_tellmebye_upload_temp_image(
+                    $itemId,
+                    $tellmebyeFile,
+                    $siteUrl,
+                    $token,
+                    $digest
+                );
+                break;
+            }
+
             $tellmebyeResult = array_merge(
                 $tellmebyeResult,
-                rs_trigger_tellmebye($itemId, $isTestMode)
+                rs_trigger_tellmebye($itemId, $isTestMode, $tellmebyeImageName)
             );
+
+            if ($tellmebyeImageName !== '') {
+                $tellmebyeResult['imageFileName'] = $tellmebyeImageName;
+            }
         } catch (Throwable $tellmebyeError) {
             $tellmebyeResult['enabled'] = true;
             $tellmebyeResult['error'] = $tellmebyeError->getMessage();
