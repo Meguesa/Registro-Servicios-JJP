@@ -248,28 +248,98 @@ try{
     $payload=$area==='parque'?pd_parque($item):pd_capillas($item);
 
     if(strtoupper((string)($_SERVER['REQUEST_METHOD']??'GET'))==='POST'){
-        if($area!=='parque')pd_json(400,['ok'=>false,'message'=>'Reenvio solo disponible para Parque.']);
+        if($area==='parque'){
+            require_once dirname(__DIR__).'/includes/registro-parque-imagenes.php';
+            require_once dirname(__DIR__).'/includes/registro-parque-correo.php';
+            require_once dirname(__DIR__).'/includes/registro-parque-documentos.php';
 
-        require_once dirname(__DIR__).'/includes/registro-parque-imagenes.php';
-        require_once dirname(__DIR__).'/includes/registro-parque-correo.php';
-        require_once dirname(__DIR__).'/includes/registro-parque-documentos.php';
+            $info=rp_generate_information_images($payload);
+            $operational=rp_generate_operational_tables($payload);
+            $letters=rp_generate_letter_attachments($payload);
+            $attachments=array_merge($info,$operational,$letters);
+            $email=rp_send_service_email($payload,$attachments,false);
 
-        $info=rp_generate_information_images($payload);
-        $operational=rp_generate_operational_tables($payload);
-        $letters=rp_generate_letter_attachments($payload);
-        $attachments=array_merge($info,$operational,$letters);
-        $email=rp_send_service_email($payload,$attachments,false);
+            $plateEmails=[];
+            foreach($operational as $attachment){
+                if(!is_array($attachment))continue;
+                $name=mb_strtolower(trim((string)($attachment['name']??'')),'UTF-8');
+                $kind=$name==='placa_nicho.png'?'nicho':($name==='placa_urna.png'?'urna':null);
+                if($kind===null)continue;
+                try{
+                    $plateEmails[]=rp_send_plate_email($payload,$attachment,$kind);
+                }catch(Throwable $plateError){
+                    $plateEmails[]=['sent'=>false,'kind'=>$kind,'error'=>$plateError->getMessage()];
+                }
+            }
 
-        $plateEmails=[];
-        foreach($operational as $attachment){
-            if(!is_array($attachment))continue;
-            $name=mb_strtolower(trim((string)($attachment['name']??'')),'UTF-8');
-            $kind=$name==='placa_nicho.png'?'nicho':($name==='placa_urna.png'?'urna':null);
-            if($kind===null)continue;
+            pd_json(200,['ok'=>true,'area'=>$area,'itemId'=>$itemId,'email'=>$email,'plateEmails'=>$plateEmails]);
+        }
+
+        require_once dirname(__DIR__).'/includes/registro-imagenes.php';
+        require_once dirname(__DIR__).'/includes/registro-placa.php';
+        require_once dirname(__DIR__).'/includes/registro-carta.php';
+        require_once dirname(__DIR__).'/includes/registro-capillas-correo.php';
+
+        $attachments=[];
+        $plateAttachment=null;
+
+        try{
+            $images=rs_generate_service_information_images($payload);
+            foreach([
+                ['nameKey'=>'serviceName','bytesKey'=>'servicePng'],
+                ['nameKey'=>'obitName','bytesKey'=>'obitPng'],
+                ['nameKey'=>'saleName','bytesKey'=>'salePng'],
+            ] as $part){
+                $name=trim((string)($images[$part['nameKey']]??''));
+                $bytes=(string)($images[$part['bytesKey']]??'');
+                if($name!==''&&$bytes!==''){
+                    $attachments[]=['name'=>$name,'contentType'=>'image/png','bytes'=>$bytes];
+                }
+            }
+        }catch(Throwable $imageError){
+            error_log('Reenvio Capillas imagenes item '.$itemId.': '.$imageError->getMessage());
+        }
+
+        try{
+            $letterPayload=$payload;
+            $letterPayload['itemId']=(string)$itemId;
+            $letter=rs_generate_service_letter($letterPayload);
+            $name=trim((string)($letter['pdfName']??''));
+            $bytes=(string)($letter['pdf']??'');
+            if($name!==''&&$bytes!==''){
+                $attachments[]=['name'=>$name,'contentType'=>'application/pdf','bytes'=>$bytes];
+            }
+        }catch(Throwable $letterError){
+            error_log('Reenvio Capillas carta item '.$itemId.': '.$letterError->getMessage());
+        }
+
+        $serviceNorm=pd_norm((string)($payload['servicio']??''));
+        $plateRequired=!empty($payload['requierePlaca'])
+            || str_contains($serviceNorm,'cremacion')
+            || str_contains($serviceNorm,'cremaciondirecta');
+        if($plateRequired){
             try{
-                $plateEmails[]=rp_send_plate_email($payload,$attachment,$kind);
+                $platePayload=$payload;
+                $platePayload['itemId']=(string)$itemId;
+                $plate=rs_generate_urna_plate($platePayload);
+                $name=trim((string)($plate['pngName']??''));
+                $bytes=(string)($plate['png']??'');
+                if($name!==''&&$bytes!==''){
+                    $plateAttachment=['name'=>$name,'contentType'=>'image/png','bytes'=>$bytes];
+                    $attachments[]=$plateAttachment;
+                }
             }catch(Throwable $plateError){
-                $plateEmails[]=['sent'=>false,'kind'=>$kind,'error'=>$plateError->getMessage()];
+                error_log('Reenvio Capillas placa item '.$itemId.': '.$plateError->getMessage());
+            }
+        }
+
+        $email=rc_send_service_email($payload,$attachments);
+        $plateEmails=[];
+        if(is_array($plateAttachment)){
+            try{
+                $plateEmails[]=rc_send_plate_email($payload,$plateAttachment);
+            }catch(Throwable $plateError){
+                $plateEmails[]=['sent'=>false,'kind'=>'urna','error'=>$plateError->getMessage()];
             }
         }
 
