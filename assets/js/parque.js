@@ -379,14 +379,23 @@ form.addEventListener("submit",async e=>{
     const lines=[
       result.modified===true?"Servicio Parque modificado correctamente.":"Servicio Parque registrado correctamente.",
       "ID: "+result.itemId,
-      "Lista: Eventos Parque",
-      result.calendar?.created
-        ? "Calendario: CREADO DIRECTAMENTE"
-        : (result.calendar?.skipped ? "Calendario: "+(result.calendar?.reason||"OMITIDO") : ("Calendario: "+(result.calendar?.error||"NO CREADO"))),
-      result.email?.sent ? "Correo operativo: ENVIADO" : ("Correo operativo: "+(result.email?.error||"NO ENVIADO"))
+      "Lista: Eventos Parque"
     ];
 
-    if(Array.isArray(result.plateEmails)){
+    if(result.backgroundProcessing===true){
+      lines.push("Automatizaciones: PROCESANDO EN SEGUNDO PLANO");
+    }else{
+      lines.push(
+        result.calendar?.created
+          ? "Calendario: CREADO DIRECTAMENTE"
+          : (result.calendar?.skipped ? "Calendario: "+(result.calendar?.reason||"OMITIDO") : ("Calendario: "+(result.calendar?.error||"NO CREADO")))
+      );
+      lines.push(
+        result.email?.sent ? "Correo operativo: ENVIADO" : ("Correo operativo: "+(result.email?.error||"NO ENVIADO"))
+      );
+    }
+
+    if(result.backgroundProcessing!==true && Array.isArray(result.plateEmails)){
       result.plateEmails.forEach(plate=>{
         const label=String(plate?.kind||"placa").toUpperCase();
         lines.push(
