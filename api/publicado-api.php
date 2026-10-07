@@ -314,6 +314,47 @@ try{
         ? pe_parque_payload($item,$index)
         : pe_capillas_payload($item,$index);
 
+    if(strtoupper((string)($_SERVER['REQUEST_METHOD']??'GET'))==='POST'){
+        if($area!=='parque'){
+            pe_json(400,['ok'=>false,'message'=>'Esta accion solo esta disponible para Parque.']);
+        }
+
+        $info=rp_generate_information_images($payload);
+        $operational=rp_generate_operational_tables($payload);
+        $letters=rp_generate_letter_attachments($payload);
+        $attachments=array_merge($info,$operational,$letters);
+
+        $email=rp_send_service_email($payload,$attachments,false);
+        $plateEmails=[];
+
+        foreach($operational as $attachment){
+            if(!is_array($attachment))continue;
+            $name=mb_strtolower(trim((string)($attachment['name']??'')),'UTF-8');
+            $kind=$name==='placa_nicho.png'?'nicho':($name==='placa_urna.png'?'urna':null);
+            if($kind===null)continue;
+
+            try{
+                $plateEmails[]=rp_send_plate_email($payload,$attachment,$kind);
+            }catch(Throwable $plateError){
+                $plateEmails[]=[
+                    'enabled'=>true,
+                    'sent'=>false,
+                    'kind'=>$kind,
+                    'error'=>$plateError->getMessage(),
+                ];
+            }
+        }
+
+        pe_json(200,[
+            'ok'=>true,
+            'area'=>$area,
+            'itemId'=>$itemId,
+            'message'=>'Correos enviados nuevamente.',
+            'email'=>$email,
+            'plateEmails'=>$plateEmails,
+        ]);
+    }
+
     pe_json(200,[
         'ok'=>true,
         'area'=>$area,
