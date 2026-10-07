@@ -5,6 +5,11 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
 
+// El registro principal debe responder al navegador antes de ejecutar tareas auxiliares.
+// El trabajo posterior puede continuar aun si el cliente ya cerro la conexion.
+ignore_user_abort(true);
+@set_time_limit(180);
+
 require_once __DIR__ . '/../includes/registro-sharepoint.php';
 require_once __DIR__ . '/../includes/registro-parque-calendario.php';
 require_once __DIR__ . '/../includes/registro-parque-imagenes.php';
@@ -386,6 +391,41 @@ try{
         if($itemId<=0)throw new RuntimeException('SharePoint creo el registro, pero no devolvio un ID utilizable.');
     }
 
+    // Una vez que SharePoint confirmo el alta/modificacion, el registro principal ya
+    // esta asegurado. Eliminar el borrador antes de continuar para evitar duplicados
+    // si alguna automatizacion posterior tarda o falla.
+    if(is_array($storageCtx) && $draftId!==''){
+        rs_remove_tree(rs_draft_dir($storageCtx,$draftId));
+        $draftId='';
+    }
+
+    $backgroundResponseSent=false;
+    if(function_exists('fastcgi_finish_request')){
+        $earlyResponse=[
+            'ok'=>true,
+            'itemId'=>$itemId,
+            'list'=>$listTitle,
+            'message'=>$isEdit
+                ? 'Servicio Parque modificado correctamente en SharePoint.'
+                : 'Servicio Parque registrado correctamente en SharePoint.',
+            'modified'=>$isEdit,
+            'backgroundProcessing'=>true,
+            'automationSource'=>'RegistroServicios',
+        ];
+
+        $encoded=json_encode($earlyResponse,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+        if(is_string($encoded)){
+            http_response_code(201);
+            if(session_status()===PHP_SESSION_ACTIVE){
+                session_write_close();
+            }
+            header('Content-Length: '.strlen($encoded));
+            echo $encoded;
+            fastcgi_finish_request();
+            $backgroundResponseSent=true;
+        }
+    }
+
     // Crear directamente el evento oficial de Parque desde Registro de Servicios.
     $calendarResult=[
         'enabled'=>false,
@@ -478,8 +518,17 @@ try{
         $plateEmails[]=$result;
     }
 
-    if(is_array($storageCtx) && $draftId!==''){
+    if(!$backgroundResponseSent && is_array($storageCtx) && $draftId!==''){
         rs_remove_tree(rs_draft_dir($storageCtx,$draftId));
+    }
+
+    if($backgroundResponseSent){
+        error_log(
+            'Registro Servicios Parque background item '.$itemId
+            .' | calendario='.(($calendarResult['created']??false)?'creado':'no creado')
+            .' | correo='.(($emailResult['sent']??false)?'enviado':'no enviado')
+        );
+        exit;
     }
 
     rp_json(201,[
@@ -495,5 +544,10 @@ try{
     ]);
 }catch(Throwable $e){
     error_log('Registro Servicios Parque: '.$e->getMessage());
+
+    if(isset($backgroundResponseSent) && $backgroundResponseSent===true){
+        exit;
+    }
+
     rp_json(500,['ok'=>false,'message'=>$e->getMessage()]);
 }
