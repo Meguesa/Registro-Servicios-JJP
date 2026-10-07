@@ -7,9 +7,6 @@ header('X-Content-Type-Options: nosniff');
 
 require_once dirname(__DIR__).'/includes/registro-storage.php';
 require_once dirname(__DIR__).'/includes/registro-sharepoint.php';
-require_once dirname(__DIR__).'/includes/registro-parque-imagenes.php';
-require_once dirname(__DIR__).'/includes/registro-parque-correo.php';
-require_once dirname(__DIR__).'/includes/registro-parque-documentos.php';
 
 function pe_json(int $status,array $payload): never {
     http_response_code($status);
@@ -318,6 +315,10 @@ try{
         if($area!=='parque'){
             pe_json(400,['ok'=>false,'message'=>'Esta accion solo esta disponible para Parque.']);
         }
+
+        require_once dirname(__DIR__).'/includes/registro-parque-imagenes.php';
+        require_once dirname(__DIR__).'/includes/registro-parque-correo.php';
+        require_once dirname(__DIR__).'/includes/registro-parque-documentos.php';
 
         $info=rp_generate_information_images($payload);
         $operational=rp_generate_operational_tables($payload);
