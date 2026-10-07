@@ -32,14 +32,52 @@ function rp_doc_flower_arrangement(array $payload): string
 
 function rp_nicho_template_image(): GdImage
 {
-    $path=dirname(__DIR__).'/assets/templates/parque/plantilla_placa_nicho_correcta.png';
-    if(!is_file($path) || !is_readable($path)){
-        throw new RuntimeException('No se encontro la plantilla correcta de placa de nicho.');
+    $filename='plantilla_placa_nicho_correcta.png';
+    $path=dirname(__DIR__).'/assets/templates/parque/'.$filename;
+
+    // Primero intentar la copia desplegada en cPanel. Algunos despliegues
+    // historicos publicaron binarios como texto, por lo que tambien se valida
+    // que GD realmente pueda abrir el archivo antes de usarlo.
+    if(is_file($path) && is_readable($path)){
+        $bytes=@file_get_contents($path);
+        if(is_string($bytes) && $bytes!==''){
+            $image=@imagecreatefromstring($bytes);
+            if($image instanceof GdImage){
+                return $image;
+            }
+        }
     }
 
-    $bytes=@file_get_contents($path);
-    if(!is_string($bytes) || $bytes===''){
-        throw new RuntimeException('No fue posible leer la plantilla correcta de placa de nicho.');
+    // Fallback confiable: obtener el PNG binario directamente del repo fuente.
+    // Registro-Servicios-JJP es la fuente de verdad; Portal-Interno-JJP solo
+    // publica el contenido en cPanel.
+    $url='https://raw.githubusercontent.com/Meguesa/Registro-Servicios-JJP/main/assets/templates/parque/'.$filename;
+    $curl=curl_init($url);
+    if($curl===false){
+        throw new RuntimeException('No fue posible inicializar la plantilla correcta de placa de nicho.');
+    }
+
+    curl_setopt_array($curl,[
+        CURLOPT_RETURNTRANSFER=>true,
+        CURLOPT_FOLLOWLOCATION=>true,
+        CURLOPT_CONNECTTIMEOUT=>8,
+        CURLOPT_TIMEOUT=>20,
+        CURLOPT_SSL_VERIFYPEER=>true,
+        CURLOPT_SSL_VERIFYHOST=>2,
+        CURLOPT_HTTPHEADER=>['Accept: image/png'],
+        CURLOPT_USERAGENT=>'Registro-Servicios-JJP',
+    ]);
+
+    $bytes=curl_exec($curl);
+    $status=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE);
+    $error=curl_error($curl);
+    curl_close($curl);
+
+    if(!is_string($bytes) || $bytes==='' || $status<200 || $status>=300){
+        throw new RuntimeException(
+            'No fue posible cargar la plantilla correcta de placa de nicho'
+            .' (HTTP '.$status.($error!==''?', '.$error:'').').'
+        );
     }
 
     $image=@imagecreatefromstring($bytes);
