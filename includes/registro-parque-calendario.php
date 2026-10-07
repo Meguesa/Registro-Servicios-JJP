@@ -41,45 +41,67 @@ function rp_calendar_norm(string $value): string
 
 function rp_graph_request(string $method, string $url, string $token, ?array $jsonBody = null): array
 {
-    $curl = curl_init($url);
-    if ($curl === false) throw new RuntimeException('No fue posible inicializar Microsoft Graph.');
+    $lastError = '';
 
-    $headers = [
-        'Authorization: Bearer ' . $token,
-        'Accept: application/json',
-        'Content-Type: application/json',
-    ];
+    for ($attempt = 1; $attempt <= 2; $attempt++) {
+        $curl = curl_init($url);
+        if ($curl === false) throw new RuntimeException('No fue posible inicializar Microsoft Graph.');
 
-    curl_setopt_array($curl, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_TIMEOUT => 45,
-        CURLOPT_CUSTOMREQUEST => $method,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_SSL_VERIFYHOST => 2,
-    ]);
+        $headers = [
+            'Authorization: Bearer ' . $token,
+            'Accept: application/json',
+            'Content-Type: application/json',
+        ];
 
-    if ($jsonBody !== null) {
-        curl_setopt($curl, CURLOPT_POSTFIELDS, (string)json_encode($jsonBody, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-    }
+        curl_setopt_array($curl, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 45,
+            CURLOPT_CUSTOMREQUEST => $method,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+        ]);
 
-    $response = curl_exec($curl);
-    $status = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
-    $error = curl_error($curl);
-    curl_close($curl);
+        if ($jsonBody !== null) {
+            curl_setopt($curl, CURLOPT_POSTFIELDS, (string)json_encode($jsonBody, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        }
 
-    if ($response === false) throw new RuntimeException('Microsoft Graph no respondio: ' . $error);
-    $decoded = json_decode((string)$response, true);
+        $response = curl_exec($curl);
+        $status = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $error = curl_error($curl);
+        curl_close($curl);
 
-    if ($status < 200 || $status >= 300) {
+        if ($response === false) {
+            $lastError = 'Microsoft Graph no respondio: ' . $error;
+            if ($attempt < 2) {
+                usleep(500000);
+                continue;
+            }
+            throw new RuntimeException($lastError);
+        }
+
+        $decoded = json_decode((string)$response, true);
+        if ($status >= 200 && $status < 300) {
+            return is_array($decoded) ? $decoded : [];
+        }
+
         $detail = is_array($decoded) ? trim((string)($decoded['error']['message'] ?? '')) : '';
         if ($detail === '') $detail = mb_substr(trim((string)$response), 0, 1200);
-        throw new RuntimeException('Microsoft Graph respondio HTTP ' . $status . ($detail !== '' ? ': ' . $detail : '.'));
+
+        $lastError = 'Microsoft Graph respondio HTTP ' . $status
+            . ($detail !== '' ? ': ' . $detail : '.');
+
+        if ($attempt < 2 && ($status === 429 || $status >= 500)) {
+            usleep(750000);
+            continue;
+        }
+
+        throw new RuntimeException($lastError);
     }
 
-    return is_array($decoded) ? $decoded : [];
+    throw new RuntimeException($lastError !== '' ? $lastError : 'Microsoft Graph no respondio.');
 }
 
 function rp_calendar_resolve_id(array $config, string $token): string

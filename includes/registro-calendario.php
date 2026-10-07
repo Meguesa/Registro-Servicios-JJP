@@ -31,9 +31,13 @@ function rs_calendar_private_config(): array
     }
 
     return [
-        'enabled' => (bool)($raw['registro_servicios_calendar_enabled'] ?? false),
+        // El calendario es parte obligatoria del registro operativo. Si la llave
+        // no existe en config.php, se considera habilitado en vez de omitirlo
+        // silenciosamente.
+        'enabled' => (bool)($raw['registro_servicios_calendar_enabled'] ?? true),
         'mailbox' => trim((string)($raw['registro_servicios_calendar_mailbox'] ?? 'sistemas@juanpablo.com.mx')),
         'calendarId' => trim((string)($raw['registro_servicios_calendar_id'] ?? '')),
+        'calendarName' => trim((string)($raw['registro_servicios_calendar_name'] ?? 'Eventos Capillas')),
     ];
 }
 
@@ -94,49 +98,73 @@ function rs_calendar_escape(string $value): string
 }
 
 /** @return array{status:int,json:array<string,mixed>,body:string} */
+function rs_calendar_norm(string $value): string
+{
+    $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', trim($value));
+    if (is_string($ascii) && $ascii !== '') $value = $ascii;
+    $value = strtolower($value);
+    return preg_replace('/[^a-z0-9]+/', '', $value) ?? '';
+}
+
+/** @return array{status:int,json:array<string,mixed>,body:string} */
 function rs_graph_request(string $method, string $url, string $token, ?array $jsonBody = null): array
 {
-    $curl = curl_init($url);
-    if ($curl === false) {
-        throw new RuntimeException('No fue posible inicializar la conexion con Microsoft Graph.');
-    }
+    $lastError = '';
 
-    $headers = [
-        'Authorization: Bearer ' . $token,
-        'Accept: application/json',
-        'Content-Type: application/json',
-    ];
+    for ($attempt = 1; $attempt <= 2; $attempt++) {
+        $curl = curl_init($url);
+        if ($curl === false) {
+            throw new RuntimeException('No fue posible inicializar la conexion con Microsoft Graph.');
+        }
 
-    curl_setopt_array($curl, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_TIMEOUT => 45,
-        CURLOPT_CUSTOMREQUEST => $method,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_SSL_VERIFYHOST => 2,
-    ]);
+        $headers = [
+            'Authorization: Bearer ' . $token,
+            'Accept: application/json',
+            'Content-Type: application/json',
+        ];
 
-    if ($jsonBody !== null) {
-        curl_setopt(
-            $curl,
-            CURLOPT_POSTFIELDS,
-            (string)json_encode($jsonBody, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
-        );
-    }
+        curl_setopt_array($curl, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 45,
+            CURLOPT_CUSTOMREQUEST => $method,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+        ]);
 
-    $response = curl_exec($curl);
-    $status = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
-    $error = curl_error($curl);
-    curl_close($curl);
+        if ($jsonBody !== null) {
+            curl_setopt(
+                $curl,
+                CURLOPT_POSTFIELDS,
+                (string)json_encode($jsonBody, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            );
+        }
 
-    if ($response === false) {
-        throw new RuntimeException('La conexion con Microsoft Graph fallo: ' . $error);
-    }
+        $response = curl_exec($curl);
+        $status = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $error = curl_error($curl);
+        curl_close($curl);
 
-    $decoded = json_decode((string)$response, true);
-    if ($status < 200 || $status >= 300) {
+        if ($response === false) {
+            $lastError = 'La conexion con Microsoft Graph fallo: ' . $error;
+            if ($attempt < 2) {
+                usleep(500000);
+                continue;
+            }
+            throw new RuntimeException($lastError);
+        }
+
+        $decoded = json_decode((string)$response, true);
+        if ($status >= 200 && $status < 300) {
+            return [
+                'status' => $status,
+                'json' => is_array($decoded) ? $decoded : [],
+                'body' => (string)$response,
+            ];
+        }
+
         $detail = '';
         if (is_array($decoded)) {
             $detail = trim((string)($decoded['error']['message'] ?? ''));
@@ -144,17 +172,49 @@ function rs_graph_request(string $method, string $url, string $token, ?array $js
         if ($detail === '') {
             $detail = mb_substr(trim((string)$response), 0, 1500);
         }
-        throw new RuntimeException(
-            'Microsoft Graph respondio HTTP ' . $status .
-            ($detail !== '' ? ': ' . $detail : '.')
-        );
+
+        $lastError = 'Microsoft Graph respondio HTTP ' . $status
+            . ($detail !== '' ? ': ' . $detail : '.');
+
+        // Reintentar una vez ante errores transitorios de Graph.
+        if ($attempt < 2 && ($status === 429 || $status >= 500)) {
+            usleep(750000);
+            continue;
+        }
+
+        throw new RuntimeException($lastError);
     }
 
-    return [
-        'status' => $status,
-        'json' => is_array($decoded) ? $decoded : [],
-        'body' => (string)$response,
-    ];
+    throw new RuntimeException($lastError !== '' ? $lastError : 'Microsoft Graph no respondio.');
+}
+
+function rs_calendar_resolve_id(array $config, string $token): string
+{
+    if (trim((string)($config['calendarId'] ?? '')) !== '') {
+        return trim((string)$config['calendarId']);
+    }
+
+    $calendarName = trim((string)($config['calendarName'] ?? 'Eventos Capillas'));
+    if ($calendarName === '') {
+        throw new RuntimeException('Falta configurar el nombre del calendario de Capillas.');
+    }
+
+    $url = 'https://graph.microsoft.com/v1.0/users/'
+        . rawurlencode((string)$config['mailbox'])
+        . '/calendars?$select=id,name&$top=100';
+
+    $data = rs_graph_request('GET', $url, $token)['json'];
+    $target = rs_calendar_norm($calendarName);
+
+    foreach (($data['value'] ?? []) as $calendar) {
+        if (!is_array($calendar)) continue;
+        if (rs_calendar_norm((string)($calendar['name'] ?? '')) !== $target) continue;
+
+        $id = trim((string)($calendar['id'] ?? ''));
+        if ($id !== '') return $id;
+    }
+
+    throw new RuntimeException('No se encontro el calendario de Capillas "' . $calendarName . '".');
 }
 
 /**
@@ -177,7 +237,7 @@ function rs_calendar_create_event(array $payload, array $sharePointConfig): arra
     // Cremacion Directa (sin velacion) no ocupa sala ni horario de capillas.
     // Por lo tanto, no debe intentar crear un evento de velacion en Outlook.
     $servicio = trim((string)($payload['servicio'] ?? ''));
-    if ($servicio === 'Cremación Directa (sin velación)') {
+    if (rs_calendar_norm($servicio) === 'cremaciondirectasinvelacion') {
         return [
             'enabled' => true,
             'created' => false,
@@ -189,10 +249,8 @@ function rs_calendar_create_event(array $payload, array $sharePointConfig): arra
     // El calendario usa SIEMPRE las credenciales dedicadas registro_servicios_*
     // dentro de rs_graph_token(). SharePoint puede seguir usando temporalmente
     // su backend certificado existente sin mezclar credenciales entre modulos.
-    if ($calendar['mailbox'] === '' || $calendar['calendarId'] === '') {
-        throw new RuntimeException(
-            'Falta configurar registro_servicios_calendar_mailbox o registro_servicios_calendar_id.'
-        );
+    if ($calendar['mailbox'] === '') {
+        throw new RuntimeException('Falta configurar registro_servicios_calendar_mailbox.');
     }
 
     $inicio = rs_calendar_local_graph_value((string)($payload['inicio'] ?? ''));
@@ -269,11 +327,15 @@ function rs_calendar_create_event(array $payload, array $sharePointConfig): arra
         'allowNewTimeProposals' => false,
     ];
 
-    $graphToken = rs_graph_token($sharePointConfig);
+    // rs_graph_token usa exclusivamente las credenciales dedicadas
+    // registro_servicios_*; el argumento de SharePoint se conserva en la firma
+    // por compatibilidad con llamadas existentes.
+    $graphToken = rs_graph_token();
+    $calendarId = rs_calendar_resolve_id($calendar, $graphToken);
     $url = 'https://graph.microsoft.com/v1.0/users/'
         . rawurlencode($calendar['mailbox'])
         . '/calendars/'
-        . rawurlencode($calendar['calendarId'])
+        . rawurlencode($calendarId)
         . '/events';
 
     $created = rs_graph_request('POST', $url, $graphToken, $event)['json'];
@@ -283,6 +345,7 @@ function rs_calendar_create_event(array $payload, array $sharePointConfig): arra
         'created' => true,
         'eventId' => trim((string)($created['id'] ?? '')),
         'webLink' => trim((string)($created['webLink'] ?? '')),
+        'calendarName' => trim((string)($calendar['calendarName'] ?? 'Eventos Capillas')),
         'exequiaCreated' => false,
     ];
 

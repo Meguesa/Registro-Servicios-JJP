@@ -1100,6 +1100,34 @@ try {
         if ($itemId <= 0) throw new RuntimeException('SharePoint creo el registro, pero no devolvio un ID utilizable.');
     }
 
+    // El calendario se ejecuta inmediatamente despues de confirmar SharePoint,
+    // antes de generar/subir documentos o enviar correos. Asi una falla posterior
+    // en adjuntos, esquela, carta o correo no puede dejar el servicio sin evento.
+    if ($isEdit) {
+        $calendarResult = [
+            'enabled' => true,
+            'created' => false,
+            'skipped' => true,
+            'reason' => 'Registro modificado: no se crea un evento de calendario duplicado.',
+            'error' => null,
+        ];
+    } else {
+        try {
+            $calendarPayload = rs_uppercase_export($payload);
+            $calendarPayload['_previewMode'] = $isTestMode;
+            $calendarResult = rs_calendar_create_event($calendarPayload, $config);
+        } catch (Throwable $calendarError) {
+            // SharePoint ya confirmo el alta. Registrar el fallo de calendario
+            // sin provocar que el usuario duplique el servicio.
+            $calendarResult = [
+                'enabled' => true,
+                'created' => false,
+                'error' => $calendarError->getMessage(),
+            ];
+            error_log('Registro Servicios Calendario item ' . $itemId . ': ' . $calendarError->getMessage());
+        }
+    }
+
     // Archivos que formaran parte del correo controlado de Preview.
     $emailAttachments = [];
     $plateEmailAttachment = null;
@@ -1391,33 +1419,6 @@ try {
                 throw new RuntimeException('Etapa ADJUNTAR ARCHIVO ' . $safeName . ': ' . $e->getMessage(), 0, $e);
             }
             $uploadedNames[] = $safeName;
-        }
-    }
-
-    // Crear evento de calendario tambien en Preview para validar el flujo completo.
-    // El modulo de calendario agrega "(PRUEBA)" al titulo cuando _previewMode=true.
-    if ($isEdit) {
-        $calendarResult = [
-            'enabled' => true,
-            'created' => false,
-            'skipped' => true,
-            'reason' => 'Registro modificado: no se crea un evento de calendario duplicado.',
-            'error' => null,
-        ];
-    } else {
-        try {
-            $calendarPayload = rs_uppercase_export($payload);
-            $calendarPayload['_previewMode'] = $isTestMode;
-            $calendarResult = rs_calendar_create_event($calendarPayload, $config);
-        } catch (Throwable $calendarError) {
-            // El registro ya existe en SharePoint. Informar el error de calendario
-            // sin provocar que el usuario duplique el servicio.
-            $calendarResult = [
-                'enabled' => true,
-                'created' => false,
-                'error' => $calendarError->getMessage(),
-            ];
-            error_log('Registro Servicios Calendario item ' . $itemId . ': ' . $calendarError->getMessage());
         }
     }
 
