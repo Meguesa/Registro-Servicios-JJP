@@ -304,6 +304,7 @@ try{
         require_once dirname(__DIR__).'/includes/registro-placa.php';
         require_once dirname(__DIR__).'/includes/registro-carta.php';
         require_once dirname(__DIR__).'/includes/registro-capillas-correo.php';
+        require_once dirname(__DIR__).'/includes/registro-tellmebye.php';
 
         $attachments=[];
         $plateAttachment=null;
@@ -368,7 +369,35 @@ try{
             }
         }
 
-        pd_json(200,['ok'=>true,'area'=>$area,'itemId'=>$itemId,'email'=>$email,'plateEmails'=>$plateEmails]);
+        // Reenviar correos tambien vuelve a disparar TellMeBye.
+        // El propio bot evita duplicar un obituario ya publicado: si el registro
+        // ya tiene TellmebyeId/Estatus Publicado, termina sin crear otro.
+        // Si nunca se publico o fallo antes, intentara publicarlo ahora.
+        $tellmebye=[
+            'enabled'=>false,
+            'triggered'=>false,
+            'mode'=>null,
+            'error'=>null,
+        ];
+        try{
+            $tellmebye=array_merge(
+                $tellmebye,
+                rs_trigger_tellmebye($itemId,false,'')
+            );
+        }catch(Throwable $tellmebyeError){
+            $tellmebye['enabled']=true;
+            $tellmebye['error']=$tellmebyeError->getMessage();
+            error_log('Reenvio Capillas TellMeBye item '.$itemId.': '.$tellmebyeError->getMessage());
+        }
+
+        pd_json(200,[
+            'ok'=>true,
+            'area'=>$area,
+            'itemId'=>$itemId,
+            'email'=>$email,
+            'plateEmails'=>$plateEmails,
+            'tellmebye'=>$tellmebye,
+        ]);
     }
 
     pd_json(200,['ok'=>true,'area'=>$area,'itemId'=>$itemId,'payload'=>$payload]);
