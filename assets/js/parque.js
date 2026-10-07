@@ -493,7 +493,7 @@ async function loadParquePublishedEdit(){
   const status=document.getElementById("status");
   try{
     if(status)status.textContent="Cargando servicio publicado...";
-    const response=await fetch("api/publicado-api.php?area=parque&id="+encodeURIComponent(id),{
+    const response=await fetch("api/publicado-detalle.php?area=parque&id="+encodeURIComponent(id),{
       cache:"no-store",
       credentials:"same-origin",
       headers:{"Accept":"application/json"}
