@@ -206,6 +206,92 @@ function rs_sharepoint_token(array $config, string $host): string
  *   de Venta. La app debe estar configurada con registro_servicios_client_id.
  * - La app dedicada debe tener Calendars.ReadWrite (Application) con admin consent.
  */
+
+/**
+ * Transporte de respaldo para correo cuando Microsoft Graph no esta disponible.
+ * Usa el MTA local del hosting (PHP mail) y no modifica configuracion externa.
+ *
+ * @param string[] $recipients
+ * @param array<int,array{name:string,contentType:string,bytes:string}> $attachments
+ */
+function rs_send_mail_fallback(
+    string $sender,
+    array $recipients,
+    string $subject,
+    string $html,
+    array $attachments = []
+): array {
+    $recipients=array_values(array_unique(array_filter(array_map(
+        static fn($v): string => trim((string)$v),
+        $recipients
+    ),static fn(string $v): bool => $v!=='' && filter_var($v,FILTER_VALIDATE_EMAIL)!==false)));
+
+    if($recipients===[]){
+        throw new RuntimeException('No hay destinatarios validos para el correo de respaldo.');
+    }
+
+    $boundary='=_JDJP_'.bin2hex(random_bytes(12));
+    $headers=[
+        'MIME-Version: 1.0',
+        'From: Jardines de Juan Pablo <'.$sender.'>',
+        'Reply-To: '.$sender,
+        'Content-Type: multipart/mixed; boundary="'.$boundary.'"',
+    ];
+
+    $body='--'.$boundary."\r\n";
+    $body.="Content-Type: text/html; charset=UTF-8\r\n";
+    $body.="Content-Transfer-Encoding: 8bit\r\n\r\n";
+    $body.=$html."\r\n";
+
+    $attachmentNames=[];
+    foreach($attachments as $attachment){
+        if(!is_array($attachment))continue;
+        $name=trim((string)($attachment['name']??''));
+        $bytes=(string)($attachment['bytes']??'');
+        if($name==='' || $bytes==='')continue;
+
+        $contentType=trim((string)($attachment['contentType']??'application/octet-stream'));
+        if($contentType==='')$contentType='application/octet-stream';
+
+        $safeName=preg_replace('/[^A-Za-z0-9._-]+/','_',iconv('UTF-8','ASCII//TRANSLIT//IGNORE',$name)?:$name)?:'adjunto.bin';
+
+        $body.='--'.$boundary."\r\n";
+        $body.='Content-Type: '.$contentType.'; name="'.$safeName.""\r\n";
+        $body.="Content-Transfer-Encoding: base64\r\n";
+        $body.='Content-Disposition: attachment; filename="'.$safeName.""\r\n\r\n";
+        $body.=chunk_split(base64_encode($bytes))."\r\n";
+        $attachmentNames[]=$name;
+    }
+
+    $body.='--'.$boundary."--\r\n";
+
+    $encodedSubject=function_exists('mb_encode_mimeheader')
+        ? mb_encode_mimeheader($subject,'UTF-8','B',"\r\n")
+        : $subject;
+
+    $ok=@mail(
+        implode(', ',$recipients),
+        $encodedSubject,
+        $body,
+        implode("\r\n",$headers),
+        '-f'.$sender
+    );
+
+    if(!$ok){
+        throw new RuntimeException('Microsoft Graph fallo y el transporte local PHP mail tampoco pudo aceptar el correo.');
+    }
+
+    return [
+        'enabled'=>true,
+        'sent'=>true,
+        'sender'=>$sender,
+        'recipients'=>$recipients,
+        'attachmentNames'=>$attachmentNames,
+        'transport'=>'php_mail_fallback',
+        'error'=>null,
+    ];
+}
+
 function rs_graph_token(array $config = []): string
 {
     // Graph usa exclusivamente la app dedicada "Registro Servicios JJP"
