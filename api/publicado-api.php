@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+// Mantener la respuesta AJAX estrictamente en JSON. Cualquier warning/notice
+// emitido por un include rompería response.json() aunque HTTP fuera 200.
+ob_start();
+ini_set('display_errors','0');
+
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
@@ -9,8 +14,29 @@ require_once dirname(__DIR__).'/includes/registro-storage.php';
 require_once dirname(__DIR__).'/includes/registro-sharepoint.php';
 
 function pe_json(int $status,array $payload): never {
+    // Descartar cualquier salida accidental previa (warnings, notices, BOM, etc.)
+    // para que el navegador reciba exclusivamente JSON válido.
+    while(ob_get_level()>0){
+        ob_end_clean();
+    }
+
     http_response_code($status);
-    echo json_encode($payload,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+    header('Content-Type: application/json; charset=utf-8');
+
+    $json=json_encode(
+        $payload,
+        JSON_UNESCAPED_UNICODE
+        | JSON_UNESCAPED_SLASHES
+        | JSON_INVALID_UTF8_SUBSTITUTE
+        | JSON_PARTIAL_OUTPUT_ON_ERROR
+    );
+
+    if(!is_string($json)){
+        http_response_code(500);
+        $json='{"ok":false,"message":"No fue posible codificar la respuesta JSON."}';
+    }
+
+    echo $json;
     exit;
 }
 
