@@ -16,8 +16,8 @@ require_once dirname(__DIR__).'/includes/registro-sharepoint.php';
 function pe_json(int $status,array $payload): never {
     // Descartar cualquier salida accidental previa (warnings, notices, BOM, etc.)
     // para que el navegador reciba exclusivamente JSON válido.
-    while(ob_get_level()>0){
-        ob_end_clean();
+    if(ob_get_level()>0){
+        @ob_end_clean();
     }
 
     http_response_code($status);
