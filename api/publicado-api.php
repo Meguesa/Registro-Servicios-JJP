@@ -7,6 +7,9 @@ header('X-Content-Type-Options: nosniff');
 
 require_once dirname(__DIR__).'/includes/registro-storage.php';
 require_once dirname(__DIR__).'/includes/registro-sharepoint.php';
+require_once dirname(__DIR__).'/includes/registro-parque-imagenes.php';
+require_once dirname(__DIR__).'/includes/registro-parque-correo.php';
+require_once dirname(__DIR__).'/includes/registro-parque-documentos.php';
 
 function pe_json(int $status,array $payload): never {
     http_response_code($status);
