@@ -254,12 +254,37 @@ try{
             require_once dirname(__DIR__).'/includes/registro-parque-documentos.php';
 
             $info=rp_generate_information_images($payload);
-            $operational=rp_generate_operational_tables($payload);
-            $letters=rp_generate_letter_attachments($payload);
+
+            // El reenvio no debe fallar completo si una placa histórica no puede
+            // regenerarse. Se envia el correo principal con el resto de adjuntos
+            // y se reporta la placa como aviso independiente.
+            $operational=[];
+            $operationalError=null;
+            try{
+                $operational=rp_generate_operational_tables($payload);
+            }catch(Throwable $operationalException){
+                $operationalError=$operationalException->getMessage();
+                error_log('Reenvio Parque adjuntos operativos item '.$itemId.': '.$operationalError);
+            }
+
+            $letters=[];
+            try{
+                $letters=rp_generate_letter_attachments($payload);
+            }catch(Throwable $letterException){
+                error_log('Reenvio Parque cartas item '.$itemId.': '.$letterException->getMessage());
+            }
+
             $attachments=array_merge($info,$operational,$letters);
             $email=rp_send_service_email($payload,$attachments,false);
 
             $plateEmails=[];
+            if($operationalError!==null){
+                $plateEmails[]=[
+                    'sent'=>false,
+                    'kind'=>'nicho',
+                    'error'=>$operationalError,
+                ];
+            }
             foreach($operational as $attachment){
                 if(!is_array($attachment))continue;
                 $name=mb_strtolower(trim((string)($attachment['name']??'')),'UTF-8');
