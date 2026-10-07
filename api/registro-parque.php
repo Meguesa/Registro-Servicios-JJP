@@ -400,7 +400,10 @@ try{
     }
 
     $backgroundResponseSent=false;
-    if(function_exists('fastcgi_finish_request')){
+    // No cerrar la peticion antes de enviar correos. En este hosting, el trabajo
+    // posterior a fastcgi_finish_request() puede detenerse y dejar el item creado
+    // en SharePoint sin correo operativo ni correo de placa.
+    if(false && function_exists('fastcgi_finish_request')){
         $earlyResponse=[
             'ok'=>true,
             'itemId'=>$itemId,
