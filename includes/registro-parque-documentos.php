@@ -91,6 +91,32 @@ function rp_nicho_template_image(): GdImage
     }
     $white=imagecolorallocate($image,255,255,255);
     imagefilledrectangle($image,0,0,2048,1024,$white);
+
+    // Recuperar el emblema institucional desde un asset local compatible con GD.
+    $logoPath=dirname(__DIR__).'/assets/esquelas/logo_jjp.b64';
+    if(is_file($logoPath) && is_readable($logoPath)){
+        $encoded=preg_replace('/\\s+/','',(string)@file_get_contents($logoPath))??'';
+        $logoBytes=$encoded!==''?base64_decode($encoded,true):false;
+        if(is_string($logoBytes) && $logoBytes!==''){
+            $logo=@imagecreatefromstring($logoBytes);
+            if($logo instanceof GdImage){
+                $srcW=imagesx($logo);
+                $srcH=imagesy($logo);
+                if($srcW>0 && $srcH>0){
+                    $maxW=430;
+                    $maxH=330;
+                    $scale=min($maxW/$srcW,$maxH/$srcH,1.0);
+                    $dstW=max(1,(int)round($srcW*$scale));
+                    $dstH=max(1,(int)round($srcH*$scale));
+                    $dstX=(int)round((2048-$dstW)/2);
+                    $dstY=655+(int)round(($maxH-$dstH)/2);
+                    imagecopyresampled($image,$logo,$dstX,$dstY,0,0,$dstW,$dstH,$srcW,$srcH);
+                }
+                imagedestroy($logo);
+            }
+        }
+    }
+
     error_log('Registro Servicios Parque: plantilla PNG incompatible; se uso base generada.');
     return $image;
 }
