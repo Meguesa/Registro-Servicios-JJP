@@ -81,10 +81,17 @@ function rp_nicho_template_image(): GdImage
     }
 
     $image=@imagecreatefromstring($bytes);
-    if(!$image instanceof GdImage){
-        throw new RuntimeException('La plantilla correcta de placa de nicho no es una imagen valida.');
+    if($image instanceof GdImage){
+        return $image;
     }
 
+    $image=imagecreatetruecolor(2048,1024);
+    if(!$image instanceof GdImage){
+        throw new RuntimeException('No fue posible crear la base de placa de nicho.');
+    }
+    $white=imagecolorallocate($image,255,255,255);
+    imagefilledrectangle($image,0,0,2048,1024,$white);
+    error_log('Registro Servicios Parque: plantilla PNG incompatible; se uso base generada.');
     return $image;
 }
 
