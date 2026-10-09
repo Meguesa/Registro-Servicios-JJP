@@ -306,23 +306,36 @@ function rp_service_letter_package_key(array $payload): string
         return 'COFFEE_BREAK';
     }
 
-    if(in_array($service,['totalservice','totalservicecomplemento'],true)){
+    if($service==='totalservice'){
         if($isNiche){
             return 'NICHO_TOTAL_SERVICE';
         }
-        if(str_starts_with($section,'ORO')){
+
+        // Solo se asignan paquetes cuando existe una constancia fuente que
+        // respalde la combinacion. El documento ORO suministrado usa un plan
+        // SAB; por eso SAB se considera dentro de esa misma matriz.
+        if(in_array($section,['ORO','ORO - RBR','SAB'],true)){
             return 'TOTAL_SERVICE_ORO';
         }
-        return 'TOTAL_SERVICE_PLATINO';
+        if($section==='PLATINO'){
+            return 'TOTAL_SERVICE_PLATINO';
+        }
+
+        return 'SERVICIO_PARQUE';
     }
 
     if($service==='basico'){
         if($isNiche){
             return 'NICHO_RESGUARDO';
         }
-        return 'SOLO_INHUMACION';
+        if($type==='inhumacion'){
+            return 'SOLO_INHUMACION';
+        }
+        return 'SERVICIO_PARQUE';
     }
 
+    // No se recibio una constancia especifica para Total Service Complemento
+    // ni para otras combinaciones; no se infieren beneficios comerciales.
     return 'SERVICIO_PARQUE';
 }
 
@@ -404,18 +417,11 @@ function rp_service_letter_benefits(array $payload): array
         return $definitions[$package];
     }
 
-    // El documento de "Solo Inhumacion" suministrado contiene un servicio
-    // basico y el impuesto municipal. Para que la carta refleje el registro
-    // real, el nombre del servicio y el numero de destape se toman del formulario.
     if($package==='SOLO_INHUMACION'){
-        $type=mb_strtoupper(trim((string)($payload['tipoServicio']??'SERVICIO')),'UTF-8');
-        $destape=mb_strtoupper(trim((string)($payload['destape']??'')),'UTF-8');
-        $serviceLine='1 SERVICIO DE '.$type;
-        if($destape!=='' && rp_doc_norm($destape)!=='noaplica'){
-            $serviceLine.=' ('.$destape.' DESTAPE)';
-        }
+        // Se conserva literalmente el contenido de beneficios del archivo
+        // suministrado para este paquete, aunque su texto menciona resguardo.
         return [
-            $serviceLine,
+            '1 SERVICIO DE RESGUARDO (SEGUNDO DESTAPE)',
             '1 IMPUESTO MUNICIPAL',
         ];
     }
