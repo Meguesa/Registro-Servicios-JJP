@@ -32,7 +32,7 @@ function rp_doc_flower_arrangement(array $payload): string
 
 function rp_nicho_template_image(): GdImage
 {
-    $filename='plantilla_placa_nicho_correcta.png';
+    $filename='plantilla_nicho.png';
     $path=dirname(__DIR__).'/assets/templates/parque/'.$filename;
 
     // Primero intentar la copia desplegada en cPanel. Algunos despliegues
@@ -284,6 +284,195 @@ function rp_generate_operational_tables(array $payload): array
     }
 
     return $attachments;
+}
+
+/**
+ * Determina el paquete comercial para la Carta de Servicio Otorgado de Parque.
+ * Las combinaciones se resuelven con los campos que ya captura el formulario:
+ * Servicio, Tipo de Servicio, Seccion y Tipo de Placa.
+ */
+function rp_service_letter_package_key(array $payload): string
+{
+    $service=rp_doc_norm((string)($payload['servicio']??''));
+    $type=rp_doc_norm((string)($payload['tipoServicio']??''));
+    $plate=rp_doc_norm((string)($payload['tipoPlaca']??''));
+    $section=mb_strtoupper(trim((string)($payload['seccion']??'')),'UTF-8');
+
+    $isNiche=in_array($type,['depositodecenizas','resguardodecenizas'],true)
+        || $plate==='nicho'
+        || $section==='PLN';
+
+    if($service==='coffeebreak'){
+        return 'COFFEE_BREAK';
+    }
+
+    if($service==='totalservice'){
+        if($isNiche){
+            return 'NICHO_TOTAL_SERVICE';
+        }
+
+        // Solo se asignan paquetes cuando existe una constancia fuente que
+        // respalde la combinacion. El documento ORO suministrado usa un plan
+        // SAB; por eso SAB se considera dentro de esa misma matriz.
+        if(in_array($section,['ORO','ORO - RBR','SAB'],true)){
+            return 'TOTAL_SERVICE_ORO';
+        }
+        if($section==='PLATINO'){
+            return 'TOTAL_SERVICE_PLATINO';
+        }
+
+        return 'SERVICIO_PARQUE';
+    }
+
+    if($service==='basico'){
+        if($isNiche){
+            return 'NICHO_RESGUARDO';
+        }
+        if($type==='inhumacion'){
+            return 'SOLO_INHUMACION';
+        }
+        return 'SERVICIO_PARQUE';
+    }
+
+    // No se recibio una constancia especifica para Total Service Complemento
+    // ni para otras combinaciones; no se infieren beneficios comerciales.
+    return 'SERVICIO_PARQUE';
+}
+
+/**
+ * Beneficios de Parque tomados de las constancias operativas proporcionadas
+ * para Total Service Platino, Total Service Oro, Nicho Total Service,
+ * Nicho Resguardo, Coffee Break y servicio basico/solo inhumacion.
+ *
+ * @return string[]
+ */
+function rp_service_letter_benefits(array $payload): array
+{
+    $package=rp_service_letter_package_key($payload);
+
+    $definitions=[
+        'TOTAL_SERVICE_PLATINO'=>[
+            'SERVICIO DE CONCIERGE',
+            'ASISTENTE FAMILIAR',
+            'DIRECTOR FUNERARIO',
+            'CEREMONIA RELIGIOSA',
+            '30 ROSAS DE MEMORIA',
+            'MUSICA EN VIVO (3 MUSICOS)',
+            'CAMINO DE FLORES',
+            'CATERING ESPECIAL PARA 50 PERSONAS',
+            'SERVICIO DE COFFE BREAK PARA 50 PERSONAS',
+            'TARJETAS DE CONDOLENCIAS',
+            'CEREMONIA DEL ULTIMO ADIOS',
+            '2 TOLDOS Y 50 SILLAS',
+            '1 DESTAPE',
+            '1 IMPUESTO MUNICIPAL',
+            '1 GRABADO DE PLACA',
+        ],
+        'TOTAL_SERVICE_ORO'=>[
+            'SERVICIO DE CONCIERGE',
+            'ASISTENTE FAMILIAR',
+            'DIRECTOR FUNERARIO',
+            'CEREMONIA RELIGIOSA',
+            '24 ROSAS DE MEMORIA',
+            'MUSICA EN VIVO (1 INSTRUMENTO) UNA HORA',
+            'CAMINO DE FLORES',
+            'CATERING ESPECIAL PARA 40 PERSONAS',
+            'SERVICIO DE CAFE PARA 40 PERSONAS',
+            '40 TARJETAS DE CONDOLENCIAS',
+            'CEREMONIA DEL ULTIMO ADIOS',
+            '2 TOLDOS Y 40 SILLAS',
+            '1 DESTAPE',
+            '1 IMPUESTO MUNICIPAL',
+            '1 GRABADO DE PLACA',
+        ],
+        'NICHO_TOTAL_SERVICE'=>[
+            'SERVICIO DE CONCIERGE',
+            'ASISTENTE FAMILIAR',
+            'DIRECTOR FUNERARIO',
+            'CEREMONIA RELIGIOSA',
+            '40 ROSAS DE LA MEMORIA',
+            'MUSICA EN VIVO (1 VIOLINISTA)',
+            'CAMINO DE FLORES',
+            'CATERING ESPECIAL PARA 40 PERSONAS',
+            'SERVICIO DE CAFE PARA 40 PERSONAS',
+            'TARJETAS DE CONDOLENCIAS',
+            '2 TOLDOS',
+            '40 SILLAS',
+            'ESQUELA DIGITAL',
+            'VIDEO HOMENAJE',
+        ],
+        'NICHO_RESGUARDO'=>[
+            '1 SERVICIO DE RESGUARDO (DESTAPE)',
+            '1 IMPUESTO MUNICIPAL',
+            '1 GRABADO DE PLACA DE NICHO',
+        ],
+        'COFFEE_BREAK'=>[
+            'ASISTENTE FUNERARIO',
+            'CEREMONIA RELIGIOSA',
+            'COFFE BREAK (CAFE, 12 AGUAS, 2 BOLSAS DE GALLETAS)',
+        ],
+    ];
+
+    if(isset($definitions[$package])){
+        return $definitions[$package];
+    }
+
+    if($package==='SOLO_INHUMACION'){
+        // Se conserva literalmente el contenido de beneficios del archivo
+        // suministrado para este paquete, aunque su texto menciona resguardo.
+        return [
+            '1 SERVICIO DE RESGUARDO (SEGUNDO DESTAPE)',
+            '1 IMPUESTO MUNICIPAL',
+        ];
+    }
+
+    // Para tipos no documentados no se inventan prestaciones comerciales.
+    // Se muestran unicamente los datos capturados del servicio.
+    return array_values(array_filter([
+        'TIPO DE SERVICIO: '.mb_strtoupper(trim((string)($payload['tipoServicio']??'')),'UTF-8'),
+        'SERVICIO: '.mb_strtoupper(trim((string)($payload['servicio']??'')),'UTF-8'),
+    ],static fn(string $value):bool=>!str_ends_with($value,': ')));
+}
+
+/**
+ * Genera la Carta de Servicio Otorgado de Parque con exactamente el mismo
+ * formato visual/PDF que Capillas.
+ *
+ * @return array{name:string,contentType:string,bytes:string,package:string,benefits:array<int,string>}
+ */
+function rp_generate_service_letter(array $payload): array
+{
+    $letterPayload=$payload;
+    $letterPayload['inicio']=trim((string)($payload['fechaHoraInicio']??$payload['inicio']??''));
+
+    $reference=rp_doc_compact_location($payload,true);
+    if($reference===''){
+        $reference=trim((string)($payload['numeroContrato']??''));
+    }
+
+    $package=rp_service_letter_package_key($payload);
+    $benefits=rp_service_letter_benefits($payload);
+
+    $letterPayload['_cartaReferencia']=$reference;
+    $letterPayload['_cartaDestino']='PARQUE DE DESCANSO JARDINES DE JUAN PABLO';
+    $letterPayload['_cartaPaquete']=$package;
+    $letterPayload['_cartaBeneficios']=$benefits;
+
+    $letter=rs_generate_service_letter($letterPayload);
+    $name=trim((string)($letter['pdfName']??''));
+    $bytes=(string)($letter['pdf']??'');
+
+    if($name==='' || $bytes===''){
+        throw new RuntimeException('La Carta de Servicio Otorgado de Parque no devolvio un PDF utilizable.');
+    }
+
+    return [
+        'name'=>$name,
+        'contentType'=>'application/pdf',
+        'bytes'=>$bytes,
+        'package'=>$package,
+        'benefits'=>$benefits,
+    ];
 }
 
 function rp_doc_template_pdf(string $filename): string

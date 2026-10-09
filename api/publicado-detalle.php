@@ -274,7 +274,22 @@ try{
                 error_log('Reenvio Parque cartas item '.$itemId.': '.$letterException->getMessage());
             }
 
-            $attachments=array_merge($info,$operational,$letters);
+            $serviceLetter=[];
+            try{
+                $letterPayload=$payload;
+                $letterPayload['itemId']=(string)$itemId;
+                $generatedLetter=rp_generate_service_letter($letterPayload);
+                if(is_array($generatedLetter)){
+                    $serviceLetter[]=$generatedLetter;
+                }
+            }catch(Throwable $serviceLetterException){
+                error_log(
+                    'Reenvio Parque Carta Servicio Otorgado item '.$itemId
+                    .': '.$serviceLetterException->getMessage()
+                );
+            }
+
+            $attachments=array_merge($info,$operational,$letters,$serviceLetter);
             $email=rp_send_service_email($payload,$attachments,false);
 
             $plateEmails=[];

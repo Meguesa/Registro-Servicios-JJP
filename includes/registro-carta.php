@@ -354,10 +354,39 @@ function rs_generate_service_letter(array $payload): array
     $centerX = (int)round($width / 2);
     $fallecido = mb_strtoupper(trim((string)($payload['fallecido'] ?? '')), 'UTF-8');
     $titular = mb_strtoupper(trim((string)($payload['titular'] ?? '')), 'UTF-8');
-    $reference = mb_strtoupper(rs_carta_reference($payload), 'UTF-8');
-    $destination = rs_carta_destination($payload);
-    $benefits = rs_carta_benefits($payload);
-    $package = rs_carta_package_key($payload);
+
+    // Parque reutiliza exactamente el mismo renderer visual de Capillas, pero
+    // puede entregar referencia, destino, paquete y beneficios ya resueltos.
+    // Si no existen estos overrides, el comportamiento de Capillas permanece
+    // sin cambios.
+    $referenceOverride = trim((string)($payload['_cartaReferencia'] ?? ''));
+    $reference = mb_strtoupper(
+        $referenceOverride !== '' ? $referenceOverride : rs_carta_reference($payload),
+        'UTF-8'
+    );
+
+    $destinationOverride = trim((string)($payload['_cartaDestino'] ?? ''));
+    $destination = $destinationOverride !== ''
+        ? $destinationOverride
+        : rs_carta_destination($payload);
+
+    $benefitsOverride = $payload['_cartaBeneficios'] ?? null;
+    if (is_array($benefitsOverride)) {
+        $benefits = array_values(array_filter(
+            array_map(
+                static fn(mixed $item): string => trim((string)$item),
+                $benefitsOverride
+            ),
+            static fn(string $item): bool => $item !== ''
+        ));
+    } else {
+        $benefits = rs_carta_benefits($payload);
+    }
+
+    $packageOverride = trim((string)($payload['_cartaPaquete'] ?? ''));
+    $package = $packageOverride !== ''
+        ? $packageOverride
+        : rs_carta_package_key($payload);
 
     if ($fallecido === '') $fallecido = 'NOMBRE DEL FALLECIDO';
     if ($titular === '') $titular = 'TITULAR / RESPONSABLE';

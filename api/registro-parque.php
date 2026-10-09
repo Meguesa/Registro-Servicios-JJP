@@ -459,6 +459,56 @@ try{
     }
 
 
+    // Carta de Servicio Otorgado de Parque. Usa el mismo formato visual que
+    // Capillas, con beneficios resueltos segun el paquete de Parque.
+    $serviceLetterResult=[
+        'required'=>true,
+        'created'=>false,
+        'attachedToItem'=>false,
+        'fileName'=>null,
+        'package'=>null,
+        'error'=>null,
+    ];
+    $serviceLetterAttachment=null;
+    try{
+        $letterPayload=$payload;
+        $letterPayload['itemId']=(string)$itemId;
+        $serviceLetterAttachment=rp_generate_service_letter($letterPayload);
+
+        $letterName=trim((string)($serviceLetterAttachment['name']??''));
+        $letterBytes=(string)($serviceLetterAttachment['bytes']??'');
+        if($letterName==='' || $letterBytes===''){
+            throw new RuntimeException('La Carta de Servicio Otorgado de Parque no devolvio un PDF utilizable.');
+        }
+
+        $serviceLetterResult['created']=true;
+        $serviceLetterResult['fileName']=$letterName;
+        $serviceLetterResult['package']=(string)($serviceLetterAttachment['package']??'');
+
+        // Igual que Capillas: en un alta nueva guardar tambien el PDF como
+        // adjunto del elemento en SharePoint. En una modificacion no se crea
+        // un adjunto duplicado.
+        if(!$isEdit){
+            $safeLetterName=preg_replace('/[^A-Za-z0-9._() -]+/u','_',$letterName)
+                ?: ('Carta_Servicio_Otorgado_'.$itemId.'.pdf');
+            $safeLetterName=str_replace("'","''",$safeLetterName);
+
+            $letterAttachmentUrl=$siteUrl
+                ."/_api/web/lists/getbytitle('".$listEsc."')/items(".$itemId.")"
+                ."/AttachmentFiles/add(FileName='".rawurlencode($safeLetterName)."')";
+
+            rp_request('POST',$letterAttachmentUrl,$token,$letterBytes,[
+                'Content-Type: application/pdf',
+                'X-RequestDigest: '.$digest,
+            ]);
+            $serviceLetterResult['attachedToItem']=true;
+        }
+    }catch(Throwable $letterError){
+        $serviceLetterAttachment=null;
+        $serviceLetterResult['error']=$letterError->getMessage();
+        error_log('Registro Servicios Parque Carta Servicio Otorgado item '.$itemId.': '.$letterError->getMessage());
+    }
+
     // Generar las tablas informativas y enviar el correo directamente desde
     // Registro de Servicios, igual que en Capillas.
     $emailResult=[
@@ -473,11 +523,16 @@ try{
         $infoAttachments=rp_generate_information_images($payload);
         $operationalAttachments=rp_generate_operational_tables($payload);
         $letterAttachments=rp_generate_letter_attachments($payload);
+
         $allAttachments=array_merge(
             $infoAttachments,
             $operationalAttachments,
             $letterAttachments
         );
+        if(is_array($serviceLetterAttachment)){
+            $allAttachments[]=$serviceLetterAttachment;
+        }
+
         $emailResult=array_merge(
             $emailResult,
             rp_send_service_email($payload,$allAttachments,$isEdit)
@@ -541,6 +596,7 @@ try{
         'message'=>$isEdit?'Servicio Parque modificado correctamente en SharePoint.':'Servicio Parque registrado correctamente en SharePoint.',
         'modified'=>$isEdit,
         'calendar'=>$calendarResult,
+        'letter'=>$serviceLetterResult,
         'email'=>$emailResult,
         'plateEmails'=>$plateEmails,
         'automationSource'=>'RegistroServicios',
