@@ -976,6 +976,7 @@ try {
         'Titular',
         'Responsable'
     ], trim((string) ($payload['titular'] ?? '')));
+    rs_add_value($sp, $fieldIndex, ['Prefijo', 'Trato', 'Tratamiento'], trim((string) ($payload['prefijo'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['field_2', 'Nombre de Fallecido (a)', 'Nombre Fallecido', 'Nombre de Fallecido(a)'], trim((string) ($payload['fallecido'] ?? '')));
     rs_add_value($sp, $fieldIndex, ['field_4', 'Fecha Nacimiento Fallecido (a)', 'Fecha Nacimiento', 'Fecha de Nacimiento'], rs_date_only((string) ($payload['fechaNacimiento'] ?? '')));
     rs_add_value($sp, $fieldIndex, [
@@ -1497,7 +1498,12 @@ try {
 
             $tellmebyeResult = array_merge(
                 $tellmebyeResult,
-                rs_trigger_tellmebye($itemId, $isTestMode, $tellmebyeImageName)
+                rs_trigger_tellmebye(
+                    $itemId,
+                    $isTestMode,
+                    $tellmebyeImageName,
+                    trim((string)($payload['prefijo'] ?? ''))
+                )
             );
 
             if ($tellmebyeImageName !== '') {
