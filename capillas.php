@@ -121,8 +121,18 @@ $capillasJsVersion = is_file(__DIR__ . '/assets/js/capillas.js') ? (string)filem
 
     <section class="form-section wizard-panel" data-step="1">
       <div class="section-title"><span>2</span><div><h2>Fallecido y responsable</h2><p>Datos personales, destino final y personal que participa en el servicio.</p></div></div>
-      <div class="form-grid grid-2">
+      <div class="form-grid grid-3">
         <label>Titular Responsable<input name="titular" placeholder="Ej. Juan Pérez González" required></label>
+        <label>Prefijo
+          <select name="prefijo" id="prefijo">
+            <option value="">Automático</option>
+            <option value="Sr.">Sr.</option>
+            <option value="Sra.">Sra.</option>
+            <option value="Srta.">Srta.</option>
+            <option value="Joven">Joven</option>
+            <option value="--">Sin prefijo</option>
+          </select>
+        </label>
         <label>Nombre de Fallecido(a)<input name="fallecido" placeholder="Ej. María López García" required></label>
       </div>
       <div class="form-grid grid-3">
