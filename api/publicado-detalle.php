@@ -153,6 +153,7 @@ function pd_capillas(array $item): array {
         'referencia'=>pd_text(pd_pick($item,$m,['Referencia'])),
         'requierePlaca'=>pd_bool(pd_pick($item,$m,['RequierePlacadeUrna_x003f_'],false)),
         'titular'=>pd_text(pd_pick($item,$m,['field_7'])),
+        'prefijo'=>pd_text(pd_pick($item,$m,['Prefijo','Trato','Tratamiento'])),
         'fallecido'=>pd_text(pd_pick($item,$m,['field_2'])),
         'fechaNacimiento'=>pd_dt(pd_pick($item,$m,['field_4']),true),
         'fechaDefuncion'=>pd_dt(pd_pick($item,$m,['FechaDefuncion'])),
@@ -397,7 +398,12 @@ try{
         try{
             $tellmebye=array_merge(
                 $tellmebye,
-                rs_trigger_tellmebye($itemId,false,'')
+                rs_trigger_tellmebye(
+                    $itemId,
+                    false,
+                    '',
+                    trim((string)($payload['prefijo'] ?? ''))
+                )
             );
         }catch(Throwable $tellmebyeError){
             $tellmebye['enabled']=true;
