@@ -688,6 +688,7 @@ function rsPayload(){
     referencia:String(document.getElementById("referenciaPreview")?.textContent||"").replace("—","").trim(),
     requierePlaca:servicioCremacion || document.getElementById("requierePlaca")?.checked===true,
     titular:String(data.get("titular")||"").trim(),
+    prefijo:String(data.get("prefijo")||"").trim(),
     fallecido:String(data.get("fallecido")||"").trim(),
     fechaNacimiento:String(document.getElementById("fechaNacimiento")?.value||""),
     fechaDefuncion:String(document.getElementById("fechaDefuncion")?.value||""),
@@ -1055,7 +1056,7 @@ function rsSetDateTime(id,value){
 
 function rsApplyDraftPayload(p){
   if(!p||typeof p!=="object")return;
-  const simple=["numeroReferencia","servicio","ubicacion","sala","tiempoCapillas","prevision","tipoAtaud","numeroServicio","titular","fallecido","sexo","destinoFinal","embalsamador","rescate1","rescate2","ubicacionRescate","motivo","referenciaCrematorio","personalCrematorio","personalVenta","precioVenta"];
+  const simple=["numeroReferencia","servicio","ubicacion","sala","tiempoCapillas","prevision","tipoAtaud","numeroServicio","titular","prefijo","fallecido","sexo","destinoFinal","embalsamador","rescate1","rescate2","ubicacionRescate","motivo","referenciaCrematorio","personalCrematorio","personalVenta","precioVenta"];
   simple.forEach(k=>rsSetNamed(k,p[k]??""));
   document.getElementById("llevaExequia").checked=!!p.llevaExequia;
   document.getElementById("requierePlaca").checked=!!p.requierePlaca;
