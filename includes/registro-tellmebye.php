@@ -143,7 +143,7 @@ function rs_tellmebye_upload_temp_image(
     );
 }
 
-function rs_trigger_tellmebye(int $itemId, bool $isPreview, string $esquelaFileName = ''): array
+function rs_trigger_tellmebye(int $itemId, bool $isPreview, string $esquelaFileName = '', string $prefijo = ''): array
 {
     if ($itemId <= 0) {
         throw new RuntimeException('TellMeBye requiere un itemId valido.');
@@ -188,6 +188,7 @@ function rs_trigger_tellmebye(int $itemId, bool $isPreview, string $esquelaFileN
             // Registro de Servicios coloca la fotografia fuente en la
             // biblioteca temporal de Esquelas y envia su nombre al bot.
             'esquelaFileName' => trim($esquelaFileName),
+            'prefijo' => trim($prefijo),
         ],
     ];
 
