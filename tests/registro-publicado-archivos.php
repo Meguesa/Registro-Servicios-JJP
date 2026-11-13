@@ -25,4 +25,12 @@ assertSameValue(pd_files_photo_name([
     ['name'=>'Placa-716.png'],
     ['name'=>'Carta.pdf'],
 ]), null, 'sin foto fuente no reconstruir');
+// El visor debe priorizar la esquela JJP y no mostrar la cartulina del bot.
+$viewer = file_get_contents(dirname(__DIR__) . '/api/publicado-detalle.php');
+if (!is_string($viewer)
+    || !str_contains($viewer, 'Esquela JJP generada con datos de SharePoint')
+    || !str_contains($viewer, "if(\$area==='capillas')")
+    || str_contains($viewer, "\$entries[]=['tipo'=>'tellmebye'")) {
+    throw new RuntimeException('El visor no prioriza la esquela JJP.');
+}
 echo "OK: rutas, tipos y fotografia fuente validados\n";
