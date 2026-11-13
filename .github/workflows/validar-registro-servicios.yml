@@ -1,0 +1,35 @@
+name: Validar Registro de Servicios sin desplegar
+on:
+  pull_request:
+    paths:
+      - 'api/publicado-detalle.php'
+      - 'assets/js/mis-servicios.js'
+      - 'includes/registro-storage.php'
+      - '.github/workflows/validar-registro-servicios.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: json, openssl, curl, mbstring, fileinfo, gd
+          coverage: none
+      - name: Revisar sintaxis PHP
+        run: |
+          php -l api/publicado-detalle.php
+          php -l includes/registro-storage.php
+      - name: Revisar sintaxis JavaScript
+        run: node --check assets/js/mis-servicios.js
+      - name: Verificar separacion de reenvio y tablas
+        run: |
+          grep -q "isset(\$_GET\['tablas'\])" api/publicado-detalle.php
+          grep -q "rp_generate_information_images" api/publicado-detalle.php
+          grep -q "rs_generate_service_information_images" api/publicado-detalle.php
+          grep -q "Ver tablas" assets/js/mis-servicios.js
