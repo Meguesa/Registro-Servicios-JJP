@@ -385,31 +385,14 @@ try{
             }
         }
 
-        // Reenviar correos tambien vuelve a disparar TellMeBye.
-        // El propio bot evita duplicar un obituario ya publicado: si el registro
-        // ya tiene TellmebyeId/Estatus Publicado, termina sin crear otro.
-        // Si nunca se publico o fallo antes, intentara publicarlo ahora.
+        // Reenvio de correo exclusivamente: no activar TellMeBye ni alterar su estado.
+        // La publicacion de obituarios tiene su propia operacion independiente.
         $tellmebye=[
             'enabled'=>false,
             'triggered'=>false,
-            'mode'=>null,
-            'error'=>null,
+            'skipped'=>true,
+            'reason'=>'Reenvio de correo: TellMeBye no se ejecuta.',
         ];
-        try{
-            $tellmebye=array_merge(
-                $tellmebye,
-                rs_trigger_tellmebye(
-                    $itemId,
-                    false,
-                    '',
-                    trim((string)($payload['prefijo'] ?? ''))
-                )
-            );
-        }catch(Throwable $tellmebyeError){
-            $tellmebye['enabled']=true;
-            $tellmebye['error']=$tellmebyeError->getMessage();
-            error_log('Reenvio Capillas TellMeBye item '.$itemId.': '.$tellmebyeError->getMessage());
-        }
 
         pd_json(200,[
             'ok'=>true,
