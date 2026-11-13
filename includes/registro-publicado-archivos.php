@@ -160,10 +160,12 @@ function pd_files_local_esquela(
     array $payload, array $files, string $siteUrl, string $listEsc, int $itemId, string $token
 ): array {
     $photoName = pd_files_photo_name($files);
-    if ($photoName === null) {
-        throw new RuntimeException('El registro no tiene una fotografia de esquela recuperable.');
-    }
-    $photoBytes = pd_files_attachment_bytes($siteUrl, $listEsc, $itemId, $photoName, $token);
+    // El generador original de la esquela JJP permite una fotografia de respaldo.
+    // No ocultar las esquelas de registros antiguos sin retrato guardado.
+    // Si existe una fotografia fuente, usar exactamente el adjunto de SharePoint.
+    $photoBytes = $photoName !== null
+        ? pd_files_attachment_bytes($siteUrl, $listEsc, $itemId, $photoName, $token)
+        : null;
     require_once dirname(__DIR__) . '/includes/registro-esquela.php';
     $payload['itemId'] = (string)$itemId;
     return rs_generate_local_esquela($payload, $photoBytes, null);
