@@ -187,10 +187,28 @@ function rs_publications_from_sharepoint(string $area): array
 try {
     $areaRaw = mb_strtolower(trim((string)($_GET['area'] ?? 'capillas')), 'UTF-8');
     $area = $areaRaw === 'parque' ? 'parque' : 'capillas';
-    $ctx = rs_storage_bootstrap();
-    $draftRoot = $ctx['userDir'] . '/drafts';
+    // Validar primero el usuario; las sesiones caducadas deben pedir nuevo login.
+    $root = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+    require_once $root . '/includes/bootstrap.php';
+    if (!portal_is_authenticated()) {
+        http_response_code(401);
+        echo json_encode(['ok'=>false,'code'=>'SESSION_EXPIRED','message'=>'La sesión del Portal terminó. Inicia sesión nuevamente.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // Los publicados viven en SharePoint; un fallo del almacenamiento local
+    // de borradores no debe ocultar los servicios que ya se capturaron.
+    $ctx = null;
+    $storageError = null;
+    try {
+        $ctx = rs_storage_bootstrap();
+    } catch (Throwable $localError) {
+        $storageError = $localError->getMessage();
+        error_log('Registro Servicios almacenamiento de borradores: '.$storageError);
+    }
+    $draftRoot = is_array($ctx) ? $ctx['userDir'] . '/drafts' : '';
     $drafts = [];
-    if (is_dir($draftRoot)) {
+    if ($draftRoot !== '' && is_dir($draftRoot)) {
         foreach (scandir($draftRoot) ?: [] as $entry) {
             if ($entry === '.' || $entry === '..') continue;
             $data = rs_read_draft($ctx, $entry);
@@ -224,7 +242,7 @@ try {
         // Fallback defensivo al índice local para no dejar el módulo inutilizable
         // si SharePoint presenta una falla temporal.
         error_log('Registro Servicios publicaciones SharePoint: ' . $syncError->getMessage());
-        $published = rs_read_publications($ctx);
+        $published = is_array($ctx) ? rs_read_publications($ctx) : [];
         $sync['message'] = $syncError->getMessage();
         $sync['source'] = 'local-fallback';
     }
@@ -237,18 +255,14 @@ try {
         'published'=>$published,
         'counts'=>['drafts'=>count($drafts),'published'=>count($published)],
         'sync'=>$sync,
+        'draftStorage'=>['ok'=>$storageError===null],
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } catch (Throwable $e) {
     error_log('Registro Servicios lista: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         'ok'=>false,
-        'message'=>'No fue posible cargar los servicios.',
-        'debug'=>[
-            'type'=>get_class($e),
-            'message'=>$e->getMessage(),
-            'file'=>$e->getFile(),
-            'line'=>$e->getLine(),
-        ],
+        'message'=>'No fue posible cargar los servicios. Error del servidor; consulta el registro PHP o solicita apoyo a Sistemas.',
+        'code'=>'SERVICES_LOAD_ERROR',
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }
