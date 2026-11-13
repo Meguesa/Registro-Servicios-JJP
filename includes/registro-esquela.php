@@ -638,29 +638,24 @@ function rs_esquela_draw_logo(GdImage $canvas, int $x, int $y, int $size): bool
     return true;
 }
 
+/**
+ * Genera el QR en el propio servidor, sin llamadas HTTP externas.
+ * La misma URL es usada tanto en capturas nuevas como en reconstrucciones.
+ * Licencia de la biblioteca: includes/registro-qr-generator.php (MIT).
+ */
 function rs_esquela_fetch_qr(string $url): ?GdImage
 {
-    // Respaldo unicamente. La ruta principal genera el QR en el navegador y lo
-    // envia junto con el registro para evitar depender de salidas HTTP del servidor.
-    $endpoint = 'https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=2&data=' . rawurlencode($url);
+    if ($url === '' || !extension_loaded('gd')) return null;
 
-    $context = stream_context_create([
-        'http' => [
-            'timeout' => 6,
-            'ignore_errors' => true,
-            'header' => "User-Agent: JDJP-Registro-Servicios\r\n",
-        ],
-        'ssl' => [
-            'verify_peer' => true,
-            'verify_peer_name' => true,
-        ],
-    ]);
-
-    $bytes = @file_get_contents($endpoint, false, $context);
-    if (!is_string($bytes) || $bytes === '') {
+    try {
+        require_once __DIR__ . '/registro-qr-generator.php';
+        $qr = QRCode::getMinimumQRCode($url, QR_ERROR_CORRECT_LEVEL_M);
+        $image = $qr->createImage(6, 24);
+        return $image instanceof GdImage ? $image : null;
+    } catch (Throwable $error) {
+        error_log('Registro Servicios QR local: ' . $error->getMessage());
         return null;
     }
-    return rs_esquela_image_from_bytes($bytes);
 }
 
 function rs_esquela_draw_qr(
@@ -685,7 +680,9 @@ function rs_esquela_draw_qr(
     imagefilledrectangle($canvas, $x, $y, $x + $size, $y + $size, $white);
     $pad = max(6, (int)round($size * 0.065));
     $inner = max(1, $size - (2 * $pad));
-    imagecopyresampled(
+    // Los modulos negros del QR no deben interpolarse: el suavizado puede
+    // producir bordes grises que dificultan su lectura en tamaño pequeño.
+    imagecopyresized(
         $canvas,
         $qr,
         $x + $pad,
