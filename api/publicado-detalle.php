@@ -309,26 +309,38 @@ try{
         echo '<p>Archivos disponibles en SharePoint, independientes de los correos. No se modifican los servicios ni se ejecuta TellMeBye.</p>';
         echo '<p><a href="publicado-detalle.php'.$escape($query).'&tablas=1">Volver a las tablas</a></p></header>';
 
+        // La esquela del Registro de Servicios se construye desde los campos
+        // de SharePoint; las cartulinas de TellMeBye no son la esquela operativa.
+        // Mostrar primero la JPG original guardada, si existe. Los registros
+        // anteriores al respaldo conservan la opcion de regenerarla con GD.
         $entries=[];
-        foreach($tellmebyeFiles as $name){
-            $entries[]=['tipo'=>'tellmebye','nombre'=>$name,'titulo'=>'Cartulina de TellMeBye (archivo guardado)'];
-        }
+        $savedEsquelaName='Esquela_'.$itemId.'.jpg';
         $hasSavedLocalEsquela=false;
         foreach($storedFiles as $file){
-            if($file['name']==='Esquela_'.$itemId.'.jpg'){
+            if(strcasecmp((string)$file['name'],$savedEsquelaName)===0){
+                $savedEsquelaName=(string)$file['name'];
                 $hasSavedLocalEsquela=true;
                 break;
             }
         }
-        if($area==='capillas'&&!$hasSavedLocalEsquela&&pd_files_photo_name($storedFiles)!==null){
-            $entries[]=['tipo'=>'esquela-local','nombre'=>'Esquela_'.$itemId.'.jpg','titulo'=>'Esquela del correo (reconstruida a partir de los datos actuales)'];
+        if($area==='capillas'){
+            if($hasSavedLocalEsquela){
+                $entries[]=['tipo'=>'adjunto','nombre'=>$savedEsquelaName,'titulo'=>'Esquela JJP generada por Registro de Servicios (original guardado)'];
+            }else{
+                $entries[]=['tipo'=>'esquela-local','nombre'=>'Esquela_'.$itemId.'.jpg','titulo'=>'Esquela JJP generada con datos de SharePoint (reconstruccion)'];
+            }
         }
         foreach($storedFiles as $file){
-            $entries[]=['tipo'=>'adjunto','nombre'=>$file['name'],'titulo'=>'Adjunto del servicio'];
+            if($area==='capillas'&&$hasSavedLocalEsquela&&$file['name']===$savedEsquelaName)continue;
+            $entries[]=['tipo'=>'adjunto','nombre'=>$file['name'],'titulo'=>'Documento adjunto del servicio'];
         }
 
         if($entries===[])echo '<div class="note">No se encontraron archivos almacenados para este servicio.</div>';
-        if($area==='capillas')echo '<p class="note">La esquela compuesta del correo no se almacenaba como archivo histórico. Si está disponible la fotografía fuente, se reconstruye con los datos actuales y puede variar del original. Las cartulinas de TellMeBye son archivos almacenados.</p>';
+        if($area==='capillas'){
+            echo $hasSavedLocalEsquela
+                ? '<p class="note">Esquela original creada por Registro de Servicios, guardada como adjunto en SharePoint. No se usa la cartulina de TellMeBye.</p>'
+                : '<p class="note">Este registro es anterior al respaldo de esquelas: se reconstruye la esquela JJP con los datos actuales de SharePoint y su fotografía adjunta, si existe. Si falta la foto, se usa la imagen de respaldo. El QR o ciertos elementos pueden diferir del archivo generado en la captura original. No se utiliza la cartulina de TellMeBye.</p>';
+        }
         echo '<div class="grid">';
         foreach($entries as $entry){
             $url=$fileLink($entry['tipo'],$entry['nombre']);
