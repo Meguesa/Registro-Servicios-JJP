@@ -248,6 +248,67 @@ try{
 
     $payload=$area==='parque'?pd_parque($item):pd_capillas($item);
 
+    // Consultar o descargar las tablas existentes SIN enviar correo ni modificar SharePoint.
+    // Se regeneran a partir del elemento publicado y las mismas funciones de imagen
+    // utilizadas por los correos operativos de Capillas y Parque.
+    if(strtoupper((string)($_SERVER['REQUEST_METHOD']??'GET'))==='GET'
+        && (isset($_GET['tablas']) || isset($_GET['tabla']))) {
+        $tableNames=$area==='parque'
+            ? [
+                'servicio'=>['Informacion_Servicio.png','Información del servicio'],
+                'propiedad'=>['Informacion_Propiedad.png','Información de propiedad'],
+                'fallecido'=>['Informacion_Fallecido.png','Información del fallecido'],
+            ]
+            : [
+                'servicio'=>['Informacion_Servicio.png','Información del servicio'],
+                'obituario'=>['Obituario.png','Obituario'],
+                'venta'=>['Informacion_Venta.png','Información de venta'],
+            ];
+
+        if(isset($_GET['tablas'])) {
+            header('Content-Type: text/html; charset=utf-8');
+            header("Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'");
+            header('X-Frame-Options: SAMEORIGIN');
+            $query='?area='.rawurlencode($area).'&id='.$itemId;
+            $escape=static fn(string $v):string=>htmlspecialchars($v,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+            $title=$area==='parque'?'Parque':'Capillas';
+            echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+            echo '<title>Tablas de '.$escape($title).' · ID '.$itemId.'</title>';
+            echo '<style>body{margin:0;background:#f7f7f7;font:16px Arial,sans-serif;color:#292522}main{max-width:1150px;margin:0 auto;padding:24px}h1{margin:0 0 8px;font-size:25px}p{line-height:1.5;color:#555}section{background:white;border:1px solid #ddd;border-radius:12px;padding:16px;margin:18px 0;page-break-inside:avoid}section h2{font-size:19px;margin:0}section header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px}img{display:block;width:100%;height:auto;border:1px solid #ddd}a{color:#155c91;font-weight:600}footer{margin:24px 0;color:#555}@media print{body{background:white}main{padding:0}a{display:none}section{border:0;padding:0;page-break-inside:avoid}}</style>';
+            echo '</head><body><main><h1>Tablas · '.$escape($title).' · ID '.$itemId.'</h1>';
+            echo '<p>Regeneradas con la información actualmente guardada en SharePoint. No se enviarán correos, no se generarán nuevos servicios y no se ejecutará TellMeBye.</p>';
+            foreach($tableNames as $key=>$meta) {
+                $view='publicado-detalle.php'.$query.'&tabla='.rawurlencode($key);
+                $download=$view.'&descargar=1';
+                echo '<section><header><h2>'.$escape($meta[1]).'</h2><a href="'.$escape($download).'">Descargar PNG</a></header>';
+                echo '<img src="'.$escape($view).'" alt="'.$escape($meta[1]).'" loading="eager"></section>';
+            }
+            echo '<footer>También puedes imprimir o guardar esta vista como PDF desde tu navegador (Ctrl+P).</footer></main></body></html>';
+            exit;
+        }
+
+        $tableKey=mb_strtolower(trim((string)($_GET['tabla']??'')),'UTF-8');
+        if(!isset($tableNames[$tableKey]))pd_json(400,['ok'=>false,'message'=>'Tabla no válida para esta área.']);
+        if($area==='parque') {
+            require_once dirname(__DIR__).'/includes/registro-parque-imagenes.php';
+            $allTables=rp_generate_information_images($payload);
+            $index=['servicio'=>0,'propiedad'=>1,'fallecido'=>2][$tableKey];
+            $bytes=(string)($allTables[$index]['bytes']??'');
+        } else {
+            require_once dirname(__DIR__).'/includes/registro-imagenes.php';
+            $allTables=rs_generate_service_information_images($payload);
+            $bytesKey=['servicio'=>'servicePng','obituario'=>'obitPng','venta'=>'salePng'][$tableKey];
+            $bytes=(string)($allTables[$bytesKey]??'');
+        }
+        if($bytes==='')throw new RuntimeException('No se pudo regenerar la imagen solicitada.');
+        header('Content-Type: image/png');
+        $attachment=isset($_GET['descargar'])?'attachment':'inline';
+        header('Content-Disposition: '.$attachment.'; filename="'.$itemId.'-'.$tableNames[$tableKey][0].'"');
+        header('Content-Length: '.strlen($bytes));
+        echo $bytes;
+        exit;
+    }
+
     if(strtoupper((string)($_SERVER['REQUEST_METHOD']??'GET'))==='POST'){
         if($area==='parque'){
             require_once dirname(__DIR__).'/includes/registro-parque-imagenes.php';
@@ -385,31 +446,14 @@ try{
             }
         }
 
-        // Reenviar correos tambien vuelve a disparar TellMeBye.
-        // El propio bot evita duplicar un obituario ya publicado: si el registro
-        // ya tiene TellmebyeId/Estatus Publicado, termina sin crear otro.
-        // Si nunca se publico o fallo antes, intentara publicarlo ahora.
+        // Reenvio de correo exclusivamente: no activar TellMeBye ni alterar su estado.
+        // La publicacion de obituarios tiene su propia operacion independiente.
         $tellmebye=[
             'enabled'=>false,
             'triggered'=>false,
-            'mode'=>null,
-            'error'=>null,
+            'skipped'=>true,
+            'reason'=>'Reenvio de correo: TellMeBye no se ejecuta.',
         ];
-        try{
-            $tellmebye=array_merge(
-                $tellmebye,
-                rs_trigger_tellmebye(
-                    $itemId,
-                    false,
-                    '',
-                    trim((string)($payload['prefijo'] ?? ''))
-                )
-            );
-        }catch(Throwable $tellmebyeError){
-            $tellmebye['enabled']=true;
-            $tellmebye['error']=$tellmebyeError->getMessage();
-            error_log('Reenvio Capillas TellMeBye item '.$itemId.': '.$tellmebyeError->getMessage());
-        }
 
         pd_json(200,[
             'ok'=>true,
@@ -424,5 +468,19 @@ try{
     pd_json(200,['ok'=>true,'area'=>$area,'itemId'=>$itemId,'payload'=>$payload]);
 }catch(Throwable $e){
     error_log('Publicado detalle v2: '.$e->getMessage());
-    pd_json(500,['ok'=>false,'message'=>'No fue posible cargar el servicio: '.$e->getMessage()]);
+    $isResend=strtoupper((string)($_SERVER['REQUEST_METHOD']??'GET'))==='POST';
+    $isGraphTransient=$isResend && preg_match('/Microsoft Graph.*HTTP (429|502|503|504)\\b/i',$e->getMessage())===1;
+    if($isGraphTransient){
+        // Un 5xx en sendMail deja la entrega incierta: nunca reintentar automaticamente.
+        pd_json(503,[
+            'ok'=>false,
+            'message'=>'Microsoft Graph/Exchange no pudo confirmar el envio. El servicio sigue registrado. Verifica Elementos enviados y seguimiento de mensajes antes de reintentar para evitar duplicados. Detalle: '.$e->getMessage(),
+            'mailStatus'=>'unknown',
+            'retryAutomatically'=>false,
+        ]);
+    }
+    pd_json(500,[
+        'ok'=>false,
+        'message'=>($isResend?'No fue posible completar el reenvio de correos: ':'No fue posible cargar el servicio: ').$e->getMessage(),
+    ]);
 }
