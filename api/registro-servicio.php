@@ -1387,6 +1387,27 @@ try {
             'contentType' => 'image/jpeg',
             'bytes' => $esquelaBytes,
         ];
+
+        // Guardar la misma esquela enviada por correo como adjunto permanente.
+        // No reescribir adjuntos al modificar un servicio historico.
+        if (!$isEdit) {
+            try {
+                $safeEsquelaName = preg_replace('/[^A-Za-z0-9._() -]+/u', '_', $esquelaFileName)
+                    ?: ('Esquela_' . $itemId . '.jpg');
+                $esquelaAttachmentUrl = $siteUrl
+                    . "/_api/web/lists/getbytitle('" . $listEsc . "')/items(" . $itemId . ")"
+                    . "/AttachmentFiles/add(FileName='" . rawurlencode($safeEsquelaName) . "')";
+                rs_request('POST', $esquelaAttachmentUrl, $token, $esquelaBytes, [
+                    'Content-Type: image/jpeg',
+                    'X-RequestDigest: ' . $digest,
+                ]);
+                $esquelaResult['savedToSharePoint'] = true;
+            } catch (Throwable $saveEsquelaError) {
+                // Un fallo de respaldo nunca invalida el servicio o el correo.
+                $esquelaResult['savedToSharePoint'] = false;
+                error_log('Registro Servicios respaldar esquela item ' . $itemId . ': ' . $saveEsquelaError->getMessage());
+            }
+        }
     } catch (Throwable $esquelaError) {
         $esquelaResult['error'] = $esquelaError->getMessage();
         error_log('Registro Servicios Esquela local item ' . $itemId . ': ' . $esquelaError->getMessage());
