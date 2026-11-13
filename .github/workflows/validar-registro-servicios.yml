@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'api/publicado-detalle.php'
+      - 'api/mis-servicios-api.php'
       - 'assets/js/mis-servicios.js'
       - 'includes/registro-storage.php'
       - '.github/workflows/validar-registro-servicios.yml'
@@ -24,6 +25,7 @@ jobs:
       - name: Revisar sintaxis PHP
         run: |
           php -l api/publicado-detalle.php
+          php -l api/mis-servicios-api.php
           php -l includes/registro-storage.php
       - name: Revisar sintaxis JavaScript
         run: node --check assets/js/mis-servicios.js
@@ -33,3 +35,4 @@ jobs:
           grep -q "rp_generate_information_images" api/publicado-detalle.php
           grep -q "rs_generate_service_information_images" api/publicado-detalle.php
           grep -q "Ver tablas" assets/js/mis-servicios.js
+          grep -q "SESSION_EXPIRED" api/mis-servicios-api.php
