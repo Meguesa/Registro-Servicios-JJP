@@ -9,6 +9,7 @@ on:
       - 'includes/registro-esquela.php'
       - 'includes/registro-qr-generator.php'
       - 'tests/esquela-qr-local.php'
+      - 'tests/esquela-estilo-correo.php'
       - 'tests/registro-publicado-archivos.php'
       - 'assets/js/mis-servicios.js'
       - 'includes/registro-storage.php'
@@ -37,6 +38,7 @@ jobs:
           php -l includes/registro-esquela.php
           php -l includes/registro-qr-generator.php
           php -l tests/esquela-qr-local.php
+          php -l tests/esquela-estilo-correo.php
           php -l tests/registro-publicado-archivos.php
           php -l api/mis-servicios-api.php
           php -l includes/registro-storage.php
@@ -47,6 +49,8 @@ jobs:
         run: php tests/registro-publicado-archivos.php
       - name: Probar generacion de QR local sin dependencias HTTP
         run: php tests/esquela-qr-local.php
+      - name: Validar esquela y tipografia originales del correo
+        run: php tests/esquela-estilo-correo.php
       - name: Revisar sintaxis JavaScript
         run: node --check assets/js/mis-servicios.js
       - name: Verificar separacion de reenvio y tablas
