@@ -313,8 +313,15 @@ try{
         foreach($tellmebyeFiles as $name){
             $entries[]=['tipo'=>'tellmebye','nombre'=>$name,'titulo'=>'Cartulina de TellMeBye (archivo guardado)'];
         }
-        if($area==='capillas'&&pd_files_photo_name($storedFiles)!==null){
-            $entries[]=['tipo'=>'esquela-local','nombre'=>'Esquela_'.$itemId.'.jpg','titulo'=>'Esquela original del correo (regenerada)'];
+        $hasSavedLocalEsquela=false;
+        foreach($storedFiles as $file){
+            if($file['name']==='Esquela_'.$itemId.'.jpg'){
+                $hasSavedLocalEsquela=true;
+                break;
+            }
+        }
+        if($area==='capillas'&&!$hasSavedLocalEsquela&&pd_files_photo_name($storedFiles)!==null){
+            $entries[]=['tipo'=>'esquela-local','nombre'=>'Esquela_'.$itemId.'.jpg','titulo'=>'Esquela del correo (reconstruida a partir de los datos actuales)'];
         }
         foreach($storedFiles as $file){
             $entries[]=['tipo'=>'adjunto','nombre'=>$file['name'],'titulo'=>'Adjunto del servicio'];
