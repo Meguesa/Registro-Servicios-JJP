@@ -144,15 +144,15 @@ function pd_files_cartulina_bytes(string $siteUrl, string $fileName, string $tok
 /** Busca la fotografia adjunta usada para construir la esquela local. */
 function pd_files_photo_name(array $files): ?string
 {
-    $images = [];
     foreach ($files as $file) {
         $name = trim((string)($file['name'] ?? ''));
         if (!pd_files_valid_name($name) || !pd_files_is_image($name)) continue;
-        if (preg_match('/(placa|qr|logo|esquela[-_ ]?\d+\.(jpg|jpeg|png))/iu', $name)) continue;
-        if (preg_match('/(imagen|foto)[-_ ]?esquela/iu', $name)) return $name;
-        $images[] = $name;
+        if (preg_match('/^(imagen|foto)[-_ ]?esquela(?:[^\/\\\\]*)\.(jpe?g|png|webp)$/iu', $name)) {
+            return $name;
+        }
     }
-    return $images[0] ?? null;
+    // Nunca usar otra imagen del expediente como retrato del fallecido.
+    return null;
 }
 
 /** El contenido generado del correo no siempre se persiste: recrearlo sin escrituras. */
