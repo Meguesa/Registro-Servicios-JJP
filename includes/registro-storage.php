@@ -8,6 +8,12 @@ function rs_storage_bootstrap(): array
     if (!is_file($bootstrap)) {
         throw new RuntimeException('No se encontro el bootstrap del Portal.');
     }
+    // bootstrap.php define $config y $provider usados por portal_config() y
+    // portal_provider() mediante "global". Si require_once se ejecuta dentro
+    // de esta funcion sin importar ambos globales, PHP deja las variables en
+    // el alcance local y portal_is_authenticated() calcula una vida de sesion 0.
+    // Las paginas principales lo cargan a nivel global; las API no siempre.
+    global $config, $provider;
     require_once $bootstrap;
 
     // Los endpoints AJAX deben validar autenticacion sin redireccion HTML.
