@@ -407,5 +407,19 @@ try{
     pd_json(200,['ok'=>true,'area'=>$area,'itemId'=>$itemId,'payload'=>$payload]);
 }catch(Throwable $e){
     error_log('Publicado detalle v2: '.$e->getMessage());
-    pd_json(500,['ok'=>false,'message'=>'No fue posible cargar el servicio: '.$e->getMessage()]);
+    $isResend=strtoupper((string)($_SERVER['REQUEST_METHOD']??'GET'))==='POST';
+    $isGraphTransient=$isResend && preg_match('/Microsoft Graph.*HTTP (429|502|503|504)\\b/i',$e->getMessage())===1;
+    if($isGraphTransient){
+        // Un 5xx en sendMail deja la entrega incierta: nunca reintentar automaticamente.
+        pd_json(503,[
+            'ok'=>false,
+            'message'=>'Microsoft Graph/Exchange no pudo confirmar el envio. El servicio sigue registrado. Verifica Elementos enviados y seguimiento de mensajes antes de reintentar para evitar duplicados. Detalle: '.$e->getMessage(),
+            'mailStatus'=>'unknown',
+            'retryAutomatically'=>false,
+        ]);
+    }
+    pd_json(500,[
+        'ok'=>false,
+        'message'=>($isResend?'No fue posible completar el reenvio de correos: ':'No fue posible cargar el servicio: ').$e->getMessage(),
+    ]);
 }
