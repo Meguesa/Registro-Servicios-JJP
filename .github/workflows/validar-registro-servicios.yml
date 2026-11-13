@@ -4,6 +4,9 @@ on:
     paths:
       - 'api/publicado-detalle.php'
       - 'api/mis-servicios-api.php'
+      - 'api/registro-servicio.php'
+      - 'includes/registro-publicado-archivos.php'
+      - 'tests/registro-publicado-archivos.php'
       - 'assets/js/mis-servicios.js'
       - 'includes/registro-storage.php'
       - '.github/workflows/validar-registro-servicios.yml'
@@ -26,11 +29,16 @@ jobs:
       - name: Revisar sintaxis PHP
         run: |
           php -l api/publicado-detalle.php
+          php -l api/registro-servicio.php
+          php -l includes/registro-publicado-archivos.php
+          php -l tests/registro-publicado-archivos.php
           php -l api/mis-servicios-api.php
           php -l includes/registro-storage.php
           php -l tests/session-bootstrap-scope.php
       - name: Validar autenticacion de API con bootstrap en funcion
         run: php tests/session-bootstrap-scope.php
+      - name: Validar lectura segura de archivos
+        run: php tests/registro-publicado-archivos.php
       - name: Revisar sintaxis JavaScript
         run: node --check assets/js/mis-servicios.js
       - name: Verificar separacion de reenvio y tablas
@@ -39,4 +47,5 @@ jobs:
           grep -q "rp_generate_information_images" api/publicado-detalle.php
           grep -q "rs_generate_service_information_images" api/publicado-detalle.php
           grep -q "Ver tablas" assets/js/mis-servicios.js
+          grep -q "Ver documentos" assets/js/mis-servicios.js
           grep -q "SESSION_EXPIRED" api/mis-servicios-api.php
