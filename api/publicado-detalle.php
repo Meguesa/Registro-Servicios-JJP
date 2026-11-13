@@ -248,6 +248,101 @@ try{
 
     $payload=$area==='parque'?pd_parque($item):pd_capillas($item);
 
+    // Vista y descarga de adjuntos y esquelas. Solo operaciones GET y lectura.
+    if(strtoupper((string)($_SERVER['REQUEST_METHOD']??'GET'))==='GET'
+        && (isset($_GET['documentos']) || isset($_GET['documento']))) {
+        require_once dirname(__DIR__).'/includes/registro-publicado-archivos.php';
+        $storedFiles=pd_files_list($siteUrl,$listEsc,$itemId,$token);
+        $escape=static fn(string $value):string=>htmlspecialchars($value,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+        $query='?area='.rawurlencode($area).'&id='.$itemId;
+
+        $tellmebyeFiles=[];
+        if($area==='capillas') {
+            foreach(['TellmebyeJpgVerticalNombre','TellmebyePdfVerticalNombre'] as $column) {
+                $name=trim((string)($item[$column]??''));
+                if(pd_files_valid_name($name))$tellmebyeFiles[]=$name;
+            }
+        }
+
+        if(isset($_GET['documento'])) {
+            $fileType=trim((string)($_GET['tipo']??'adjunto'));
+            $fileName=trim((string)($_GET['documento']??''));
+            $download=isset($_GET['descargar']);
+            if($fileType==='adjunto') {
+                // Solo archivos cuyos nombres figuran en este mismo item SharePoint.
+                $allowed=false;
+                foreach($storedFiles as $file){
+                    if(hash_equals($file['name'],$fileName)){$allowed=true;break;}
+                }
+                if(!$allowed)pd_json(404,['ok'=>false,'message'=>'El adjunto no existe para este servicio.']);
+                $bytes=pd_files_attachment_bytes($siteUrl,$listEsc,$itemId,$fileName,$token);
+                pd_files_stream($fileName,$bytes,$download);
+            }
+            if($fileType==='tellmebye'&&$area==='capillas') {
+                if(!in_array($fileName,$tellmebyeFiles,true)){
+                    pd_json(404,['ok'=>false,'message'=>'La cartulina solicitada no existe en este registro.']);
+                }
+                $bytes=pd_files_cartulina_bytes($siteUrl,$fileName,$token);
+                pd_files_stream($fileName,$bytes,$download);
+            }
+            if($fileType==='esquela-local'&&$area==='capillas'
+                &&$fileName==='Esquela_'.$itemId.'.jpg') {
+                $generated=pd_files_local_esquela($payload,$storedFiles,$siteUrl,$listEsc,$itemId,$token);
+                $bytes=(string)($generated['jpeg']??'');
+                if($bytes==='')throw new RuntimeException('La esquela generada no tiene contenido.');
+                pd_files_stream($fileName,$bytes,$download);
+            }
+            pd_json(400,['ok'=>false,'message'=>'Tipo de documento no permitido.']);
+        }
+
+        header('Content-Type: text/html; charset=utf-8');
+        header("Content-Security-Policy: default-src 'none'; img-src 'self'; frame-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'");
+        header('X-Frame-Options: SAMEORIGIN');
+        $areaLabel=$area==='parque'?'Parque':'Capillas';
+        $fileLink=static function(string $type,string $name)use($query):string{
+            return 'publicado-detalle.php'.$query.'&tipo='.rawurlencode($type).'&documento='.rawurlencode($name);
+        };
+        echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+        echo '<title>Documentos · '.$escape($areaLabel).' · ID '.$itemId.'</title>';
+        echo '<style>body{background:#f7f7f7;font:16px Arial,sans-serif;color:#292522;margin:0}main{max-width:1100px;margin:0 auto;padding:24px}header{margin-bottom:18px}h1{margin:0 0 8px}p{color:#555;line-height:1.5}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}.file{background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px;overflow:hidden}.file h2{font-size:18px;overflow-wrap:anywhere;margin:0 0 12px}.file img{display:block;width:100%;height:auto;max-height:500px;object-fit:contain;background:#f5f5f5}.file iframe{width:100%;height:430px;border:1px solid #ddd}.actions{display:flex;flex-wrap:wrap;gap:14px;margin:12px 0}a{color:#185c8e;font-weight:600}.note{background:#fff4db;border:1px solid #e9c985;padding:12px;border-radius:8px;margin:14px 0}@media print{body{background:white}main{padding:0}.actions{display:none}.file{page-break-inside:avoid}}</style>';
+        echo '</head><body><main><header><h1>Documentos y esquelas · '.$escape($areaLabel).' · ID '.$itemId.'</h1>';
+        echo '<p>Archivos disponibles en SharePoint, independientes de los correos. No se modifican los servicios ni se ejecuta TellMeBye.</p>';
+        echo '<p><a href="publicado-detalle.php'.$escape($query).'&tablas=1">Volver a las tablas</a></p></header>';
+
+        $entries=[];
+        foreach($tellmebyeFiles as $name){
+            $entries[]=['tipo'=>'tellmebye','nombre'=>$name,'titulo'=>'Cartulina de TellMeBye (archivo guardado)'];
+        }
+        if($area==='capillas'&&pd_files_photo_name($storedFiles)!==null){
+            $entries[]=['tipo'=>'esquela-local','nombre'=>'Esquela_'.$itemId.'.jpg','titulo'=>'Esquela original del correo (regenerada)'];
+        }
+        foreach($storedFiles as $file){
+            $entries[]=['tipo'=>'adjunto','nombre'=>$file['name'],'titulo'=>'Adjunto del servicio'];
+        }
+
+        if($entries===[])echo '<div class="note">No se encontraron archivos almacenados para este servicio.</div>';
+        if($area==='capillas')echo '<p class="note">La esquela compuesta del correo no se almacenaba como archivo histórico. Si está disponible la fotografía fuente, se reconstruye con los datos actuales y puede variar del original. Las cartulinas de TellMeBye son archivos almacenados.</p>';
+        echo '<div class="grid">';
+        foreach($entries as $entry){
+            $url=$fileLink($entry['tipo'],$entry['nombre']);
+            $downloadUrl=$url.'&descargar=1';
+            $name=$escape($entry['nombre']);
+            echo '<section class="file"><h2>'.$escape($entry['titulo']).'</h2><p>'.$name.'</p>';
+            if(pd_files_is_image($entry['nombre'])){
+                echo '<img src="'.$escape($url).'" alt="'.$name.'" loading="lazy">';
+            }elseif(pd_files_mime($entry['nombre'])==='application/pdf'){
+                echo '<iframe title="'.$name.'" src="'.$escape($url).'" loading="lazy"></iframe>';
+            }else{
+                echo '<p>Este formato no admite vista previa en el navegador.</p>';
+            }
+            echo '<div class="actions"><a href="'.$escape($url).'" target="_blank" rel="noopener">Abrir</a>';
+            echo '<a href="'.$escape($downloadUrl).'">Descargar</a></div></section>';
+        }
+        echo '</div></main></body></html>';
+        exit;
+    }
+
+
     // Consultar o descargar las tablas existentes SIN enviar correo ni modificar SharePoint.
     // Se regeneran a partir del elemento publicado y las mismas funciones de imagen
     // utilizadas por los correos operativos de Capillas y Parque.
