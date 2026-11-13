@@ -372,6 +372,7 @@ try{
             echo '<style>body{margin:0;background:#f7f7f7;font:16px Arial,sans-serif;color:#292522}main{max-width:1150px;margin:0 auto;padding:24px}h1{margin:0 0 8px;font-size:25px}p{line-height:1.5;color:#555}section{background:white;border:1px solid #ddd;border-radius:12px;padding:16px;margin:18px 0;page-break-inside:avoid}section h2{font-size:19px;margin:0}section header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px}img{display:block;width:100%;height:auto;border:1px solid #ddd}a{color:#155c91;font-weight:600}footer{margin:24px 0;color:#555}@media print{body{background:white}main{padding:0}a{display:none}section{border:0;padding:0;page-break-inside:avoid}}</style>';
             echo '</head><body><main><h1>Tablas · '.$escape($title).' · ID '.$itemId.'</h1>';
             echo '<p>Regeneradas con la información actualmente guardada en SharePoint. No se enviarán correos, no se generarán nuevos servicios y no se ejecutará TellMeBye.</p>';
+            echo '<p><a href="publicado-detalle.php'.$escape($query).'&documentos=1">Ver esquelas y documentos adjuntos</a></p>';
             foreach($tableNames as $key=>$meta) {
                 $view='publicado-detalle.php'.$query.'&tabla='.rawurlencode($key);
                 $download=$view.'&descargar=1';
