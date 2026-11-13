@@ -10,6 +10,12 @@ function rs_storage_bootstrap(): array
     }
     require_once $bootstrap;
 
+    // Los endpoints AJAX deben validar autenticacion sin redireccion HTML.
+    // No basta con que exista una sesion PHP: puede ser anonima o estar vencida.
+    if (!function_exists('portal_is_authenticated') || !portal_is_authenticated()) {
+        throw new RuntimeException('SESSION_EXPIRED: inicia sesion nuevamente en el Portal.');
+    }
+
     // En endpoints AJAX no usamos portal_require_authentication(), porque
     // esa funcion responde con un redirect HTML a /login.php. fetch sigue
     // el redirect y termina viendo HTTP 200 en vez de JSON.
