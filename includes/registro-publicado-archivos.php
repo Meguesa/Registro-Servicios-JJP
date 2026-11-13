@@ -166,7 +166,23 @@ function pd_files_local_esquela(
     $photoBytes = $photoName !== null
         ? pd_files_attachment_bytes($siteUrl, $listEsc, $itemId, $photoName, $token)
         : null;
+    // La captura original incluye registro-imagenes.php antes de la esquela.
+    // Ese modulo proporciona las fuentes TrueType Carlito/sans serif (normal y
+    // negrita). Sin el, esta reconstruccion cae a imagestring() de GD: letras
+    // monoespaciadas, nombre sin enfasis y texto UTF-8 ilegible ("aÃ±os").
+    // Cargar exactamente la misma dependencia y el mismo generador del correo.
+    require_once dirname(__DIR__) . '/includes/registro-imagenes.php';
     require_once dirname(__DIR__) . '/includes/registro-esquela.php';
+    $font = rs_esquela_font(false);
+    $fontBold = rs_esquela_font(true);
+    if (!function_exists('imagettftext')
+        || !is_string($font) || !is_readable($font)
+        || !is_string($fontBold) || !is_readable($fontBold)) {
+        throw new RuntimeException(
+            'No hay una fuente TrueType disponible para reconstruir la esquela. ' .
+            'La imagen no se genero para evitar texto ilegible; revisa las fuentes del servidor.'
+        );
+    }
     $payload['itemId'] = (string)$itemId;
     return rs_generate_local_esquela($payload, $photoBytes, null);
 }
