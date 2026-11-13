@@ -7,6 +7,7 @@ on:
       - 'assets/js/mis-servicios.js'
       - 'includes/registro-storage.php'
       - '.github/workflows/validar-registro-servicios.yml'
+      - 'tests/session-bootstrap-scope.php'
   workflow_dispatch:
 
 permissions:
@@ -27,6 +28,9 @@ jobs:
           php -l api/publicado-detalle.php
           php -l api/mis-servicios-api.php
           php -l includes/registro-storage.php
+          php -l tests/session-bootstrap-scope.php
+      - name: Validar autenticacion de API con bootstrap en funcion
+        run: php tests/session-bootstrap-scope.php
       - name: Revisar sintaxis JavaScript
         run: node --check assets/js/mis-servicios.js
       - name: Verificar separacion de reenvio y tablas
