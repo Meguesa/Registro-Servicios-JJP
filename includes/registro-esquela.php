@@ -140,8 +140,8 @@ function rs_esquela_prefix(array $payload): string
     // El prefijo es una eleccion explicita del usuario. Nunca deducirlo
     // a partir del sexo, edad u otros datos del fallecido.
     $prefix = trim((string)($payload['prefijo'] ?? ''));
-    $normalized = rs_esquela_norm($prefix);
-    if ($normalized === '' || in_array($normalized, [
+    $normalized = trim(rs_esquela_norm($prefix));
+    if ($prefix === '--' || $normalized === '' || in_array($normalized, [
         'automatico', 'sin prefijo', 'ninguno', 'no aplica',
     ], true)) {
         return '';
