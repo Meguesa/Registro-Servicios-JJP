@@ -109,8 +109,13 @@ function calcAge(){
 }
 function updateRules(){
   const svc=servicio.value;
+  // Domicilio es una ubicacion para Inhumacion, no un nuevo tipo de servicio.
+  // Solo habilitarla para Inhumacion; no alterar ubicaciones existentes.
+  const opcionDomicilio=Array.from(ubicacionServicio?.options||[]).find(o=>o.value==="Domicilio");
+  if(opcionDomicilio)opcionDomicilio.disabled=svc!=="Inhumación";
+  if(svc!=="Inhumación" && ubicacionServicio?.value==="Domicilio")ubicacionServicio.value="";
   const sinVelacion=svc==="Cremación Directa (sin velación)";
-  const domicilio=ubicacionServicio?.value==="Domicilio";
+  const domicilio=svc==="Inhumación"&&ubicacionServicio?.value==="Domicilio";
   const renta=svc==="Renta de Capillas";
   const crem=["Cremación","Cremación Directa (con velación)","Cremación Directa (sin velación)"].includes(svc);
   const requierePlaca=document.getElementById("requierePlaca");
