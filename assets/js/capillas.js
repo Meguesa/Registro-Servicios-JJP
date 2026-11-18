@@ -1,5 +1,5 @@
 const SERVICIOS=["Cremación","Cremación Directa (con velación)","Cremación Directa (sin velación)","Inhumación","Inhumación Directa","RA - Inhumacion","Renta de Capillas","Velación a Domicilio","Deposito Cenizas","Resguardo Urna","Traslado","Aniversario Luctuoso"];
-const UBICACIONES=["Apodaca","Churubusco","Crematorio","Parque JdJP"];
+const UBICACIONES=["Apodaca","Churubusco","Crematorio","Parque JdJP","Domicilio"];
 const SALAS=["Sala 1","Sala 2","Sala 3"];
 const TIEMPOS=["4H","6H","12H","24H"];
 const PREVISION=["Previsión","Uso Inmediato"];
@@ -42,6 +42,7 @@ fill("serviciosExtra",EXTRAS,"");
 
 const form=document.getElementById("capillasForm");
 const servicio=document.getElementById("servicio");
+const ubicacionServicio=document.getElementById("ubicacion");
 const exequia=document.getElementById("llevaExequia");
 const tipoAtaud=document.getElementById("tipoAtaud");
 const numeroServicio=document.getElementById("numeroServicio");
@@ -109,18 +110,24 @@ function calcAge(){
 function updateRules(){
   const svc=servicio.value;
   const sinVelacion=svc==="Cremación Directa (sin velación)";
+  const domicilio=ubicacionServicio?.value==="Domicilio";
   const renta=svc==="Renta de Capillas";
   const crem=["Cremación","Cremación Directa (con velación)","Cremación Directa (sin velación)"].includes(svc);
   const requierePlaca=document.getElementById("requierePlaca");
   if(crem && requierePlaca) requierePlaca.checked=true;
   const tieneExequia=exequia.checked&&!sinVelacion;
 
-  ["wrapSala","wrapInicio","wrapTermino","wrapExequiaToggle","wrapTiempo"].forEach(id=>toggle(id,!sinVelacion));
+  // En domicilio la velación conserva fechas y exequia, pero no usa sala
+  // ni tiempo de capillas. Los servicios dentro de capillas no cambian.
+  ["wrapInicio","wrapTermino","wrapExequiaToggle"].forEach(id=>toggle(id,!sinVelacion));
+  toggle("wrapSala",!sinVelacion&&!domicilio);
+  toggle("wrapTiempo",!sinVelacion&&!domicilio);
+  toggle("domicilioNota",domicilio);
   toggle("wrapExequia",tieneExequia);
-  setRequired("sala",!sinVelacion);
+  setRequired("sala",!sinVelacion&&!domicilio);
   setRequired("inicio",!sinVelacion);
   setRequired("termino",!sinVelacion);
-  setRequired("tiempoCapillas",!sinVelacion);
+  setRequired("tiempoCapillas",!sinVelacion&&!domicilio);
   setRequired("horaExequia",tieneExequia);
 
   toggle("wrapTipoAtaud",!renta);
@@ -167,6 +174,7 @@ function updateTotal(){
 }
 
 servicio.addEventListener("change",updateRules);
+ubicacionServicio?.addEventListener("change",updateRules);
 prevision?.addEventListener("change",updateRules);
 previsionViOpcionCremacion?.addEventListener("change",updateRules);
 exequia.addEventListener("change",updateRules);
@@ -658,6 +666,7 @@ function rsPayload(){
   const data=new FormData(form);
   const servicioActual=String(data.get("servicio")||"").trim();
   const sinVelacion=servicioActual==="Cremación Directa (sin velación)";
+  const domicilio=String(data.get("ubicacion")||"").trim()==="Domicilio";
   const servicioCremacion=["Cremación","Cremación Directa (con velación)","Cremación Directa (sin velación)"].includes(servicioActual);
   const extrasSeleccionados=selectedExtras();
   // SharePoint tiene "Servicios Extra" como obligatorio.
@@ -673,11 +682,11 @@ function rsPayload(){
     servicio:servicioActual,
     ubicacion:String(data.get("ubicacion")||"").trim(),
     // Cremacion directa sin velacion no usa datos de capilla ni crea evento de velacion.
-    sala:sinVelacion?"":String(data.get("sala")||"").trim(),
+    sala:(sinVelacion||domicilio)?"":String(data.get("sala")||"").trim(),
     inicio:sinVelacion?"":String(document.getElementById("inicio")?.value||""),
     termino:sinVelacion?"":String(document.getElementById("termino")?.value||""),
     llevaExequia:sinVelacion?false:document.getElementById("llevaExequia")?.checked===true,
-    tiempoCapillas:sinVelacion?"":String(data.get("tiempoCapillas")||"").trim(),
+    tiempoCapillas:(sinVelacion||domicilio)?"":String(data.get("tiempoCapillas")||"").trim(),
     horaExequia:sinVelacion?"":String(document.getElementById("horaExequia")?.value||""),
     prevision:String(data.get("prevision")||"").trim(),
     previsionViOpcionCremacion:previsionViOpcionCremacion?.checked===true,
