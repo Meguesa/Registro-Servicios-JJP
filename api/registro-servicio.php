@@ -960,6 +960,31 @@ try {
     }
     $fieldIndex = rs_fields_by_norm(is_array($fieldRows) ? $fieldRows : []);
 
+    // La columna de ubicacion es un Choice de SharePoint. Nunca aceptar
+    // silenciosamente una nueva opcion que la lista no tenga configurada.
+    if ($domicilio) {
+        try {
+            $locationFieldUrl = $siteUrl . "/_api/web/lists/getbytitle('" . $listEsc
+                . "')/fields/getbyinternalnameortitle('field_39')"
+                . '?$select=Choices,FillInChoice,TypeAsString';
+            $choiceMeta = rs_request('GET', $locationFieldUrl, $token)['json'];
+            $available = is_array($choiceMeta['Choices'] ?? null)
+                ? $choiceMeta['Choices'] : [];
+            $fillIn = (bool)($choiceMeta['FillInChoice'] ?? false);
+            if (!$fillIn && !in_array('Domicilio', $available, true)) {
+                rs_json(422, [
+                    'ok' => false,
+                    'message' => 'La ubicacion Domicilio aun no esta habilitada en la columna Ubicacion Servicio Capillas (field_39) de SharePoint. Solicita a Sistemas agregarla antes de registrar este servicio.',
+                ]);
+            }
+        } catch (Throwable $choiceError) {
+            throw new RuntimeException(
+                'No fue posible verificar que Domicilio este habilitado en la columna de SharePoint: '
+                . $choiceError->getMessage(), 0, $choiceError
+            );
+        }
+    }
+
     $sp = [];
     rs_add_value($sp, $fieldIndex, ['ModoPrueba', 'Modo Prueba'], $isTestMode, false);
     rs_add_value($sp, $fieldIndex, ['field_1', 'Numero de Referencia', 'Número de Referencia'], trim((string) ($payload['numeroReferencia'] ?? '')));
