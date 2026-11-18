@@ -126,7 +126,7 @@ $capillasJsVersion = is_file(__DIR__ . '/assets/js/capillas.js') ? (string)filem
         <label>Titular Responsable<input name="titular" placeholder="Ej. Juan Pérez González" required></label>
         <label>Prefijo
           <select name="prefijo" id="prefijo">
-            <option value="">Automático</option>
+            <option value="">Sin prefijo (predeterminado)</option>
             <option value="Sr.">Sr.</option>
             <option value="Sra.">Sra.</option>
             <option value="Srta.">Srta.</option>
