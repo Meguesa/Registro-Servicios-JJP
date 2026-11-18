@@ -14,6 +14,7 @@ on:
       - 'includes/registro-qr-generator.php'
       - 'tests/esquela-qr-local.php'
       - 'tests/esquela-estilo-correo.php'
+      - 'tests/esquela-prefijo-explicito.php'
       - 'tests/registro-publicado-archivos.php'
       - 'assets/js/mis-servicios.js'
       - 'includes/registro-storage.php'
@@ -45,6 +46,7 @@ jobs:
           php -l includes/registro-qr-generator.php
           php -l tests/esquela-qr-local.php
           php -l tests/esquela-estilo-correo.php
+          php -l tests/esquela-prefijo-explicito.php
           php -l tests/registro-publicado-archivos.php
           php -l api/mis-servicios-api.php
           php -l includes/registro-storage.php
@@ -57,6 +59,8 @@ jobs:
         run: php tests/esquela-qr-local.php
       - name: Validar esquela y tipografia originales del correo
         run: php tests/esquela-estilo-correo.php
+      - name: Validar prefijo opcional de esquela
+        run: php tests/esquela-prefijo-explicito.php
       - name: Verificar reglas de Inhumacion a Domicilio
         run: php tests/ubicacion-domicilio.php
       - name: Revisar sintaxis JavaScript
