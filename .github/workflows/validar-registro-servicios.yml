@@ -5,6 +5,10 @@ on:
       - 'api/publicado-detalle.php'
       - 'api/mis-servicios-api.php'
       - 'api/registro-servicio.php'
+      - 'capillas.php'
+      - 'assets/js/capillas.js'
+      - 'docs/CAPILLAS_RULES.md'
+      - 'tests/ubicacion-domicilio.php'
       - 'includes/registro-publicado-archivos.php'
       - 'includes/registro-esquela.php'
       - 'includes/registro-qr-generator.php'
@@ -34,6 +38,8 @@ jobs:
         run: |
           php -l api/publicado-detalle.php
           php -l api/registro-servicio.php
+          php -l capillas.php
+          php -l tests/ubicacion-domicilio.php
           php -l includes/registro-publicado-archivos.php
           php -l includes/registro-esquela.php
           php -l includes/registro-qr-generator.php
@@ -51,8 +57,12 @@ jobs:
         run: php tests/esquela-qr-local.php
       - name: Validar esquela y tipografia originales del correo
         run: php tests/esquela-estilo-correo.php
+      - name: Verificar reglas de Inhumacion a Domicilio
+        run: php tests/ubicacion-domicilio.php
       - name: Revisar sintaxis JavaScript
-        run: node --check assets/js/mis-servicios.js
+        run: |
+          node --check assets/js/mis-servicios.js
+          node --check assets/js/capillas.js
       - name: Verificar separacion de reenvio y tablas
         run: |
           grep -q "isset(\$_GET\['tablas'\])" api/publicado-detalle.php
