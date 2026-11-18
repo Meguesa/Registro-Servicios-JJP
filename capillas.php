@@ -91,8 +91,9 @@ $capillasJsVersion = is_file(__DIR__ . '/assets/js/capillas.js') ? (string)filem
       <div class="form-grid grid-2">
         <label>Número de Referencia<input name="numeroReferencia" placeholder="Ej. 1957, AF2054" required></label>
         <label>Tipo de Servicio<select name="servicio" id="servicio" required></select></label>
-        <label>Ubicación Servicio Capillas<select name="ubicacion" id="ubicacion" required></select></label>
+        <label>Ubicación del servicio<select name="ubicacion" id="ubicacion" required></select></label>
         <label id="wrapSala">Sala<select name="sala" id="sala"></select></label>
+        <div id="domicilioNota" class="span-2 hidden" role="status" style="font-size:13px;color:#654321;">Servicio de inhumación en domicilio: no se requiere sala ni tiempo de capillas. Captura las fechas de inicio y término normalmente.</div>
         <label id="wrapInicio">Fecha y Hora Inicio<input type="text" name="inicio" id="inicio" class="datetime-picker" placeholder="Ej. 21/09/2026 12:00" autocomplete="off"></label>
         <label id="wrapTermino">Fecha y Hora Término<input type="text" name="termino" id="termino" class="datetime-picker" placeholder="Ej. 21/09/2026 22:00" autocomplete="off"></label>
         <label id="wrapTiempo">Tiempo de Capillas<select name="tiempoCapillas" id="tiempoCapillas"></select></label>
