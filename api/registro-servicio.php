@@ -726,12 +726,11 @@ try {
         )));
     }
 
-    // Inhumacion en domicilio conserva las fechas y operacion, pero no tiene
-    // sala ni tiempo de uso de capillas. No es un servicio distinto.
+    // Ubicacion y tipo de servicio son campos independientes: Domicilio
+    // es valido para Inhumacion, Cremacion y cualquier otro tipo de servicio.
+    // Solo se omiten Sala y Tiempo de Capillas, sin modificar reglas de
+    // crematorio, inhumacion o fechas del tipo de servicio seleccionado.
     $domicilio = trim((string)($payload['ubicacion'] ?? '')) === 'Domicilio';
-    if ($domicilio && $service !== 'Inhumación') {
-        rs_json(422, ['ok'=>false,'message'=>'Domicilio solo puede seleccionarse para el servicio Inhumación.']);
-    }
     if ($domicilio) {
         $payload['sala'] = '';
         $payload['tiempoCapillas'] = '';
