@@ -726,6 +726,17 @@ try {
         )));
     }
 
+    // Inhumacion en domicilio conserva las fechas y operacion, pero no tiene
+    // sala ni tiempo de uso de capillas. No es un servicio distinto.
+    $domicilio = trim((string)($payload['ubicacion'] ?? '')) === 'Domicilio';
+    if ($domicilio && $service !== 'Inhumación') {
+        rs_json(422, ['ok'=>false,'message'=>'Domicilio solo puede seleccionarse para el servicio Inhumación.']);
+    }
+    if ($domicilio) {
+        $payload['sala'] = '';
+        $payload['tiempoCapillas'] = '';
+    }
+
     $sinVelacion = $service === 'Cremación Directa (sin velación)';
     $rentaCapillas = $service === 'Renta de Capillas';
     $esCremacion = in_array($service, [
@@ -735,7 +746,7 @@ try {
     ], true);
 
     if (!$sinVelacion) {
-        foreach (['sala','inicio','termino','tiempoCapillas'] as $key) {
+        foreach ($domicilio ? ['inicio','termino'] : ['sala','inicio','termino','tiempoCapillas'] as $key) {
             if (trim((string) ($payload[$key] ?? '')) === '') {
                 rs_json(422, ['ok' => false, 'message' => 'Falta el campo obligatorio: ' . $key . '.']);
             }
