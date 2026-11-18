@@ -137,17 +137,17 @@ function rs_esquela_background_key(array $payload): string
 
 function rs_esquela_prefix(array $payload): string
 {
-    $age = max(0, (int)($payload['edad'] ?? 0));
-    $sex = rs_esquela_norm((string)($payload['sexo'] ?? ''));
-    $female = str_contains($sex, 'femen') || $sex === 'f' || str_contains($sex, 'mujer');
+    // El prefijo es una eleccion explicita del usuario. Nunca deducirlo
+    // a partir del sexo, edad u otros datos del fallecido.
+    $prefix = trim((string)($payload['prefijo'] ?? ''));
+    $normalized = rs_esquela_norm($prefix);
+    if ($normalized === '' || in_array($normalized, [
+        'automatico', 'sin prefijo', 'ninguno', 'no aplica',
+    ], true)) {
+        return '';
+    }
 
-    if ($age <= 5) {
-        return $female ? 'Niña' : 'Niño';
-    }
-    if ($age < 20) {
-        return $female ? 'La Joven' : 'El Joven';
-    }
-    return $female ? 'Sra.' : 'Sr.';
+    return $prefix;
 }
 
 function rs_esquela_location_name(string $ubicacion): string
@@ -769,7 +769,8 @@ function rs_generate_local_esquela(array $payload, ?string $photoBytes = null, ?
 
     $y = $S(300);
     $y = rs_esquela_center_text($canvas, 'Informamos el sensible fallecimiento', $y, $S(640), $black, $font, $FS(21), $S(27));
-    $y = rs_esquela_center_text($canvas, 'de ' . $prefix . ' ' . $name, $y, $S(640), $black, $bold, $FS(22), $S(28), true);
+    $displayName = $prefix !== '' ? $prefix . ' ' . $name : $name;
+    $y = rs_esquela_center_text($canvas, 'de ' . $displayName, $y, $S(640), $black, $bold, $FS(22), $S(28), true);
     $y = rs_esquela_center_text($canvas, 'a la edad de ' . $age . ' años.', $y, $S(640), $black, $font, $FS(21), $S(27));
 
     rs_esquela_draw_ribbon($canvas, $S(360), $y + $S(39), $S(80), is_string($assets['crespon'] ?? null) ? $assets['crespon'] : null);
