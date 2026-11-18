@@ -15,12 +15,13 @@ Documento derivado del comportamiento actual de Power Apps y de la configuració
 - Required: \`!varSinVelacion\`
 - Si no aplica, se guarda vacío.
 
-### Inhumación con ubicación Domicilio
-- Servicio: `Inhumación` (no se modifica el tipo ni el código VI).
-- Ubicación Servicio Capillas: opción `Domicilio` exclusiva para `Inhumación`.
-- `Sala` y `Tiempo de Capillas`: ocultos, no obligatorios y se guardan vacíos.
-- Fechas y horas `Inicio` / `Término`: siguen siendo obligatorias.
-- `Fecha y Hora Inhumación`, destino final, exequia (si aplica), documentos, correos y calendario: mismos flujos existentes.
+### Ubicación Domicilio para cualquier tipo de servicio
+- `Domicilio` es una **ubicación**, no un tipo de servicio nuevo.
+- Puede elegirse independientemente de `Inhumación`, `Cremación`, `Cremación Directa` u otros tipos del selector.
+- `Sala` y `Tiempo de Capillas`: ocultos, no obligatorios y se guardan vacíos para `Domicilio`.
+- Las fechas `Inicio` y `Término` conservan las reglas propias del tipo de servicio. `Cremación Directa (sin velación)` sigue sin pedirlas.
+- Los datos propios de inhumación, crematorio, exequia (si aplica), destino final, documentos, correos y calendario conservan sus reglas actuales.
+- Se mantiene el código original del tipo de servicio (por ejemplo, `VI` para Inhumación, `VC` para Cremación).
 - **Requisito de SharePoint antes de usar la opción:** agregar `Domicilio` a la columna de opciones `Ubicación Servicio Capillas` (`field_39`) en la lista `Eventos Capillas` del sitio Operaciones. El despliegue de código no modifica las opciones de la columna.
 - No se crea un campo de dirección postal nuevo con este cambio; `Ubicación de Rescate` y `Ubicación Destino Final` conservan su significado anterior.
 
